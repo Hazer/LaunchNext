@@ -589,7 +589,7 @@ struct LaunchpadView: View {
             .scaleEffect(appStore.shouldShowOnboarding ? 1 : postOnboardingGridScale)
 
             // Merged PageIndicator - add tap to jump to page
-            if !appStore.shouldShowOnboarding && pages.count > 1 {
+            if !appStore.shouldShowOnboarding && pages.count > 1 && appStore.layoutMode == .paged {
                 HStack(spacing: 8) {
                     ForEach(0..<pages.count, id: \.self) { index in
                         Circle()

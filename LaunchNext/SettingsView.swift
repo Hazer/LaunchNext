@@ -2779,6 +2779,12 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             loginLayoutCard
                 .padding(.top, -10)
 
+            searchStrategyCard
+                .padding(.top, -10)
+
+            layoutModeCard
+                .padding(.top, -10)
+
             Text(appStore.localized(.lockLayoutDescription))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -2819,6 +2825,81 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         .foregroundStyle(Color.red)
                 }
             }
+        }
+    }
+
+    private var searchStrategyCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(appStore.localized(.searchStrategyTitle))
+                .font(.subheadline.weight(.semibold))
+
+            Picker("", selection: $appStore.searchStrategyType) {
+                ForEach(SearchStrategyType.allCases) { type in
+                    Text(type.displayName).tag(type)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+
+            if appStore.searchStrategyType == .debounce {
+                HStack {
+                    Text(appStore.localized(.searchDebounceMsLabel))
+                        .font(.subheadline)
+                    Spacer()
+                    Text("\(appStore.searchDebounceMs)ms")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 50, alignment: .trailing)
+                }
+                Slider(
+                    value: Binding(
+                        get: { Double(appStore.searchDebounceMs) },
+                        set: { appStore.searchDebounceMs = Int($0) }
+                    ),
+                    in: Double(AppStore.searchDebounceMsRange.lowerBound)...Double(AppStore.searchDebounceMsRange.upperBound)
+                )
+            } else if appStore.searchStrategyType == .throttle {
+                HStack {
+                    Text(appStore.localized(.searchThrottleMsLabel))
+                        .font(.subheadline)
+                    Spacer()
+                    Text("\(appStore.searchThrottleMs)ms")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 50, alignment: .trailing)
+                }
+                Slider(
+                    value: Binding(
+                        get: { Double(appStore.searchThrottleMs) },
+                        set: { appStore.searchThrottleMs = Int($0) }
+                    ),
+                    in: Double(AppStore.searchThrottleMsRange.lowerBound)...Double(AppStore.searchThrottleMsRange.upperBound)
+                )
+
+                HStack {
+                    Text(appStore.localized(.searchThrottleLatestTitle))
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Toggle("", isOn: $appStore.searchThrottleLatest)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+            }
+        }
+    }
+
+    private var layoutModeCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(appStore.localized(.layoutModeTitle))
+                .font(.subheadline.weight(.semibold))
+
+            Picker("", selection: $appStore.layoutMode) {
+                ForEach(LayoutMode.allCases) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
         }
     }
 

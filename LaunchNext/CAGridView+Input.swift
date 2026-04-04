@@ -77,6 +77,12 @@ extension CAGridView {
     }
 
     func handleScrollWheel(with event: NSEvent) {
+        // Vertical mode: CAGridView manages scrolling itself
+        if isVerticalMode {
+            handleVerticalScrollWheel(with: event)
+            return
+        }
+
         // 优先使用水平滑动，如果没有则用垂直滑动（反向）
         let deltaX = event.scrollingDeltaX
         let deltaY = event.scrollingDeltaY
@@ -236,6 +242,165 @@ extension CAGridView {
         return offset >= 0 ? scaled : -scaled
     }
 
+    // MARK: - Vertical Scroll Handling
+
+    func handleVerticalScrollWheel(with event: NSEvent) {
+        guard bounds.height > 0 else { return }
+
+        // Calculate content dimensions
+        let labelHeight: CGFloat = showLabels ? (labelFontSize + 8) : 0
+        let labelTopSpacing: CGFloat = showLabels ? 6 : 0
+        let rowHeight = iconSize + labelTopSpacing + labelHeight
+        let totalRows = (items.count + columns - 1) / columns
+        let contentHeight = CGFloat(totalRows) * rowHeight + CGFloat(max(totalRows - 1, 0)) * rowSpacing
+        let totalContainerHeight = max(contentHeight + contentInsets.top + contentInsets.bottom, bounds.height)
+
+        // Scroll boundaries
+        let maxScrollDown = bounds.height - totalContainerHeight  // negative
+        let minScrollOffset = min(0, maxScrollDown)
+
+        let deltaY = event.scrollingDeltaY
+        let isPrecise = event.hasPreciseScrollingDeltas
+
+        // macOS natural scroll: swipe down = positive deltaY = content moves up
+        // scrollOffset decreases to scroll down (show content below)
+
+        if isPrecise {
+            // Trackpad / Magic Mouse: smooth scrolling with momentum
+            let scaledDelta = deltaY
+
+            if event.phase != [] {
+                // Gesture phase events
+                switch event.phase {
+                case .began:
+                    isDragging = true
+                    isScrollAnimating = false
+                    dragStartOffset = scrollOffset
+                    targetScrollOffset = scrollOffset  // sync target so animation doesn't fight
+                    accumulatedDelta = 0
+                    scrollVelocity = 0
+
+                case .changed:
+                    accumulatedDelta += scaledDelta
+                    var newOffset = dragStartOffset - accumulatedDelta
+
+                    // Rubber-banding at boundaries
+                    if newOffset > 0 {
+                        newOffset = rubberBand(newOffset, limit: bounds.height * 0.2)
+                    } else if newOffset < minScrollOffset {
+                        let overscroll = newOffset - minScrollOffset
+                        newOffset = minScrollOffset + rubberBand(overscroll, limit: bounds.height * 0.2)
+                    }
+
+                    scrollOffset = newOffset
+                    updateVerticalContainerPosition(totalContainerHeight: totalContainerHeight)
+
+                case .ended, .cancelled:
+                    isDragging = false
+                    // Velocity will be applied via momentumPhase events
+                    // If no momentum events follow, snap to boundary
+                    if scrollOffset > 0 || scrollOffset < minScrollOffset {
+                        targetScrollOffset = scrollOffset > 0 ? 0 : minScrollOffset
+                        isScrollAnimating = true
+                    }
+
+                default:
+                    break
+                }
+            }
+
+            if event.momentumPhase != [] {
+                // Momentum phase events (delivered after fingers lift)
+                switch event.momentumPhase {
+                case .began:
+                    isScrollAnimating = false
+
+                case .changed:
+                    var newOffset = scrollOffset - scaledDelta
+
+                    // Rubber-banding during momentum
+                    if newOffset > 0 {
+                        newOffset = rubberBand(newOffset, limit: bounds.height * 0.2)
+                    } else if newOffset < minScrollOffset {
+                        let overscroll = newOffset - minScrollOffset
+                        newOffset = minScrollOffset + rubberBand(overscroll, limit: bounds.height * 0.2)
+                    }
+
+                    scrollOffset = newOffset
+                    updateVerticalContainerPosition(totalContainerHeight: totalContainerHeight)
+
+                case .ended, .cancelled:
+                    // Momentum finished — snap back if overscrolled
+                    if scrollOffset > 0 || scrollOffset < minScrollOffset {
+                        targetScrollOffset = scrollOffset > 0 ? 0 : minScrollOffset
+                        isScrollAnimating = true
+                    }
+
+                default:
+                    break
+                }
+            }
+        } else {
+            // Mouse wheel: discrete scrolling
+            let baseline = max(AppStore.defaultScrollSensitivity, 0.0001)
+            let sensitivityScale = CGFloat(max(scrollSensitivity, 0.0001) / baseline)
+            let step = deltaY * sensitivityScale * 3
+
+            var newOffset = scrollOffset - step
+
+            // Rubber-banding
+            if newOffset > 0 {
+                newOffset = rubberBand(newOffset, limit: bounds.height * 0.15)
+            } else if newOffset < minScrollOffset {
+                let overscroll = newOffset - minScrollOffset
+                newOffset = minScrollOffset + rubberBand(overscroll, limit: bounds.height * 0.15)
+            }
+
+            scrollOffset = newOffset
+            updateVerticalContainerPosition(totalContainerHeight: totalContainerHeight)
+
+            // Snap back after a short delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                self?.clampVerticalScrollOffset()
+            }
+        }
+    }
+
+    private func updateVerticalContainerPosition(totalContainerHeight: CGFloat) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        pageContainerLayer.frame = CGRect(x: 0, y: scrollOffset, width: bounds.width, height: totalContainerHeight)
+        CATransaction.commit()
+    }
+
+    func clampVerticalScrollOffset() {
+        guard isVerticalMode, bounds.height > 0 else { return }
+
+        let labelHeight: CGFloat = showLabels ? (labelFontSize + 8) : 0
+        let labelTopSpacing: CGFloat = showLabels ? 6 : 0
+        let rowHeight = iconSize + labelTopSpacing + labelHeight
+        let totalRows = (items.count + columns - 1) / columns
+        let contentHeight = CGFloat(totalRows) * rowHeight + CGFloat(max(totalRows - 1, 0)) * rowSpacing
+        let totalContainerHeight = max(contentHeight + contentInsets.top + contentInsets.bottom, bounds.height)
+
+        let maxScrollDown = bounds.height - totalContainerHeight
+        let minScrollOffset = min(0, maxScrollDown)
+
+        // Check if we need to animate back to boundary
+        let needsClamp = scrollOffset > 0 || scrollOffset < minScrollOffset
+        guard needsClamp else { return }
+
+        let targetOffset: CGFloat
+        if scrollOffset > 0 {
+            targetOffset = 0
+        } else {
+            targetOffset = minScrollOffset
+        }
+
+        targetScrollOffset = targetOffset
+        isScrollAnimating = true
+    }
+
     override func mouseDown(with event: NSEvent) {
         guard !externalAppDragSessionActive else { return }
         // 确保成为第一响应者，这样后续的滚轮事件才能被接收
@@ -262,12 +427,13 @@ extension CAGridView {
                 longPressTimer = timer
             }
         } else {
-            // 点击空白区域 - 开始页面拖拽模式
-            // print("🖱️ [CAGrid] Hit empty area, starting page drag")
-            isPageDragging = true
-            pageDragStartX = location.x
-            pageDragStartOffset = scrollOffset
-            dragStartPoint = location
+            // 点击空白区域 - 开始页面拖拽模式 (only in paged mode)
+            if !isVerticalMode {
+                isPageDragging = true
+                pageDragStartX = location.x
+                pageDragStartOffset = scrollOffset
+                dragStartPoint = location
+            }
         }
     }
 
@@ -1201,6 +1367,7 @@ extension CAGridView {
     }
 
     func hardSnapToCurrentPage() {
+        guard !isVerticalMode else { return }
         guard bounds.width > 0 else { return }
         resetScrollInteractionState()
         isScrollAnimating = false
