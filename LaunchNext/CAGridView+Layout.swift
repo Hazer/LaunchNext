@@ -475,6 +475,8 @@ extension CAGridView {
 
             // Update container layer to cover the view bounds
             containerLayer.frame = bounds
+            fadeMaskLayer.frame = containerLayer.bounds
+            fadeMaskLayer.isHidden = false
             
             // Update pageContainerLayer position - Y based on scrollOffset
             CATransaction.begin()
@@ -482,6 +484,7 @@ extension CAGridView {
             pageContainerLayer.frame = CGRect(x: 0, y: scrollOffset, width: bounds.width, height: totalContainerHeight)
             CATransaction.commit()
         } else {
+            fadeMaskLayer.isHidden = true
             // Clamp currentPage to valid range after items/pageCount might have changed
             let validPage = max(0, min(pageCount - 1, currentPage))
             if validPage != currentPage {

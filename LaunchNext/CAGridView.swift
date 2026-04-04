@@ -20,6 +20,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     var containerLayer: CALayer!
     var pageContainerLayer: CALayer!
     var iconLayers: [[CALayer]] = []  // [page][item]
+    let fadeMaskLayer = CAGradientLayer()
 
     // 网格配置
     var columns: Int = 7 { didSet { rebuildLayers() } }
@@ -253,6 +254,20 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
         containerLayer.frame = bounds
         containerLayer.masksToBounds = false  // 不裁剪，让滑动时内容可以超出边界
         layer?.addSublayer(containerLayer)
+
+        // Top/bottom fade mask (vertical scroll mode only)
+        // Fades icons near search bar at top and clips softly at bottom
+        fadeMaskLayer.colors = [
+            NSColor.clear.cgColor,
+            NSColor.white.cgColor,
+            NSColor.white.cgColor,
+            NSColor.clear.cgColor
+        ]
+        fadeMaskLayer.locations = [0, 0.12, 0.92, 1.0]
+        fadeMaskLayer.startPoint = CGPoint(x: 0.5, y: 1)
+        fadeMaskLayer.endPoint = CGPoint(x: 0.5, y: 0)
+        fadeMaskLayer.isHidden = true
+        containerLayer.mask = fadeMaskLayer
 
         // 页面容器层（用于整体偏移）
         pageContainerLayer = CALayer()
