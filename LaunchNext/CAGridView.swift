@@ -57,8 +57,27 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
 
     // 分页
     var currentPage: Int = 0
-    var itemsPerPage: Int { columns * rows }
-    var pageCount: Int { max(1, (items.count + itemsPerPage - 1) / itemsPerPage) }
+    var itemsPerPage: Int {
+        layoutStrategy.itemsPerPage(columns: columns, rows: rows)
+    }
+    var pageCount: Int {
+        layoutStrategy.pageCount(totalItems: items.count, columns: columns, rows: rows)
+    }
+
+    // Layout strategy
+    var layoutMode: LayoutMode = .paged {
+        didSet {
+            guard layoutMode != oldValue else { return }
+            rebuildLayers()
+        }
+    }
+    var layoutStrategy: LayoutStrategy {
+        switch layoutMode {
+        case .paged: return PagedLayoutStrategy()
+        case .vertical: return VerticalLayoutStrategy()
+        }
+    }
+    var isVerticalMode: Bool { layoutMode == .vertical }
 
     // 滚动状态
     var scrollOffset: CGFloat = 0
@@ -116,6 +135,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     var batchSelectAppsMenuTitle: String = "Batch Select Apps"
     var finishBatchSelectionMenuTitle: String = "Finish Batch Selection"
     var canUseConfiguredUninstallTool: Bool = false
+    weak var appStore: AppStore?
     var contextMenuTargetApp: AppInfo?
     var contextMenuTargetFolder: FolderInfo?
     var allowsBatchSelectionMode: Bool = true {
@@ -490,11 +510,23 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
             }
         }
 
-        // 更新页面容器位置 - 使用最小开销的方式
+        // 更新页面容器位置
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         CATransaction.setAnimationDuration(0)
-        pageContainerLayer.transform = CATransform3DMakeTranslation(scrollOffset, 0, 0)
+        if isVerticalMode {
+            // Vertical mode: update pageContainerLayer frame Y position
+            let labelHeight: CGFloat = showLabels ? (labelFontSize + 8) : 0
+            let labelTopSpacing: CGFloat = showLabels ? 6 : 0
+            let rowHeight = iconSize + labelTopSpacing + labelHeight
+            let totalRows = (items.count + columns - 1) / columns
+            let contentHeight = CGFloat(totalRows) * rowHeight + CGFloat(max(totalRows - 1, 0)) * rowSpacing
+            let totalContainerHeight = max(contentHeight + contentInsets.top + contentInsets.bottom, bounds.height)
+            pageContainerLayer.frame = CGRect(x: 0, y: scrollOffset, width: bounds.width, height: totalContainerHeight)
+        } else {
+            // Paged mode: use transform for horizontal scrolling
+            pageContainerLayer.transform = CATransform3DMakeTranslation(scrollOffset, 0, 0)
+        }
         CATransaction.commit()
     }
 
@@ -580,6 +612,8 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     }
 
     func navigateToPage(_ page: Int, animated: Bool = true) {
+        guard !isVerticalMode else { return }
+
         let newPage = max(0, min(pageCount - 1, page))
         let pageChanged = newPage != currentPage
         currentPage = newPage
@@ -721,6 +755,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     }
 
     func snapToCurrentPageIfNeeded() {
+        guard !isVerticalMode else { return }
         // 如果用户正在拖拽或动画正在进行，不要强制 snap
         guard !isDragging && !isScrollAnimating && !isPageDragging else { return }
         guard bounds.width > 0 else { return }
@@ -744,6 +779,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     }
 
     func forceSyncPageTransformIfNeeded() {
+        guard !isVerticalMode else { return }
         guard bounds.width > 0 else { return }
         let pageStride = bounds.width + pageSpacing
         let expectedOffset = -CGFloat(currentPage) * pageStride

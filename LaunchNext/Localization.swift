@@ -450,6 +450,28 @@ enum LocalizationKey: String {
     case updaterMissingBinary
     case updaterNotExecutable
     case updaterHoldPrompt
+
+    // Search Strategy
+    case searchStrategyTitle
+    case searchStrategyDescription
+    case searchStrategyDebounce
+    case searchStrategyThrottle
+    case searchStrategyInstant
+    case searchDebounceMsLabel
+    case searchThrottleMsLabel
+    case searchThrottleLatestTitle
+
+    // Layout Mode
+    case layoutModeTitle
+    case layoutModePaged
+    case layoutModeVerticalScroll
+
+    // Context Menu Actions
+    case contextMenuShowInFinder
+    case contextMenuAddToDock
+    case contextMenuGetInfo
+    case contextMenuHideFromLaunchNext
+    case contextMenuUninstall
 }
 
 final class LocalizationManager {
@@ -690,7 +712,29 @@ final class LocalizationManager {
                 .updaterLaunchFailed: "Failed to start updater (%@).",
                 .updaterMissingBinary: "Updater binary not found in the app bundle.",
                 .updaterNotExecutable: "Updater binary is not executable.",
-            .updaterHoldPrompt: "Press Enter to close this window. LaunchNext will reopen automatically."
+            .updaterHoldPrompt: "Press Enter to close this window. LaunchNext will reopen automatically.",
+
+                // Search Strategy
+                .searchStrategyTitle: "Search Strategy",
+                .searchStrategyDescription: "Choose how search input is processed.",
+                .searchStrategyDebounce: "Debounce",
+                .searchStrategyThrottle: "Throttle",
+                .searchStrategyInstant: "Instant",
+                .searchDebounceMsLabel: "Debounce delay",
+                .searchThrottleMsLabel: "Throttle interval",
+                .searchThrottleLatestTitle: "Emit latest value",
+
+                // Layout Mode
+                .layoutModeTitle: "Layout Mode",
+                .layoutModePaged: "Paged",
+                .layoutModeVerticalScroll: "Vertical Scroll",
+
+                // Context Menu Actions
+                .contextMenuShowInFinder: "Show in Finder",
+                .contextMenuAddToDock: "Add to Dock",
+                .contextMenuGetInfo: "Get Info",
+                .contextMenuHideFromLaunchNext: "Hide from LaunchNext",
+                .contextMenuUninstall: "Uninstall"
         ],
         .portugueseBrazil: [
             .noAppsFound: "Nenhum app encontrado",

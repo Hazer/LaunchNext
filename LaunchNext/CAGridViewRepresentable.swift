@@ -49,6 +49,7 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         view.activePressScale = CGFloat(appStore.activePressScale)
         view.animationsEnabled = appStore.enableAnimations
         view.animationDuration = appStore.animationDuration
+        view.layoutMode = appStore.layoutMode
         view.dockDragEnabled = appStore.dockDragEnabled
         view.dockDragSide = appStore.dockDragSide
         view.externalAppDragTriggerDistance = CGFloat(appStore.dockDragTriggerDistance)
@@ -58,6 +59,7 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         view.batchSelectAppsMenuTitle = appStore.localized(.contextMenuBatchSelectApps)
         view.finishBatchSelectionMenuTitle = appStore.localized(.contextMenuFinishBatchSelection)
         view.canUseConfiguredUninstallTool = appStore.uninstallToolAppURL != nil
+        view.appStore = appStore
         view.allowsBatchSelectionMode = appStore.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         
         // Set current page BEFORE items to ensure correct initial position
@@ -199,7 +201,6 @@ struct CAGridViewRepresentable: NSViewRepresentable {
 
     func updateNSView(_ nsView: CAGridView, context: Context) {
         // print("🔄 [CAGrid #\(nsView.debugInstanceId)] updateNSView, window=\(nsView.window != nil), isVisible=\(nsView.window?.isVisible ?? false)")
-        // 确保滚轮事件监听器已安装（窗口重新显示时需要）
         nsView.ensureScrollMonitorInstalled()
 
         // 更新配置
@@ -246,6 +247,7 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         nsView.activePressScale = CGFloat(appStore.activePressScale)
         nsView.animationsEnabled = appStore.enableAnimations
         nsView.animationDuration = appStore.animationDuration
+        nsView.layoutMode = appStore.layoutMode
         nsView.isScrollEnabled = appStore.openFolder == nil && !appStore.isSetting
         nsView.hideAppMenuTitle = appStore.localized(.hiddenAppsAddButton)
         nsView.dissolveFolderMenuTitle = appStore.localized(.contextMenuDissolveFolder)

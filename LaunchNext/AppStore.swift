@@ -355,6 +355,11 @@ final class AppStore: ObservableObject {
     private static let voiceFeedbackEnabledKey = "voiceFeedbackEnabled"
     static let folderDropZoneScaleKey = "folderDropZoneScale"
     static let pageIndicatorTopPaddingKey = "pageIndicatorTopPadding"
+    static let searchStrategyTypeKey = "searchStrategyType"
+    static let searchDebounceMsKey = "searchDebounceMs"
+    static let searchThrottleMsKey = "searchThrottleMs"
+    static let searchThrottleLatestKey = "searchThrottleLatest"
+    static let layoutModeKey = "layoutMode"
     static let onboardingVersionKey = "onboardingVersionShown"
     static let currentOnboardingVersion = 1
     static let dockDragTriggerDistanceRange: ClosedRange<Double> = 8...72
@@ -707,6 +712,82 @@ final class AppStore: ObservableObject {
     }
     @Published var searchText: String = ""
     @Published private(set) var searchQuery: String = ""
+
+    // MARK: - Search Strategy
+
+    @Published var searchStrategyType: SearchStrategyType = {
+        if let raw = UserDefaults.standard.string(forKey: searchStrategyTypeKey),
+           let type = SearchStrategyType(rawValue: raw) {
+            return type
+        }
+        return .debounce
+    }() {
+        didSet {
+            guard searchStrategyType != oldValue else { return }
+            UserDefaults.standard.set(searchStrategyType.rawValue, forKey: Self.searchStrategyTypeKey)
+            setupSearchPipeline()
+        }
+    }
+
+    @Published var searchDebounceMs: Int = {
+        let stored = UserDefaults.standard.integer(forKey: searchDebounceMsKey)
+        return stored > 0 ? stored : 500
+    }() {
+        didSet {
+            guard searchDebounceMs != oldValue else { return }
+            UserDefaults.standard.set(searchDebounceMs, forKey: Self.searchDebounceMsKey)
+            if searchStrategyType == .debounce { setupSearchPipeline() }
+        }
+    }
+
+    @Published var searchThrottleMs: Int = {
+        let stored = UserDefaults.standard.integer(forKey: searchThrottleMsKey)
+        return stored > 0 ? stored : 50
+    }() {
+        didSet {
+            guard searchThrottleMs != oldValue else { return }
+            UserDefaults.standard.set(searchThrottleMs, forKey: Self.searchThrottleMsKey)
+            if searchStrategyType == .throttle { setupSearchPipeline() }
+        }
+    }
+
+    @Published var searchThrottleLatest: Bool = {
+        if UserDefaults.standard.object(forKey: searchThrottleLatestKey) == nil { return true }
+        return UserDefaults.standard.bool(forKey: searchThrottleLatestKey)
+    }() {
+        didSet {
+            guard searchThrottleLatest != oldValue else { return }
+            UserDefaults.standard.set(searchThrottleLatest, forKey: Self.searchThrottleLatestKey)
+            if searchStrategyType == .throttle { setupSearchPipeline() }
+        }
+    }
+
+    static let searchDebounceMsRange: ClosedRange<Int> = 100...1000
+    static let searchThrottleMsRange: ClosedRange<Int> = 16...500
+
+    var currentSearchStrategy: SearchStrategy {
+        switch searchStrategyType {
+        case .debounce:
+            return DebounceStrategy(milliseconds: searchDebounceMs)
+        case .throttle:
+            return ThrottleStrategy(milliseconds: searchThrottleMs, emitLatest: searchThrottleLatest)
+        case .instant:
+            return InstantStrategy()
+        }
+    }
+
+    private var searchCancellable: AnyCancellable?
+
+    func setupSearchPipeline() {
+        searchCancellable?.cancel()
+
+        searchCancellable = currentSearchStrategy
+            .apply(to: $searchText.removeDuplicates())
+            .sink { [weak self] value in
+                self?.searchQuery = value
+            }
+    }
+
     @Published var isStartOnLogin: Bool = {
         if #available(macOS 13.0, *) {
             return SMAppService.mainApp.status == .enabled
@@ -1223,6 +1304,28 @@ final class AppStore: ObservableObject {
                 performanceMode = .lean
             }
             UserDefaults.standard.set(useCAGridRenderer, forKey: Self.useCAGridRendererKey)
+        }
+    }
+
+    // MARK: - Layout Mode
+
+    @Published var layoutMode: LayoutMode = {
+        if let raw = UserDefaults.standard.string(forKey: layoutModeKey),
+           let mode = LayoutMode(rawValue: raw) {
+            return mode
+        }
+        return .paged
+    }() {
+        didSet {
+            guard layoutMode != oldValue else { return }
+            UserDefaults.standard.set(layoutMode.rawValue, forKey: Self.layoutModeKey)
+        }
+    }
+
+    var layoutStrategy: LayoutStrategy {
+        switch layoutMode {
+        case .paged: return PagedLayoutStrategy()
+        case .vertical: return VerticalLayoutStrategy()
         }
     }
 
@@ -2378,13 +2481,7 @@ final class AppStore: ObservableObject {
 
         setupVolumeObservers()
 
-        $searchText
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
-            .removeDuplicates()
-            .sink { [weak self] value in
-                self?.searchQuery = value
-            }
-            .store(in: &cancellables)
+        setupSearchPipeline()
 
         searchQuery = searchText
 

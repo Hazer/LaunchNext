@@ -256,87 +256,127 @@ extension CAGridView {
 
         let pageWidth = bounds.width
         let pageHeight = bounds.height
-        let pageStride = pageWidth + pageSpacing
 
         let availableWidth = max(0, pageWidth - contentInsets.left - contentInsets.right)
         let availableHeight = max(0, pageHeight - contentInsets.top - contentInsets.bottom)
 
         let totalColumnSpacing = columnSpacing * CGFloat(max(columns - 1, 0))
-        let totalRowSpacing = rowSpacing * CGFloat(max(rows - 1, 0))
         let usableWidth = max(0, availableWidth - totalColumnSpacing)
-        let usableHeight = max(0, availableHeight - totalRowSpacing)
         let cellWidth = usableWidth / CGFloat(max(columns, 1))
-        let cellHeight = usableHeight / CGFloat(max(rows, 1))
         let strideX = cellWidth + columnSpacing
 
         let actualIconSize = iconSize
         let labelHeight: CGFloat = showLabels ? (labelFontSize + 8) : 0
         let labelTopSpacing: CGFloat = showLabels ? 6 : 0
+        let totalCellHeight = actualIconSize + labelTopSpacing + labelHeight
 
-        for (pageIndex, pageLayers) in iconLayers.enumerated() {
-            for (localIndex, containerLayer) in pageLayers.enumerated() {
-                let col = localIndex % columns
-                let row = localIndex / columns
+        if isVerticalMode {
+            // Vertical scroll mode: single page, items flow top-to-bottom, left-to-right
+            let rowHeight = totalCellHeight
 
-                let cellOriginX = contentInsets.left + CGFloat(col) * strideX
-                let cellOriginY = pageHeight - contentInsets.top - CGFloat(row + 1) * cellHeight - CGFloat(row) * rowSpacing
+            // Calculate total content height for the scrollable document
+            let totalRows = (items.count + columns - 1) / columns
+            let contentHeight = CGFloat(totalRows) * rowHeight + CGFloat(max(totalRows - 1, 0)) * rowSpacing
+            let totalContainerHeight = max(contentHeight + contentInsets.top + contentInsets.bottom, pageHeight)
 
-                let totalHeight = actualIconSize + labelTopSpacing + labelHeight
-                let containerX = CGFloat(pageIndex) * pageStride + cellOriginX
-                let containerY = cellOriginY + (cellHeight - totalHeight) / 2
+            for (pageIndex, pageLayers) in iconLayers.enumerated() {
+                for (localIndex, containerLayer) in pageLayers.enumerated() {
+                    let col = localIndex % columns
+                    let row = localIndex / columns
 
-                containerLayer.frame = CGRect(x: containerX, y: containerY, width: cellWidth, height: totalHeight)
+                    let cellOriginX = contentInsets.left + CGFloat(col) * strideX
 
-                if let iconLayer = containerLayer.sublayers?.first(where: { $0.name == "icon" }) {
-                    let iconX = (cellWidth - actualIconSize) / 2
-                    let iconY = labelHeight + labelTopSpacing
-                    let iconFrame = CGRect(x: iconX, y: iconY, width: actualIconSize, height: actualIconSize)
-                    iconLayer.frame = iconFrame
+                    // macOS CALayer Y goes up from bottom
+                    // Position items from the bottom of the container
+                    let cellOriginY = totalContainerHeight - contentInsets.top - CGFloat(row + 1) * rowHeight - CGFloat(row) * rowSpacing
 
-                    if let checkboxLayer = containerLayer.sublayers?.first(where: { $0.name == "batchSelectionCheckbox" }) {
-                        let checkboxSize = max(16, min(22, actualIconSize * 0.28))
-                        let edgeInset = max(2.5, min(5.0, actualIconSize * 0.055))
-                        let checkboxX = iconFrame.maxX - checkboxSize - edgeInset
-                        let checkboxY = iconFrame.maxY - checkboxSize - edgeInset
-                        checkboxLayer.frame = CGRect(x: checkboxX, y: checkboxY, width: checkboxSize, height: checkboxSize)
-                        checkboxLayer.cornerRadius = checkboxSize * 0.5
-                        if let markLayer = checkboxLayer.sublayers?.first(where: { $0.name == "batchSelectionCheckboxMark" }) as? CAShapeLayer {
-                            markLayer.frame = checkboxLayer.bounds
-                            markLayer.lineWidth = max(1.7, checkboxSize * 0.14)
-                            markLayer.path = checkboxMarkPath(in: checkboxLayer.bounds)
-                        }
-                    }
-                }
-                
-                // Update glass background for folders
-                if let glassLayer = containerLayer.sublayers?.first(where: { $0.name == "glass" }) {
-                    let glassSize = actualIconSize * 0.8
-                    let glassX = (cellWidth - glassSize) / 2
-                    let glassY = labelHeight + labelTopSpacing + (actualIconSize - glassSize) / 2
-                    glassLayer.frame = CGRect(x: glassX, y: glassY, width: glassSize, height: glassSize)
-                    glassLayer.cornerRadius = glassSize * 0.25  // Larger corner radius
-                }
+                    containerLayer.frame = CGRect(x: cellOriginX, y: cellOriginY, width: cellWidth, height: totalCellHeight)
 
-                if let textLayer = containerLayer.sublayers?.first(where: { $0.name == "label" }) as? CATextLayer {
-                    let labelWidth = cellWidth - 8
-                    textLayer.isHidden = !showLabels
-                    textLayer.frame = CGRect(x: 4, y: 0, width: labelWidth, height: labelHeight)
+                    positionSublayers(in: containerLayer, cellWidth: cellWidth, iconSize: actualIconSize, labelHeight: labelHeight, labelTopSpacing: labelTopSpacing)
                 }
             }
+
+            // Set container frame - Y position based on scrollOffset
+            // scrollOffset is negative when scrolled down (content moves up, showing bottom items)
+            // We translate by scrollOffset so content appears to move
+            pageContainerLayer.transform = CATransform3DIdentity
+            pageContainerLayer.frame = CGRect(x: 0, y: scrollOffset, width: pageWidth, height: totalContainerHeight)
+        } else {
+            // Paged mode: original behavior
+            let pageStride = pageWidth + pageSpacing
+            let totalRowSpacing = rowSpacing * CGFloat(max(rows - 1, 0))
+            let usableHeight = max(0, availableHeight - totalRowSpacing)
+            let cellHeight = usableHeight / CGFloat(max(rows, 1))
+
+            for (pageIndex, pageLayers) in iconLayers.enumerated() {
+                for (localIndex, containerLayer) in pageLayers.enumerated() {
+                    let col = localIndex % columns
+                    let row = localIndex / columns
+
+                    let cellOriginX = contentInsets.left + CGFloat(col) * strideX
+                    let cellOriginY = pageHeight - contentInsets.top - CGFloat(row + 1) * cellHeight - CGFloat(row) * rowSpacing
+
+                    let containerX = CGFloat(pageIndex) * pageStride + cellOriginX
+                    let containerY = cellOriginY + (cellHeight - totalCellHeight) / 2
+
+                    containerLayer.frame = CGRect(x: containerX, y: containerY, width: cellWidth, height: totalCellHeight)
+
+                    positionSublayers(in: containerLayer, cellWidth: cellWidth, iconSize: actualIconSize, labelHeight: labelHeight, labelTopSpacing: labelTopSpacing)
+                }
+            }
+
+            let totalWidth = pageWidth * CGFloat(max(1, pageCount)) + pageSpacing * CGFloat(max(pageCount - 1, 0))
+            pageContainerLayer.transform = CATransform3DIdentity
+            pageContainerLayer.frame = CGRect(x: 0, y: 0, width: totalWidth, height: bounds.height)
+            pageContainerLayer.transform = CATransform3DMakeTranslation(scrollOffset, 0, 0)
         }
 
-        let totalWidth = pageWidth * CGFloat(max(1, pageCount)) + pageSpacing * CGFloat(max(pageCount - 1, 0))
-        // Avoid setting frame on a transformed layer; reset to identity, update frame, then re-apply translation.
-        // This prevents visual/data misalignment caused by frame updates under non-identity transforms.
-        pageContainerLayer.transform = CATransform3DIdentity
-        pageContainerLayer.frame = CGRect(x: 0, y: 0, width: totalWidth, height: bounds.height)
-        pageContainerLayer.transform = CATransform3DMakeTranslation(scrollOffset, 0, 0)
         refreshBatchSelectionUI()
 
         CATransaction.commit()
 
         logIfMismatch("updateLayout")
-        // print("📐 [CAGrid] Layout: \(columns)x\(rows), iconSize=\(actualIconSize), cell=\(cellWidth)x\(cellHeight)")
+    }
+
+    /// Positions icon, label, checkbox, and glass sublayers within a container layer.
+    private func positionSublayers(in containerLayer: CALayer, cellWidth: CGFloat, iconSize: CGFloat, labelHeight: CGFloat, labelTopSpacing: CGFloat) {
+        let actualIconSize = iconSize
+
+        if let iconLayer = containerLayer.sublayers?.first(where: { $0.name == "icon" }) {
+            let iconX = (cellWidth - actualIconSize) / 2
+            let iconY = labelHeight + labelTopSpacing
+            let iconFrame = CGRect(x: iconX, y: iconY, width: actualIconSize, height: actualIconSize)
+            iconLayer.frame = iconFrame
+
+            if let checkboxLayer = containerLayer.sublayers?.first(where: { $0.name == "batchSelectionCheckbox" }) {
+                let checkboxSize = max(16, min(22, actualIconSize * 0.28))
+                let edgeInset = max(2.5, min(5.0, actualIconSize * 0.055))
+                let checkboxX = iconFrame.maxX - checkboxSize - edgeInset
+                let checkboxY = iconFrame.maxY - checkboxSize - edgeInset
+                checkboxLayer.frame = CGRect(x: checkboxX, y: checkboxY, width: checkboxSize, height: checkboxSize)
+                checkboxLayer.cornerRadius = checkboxSize * 0.5
+                if let markLayer = checkboxLayer.sublayers?.first(where: { $0.name == "batchSelectionCheckboxMark" }) as? CAShapeLayer {
+                    markLayer.frame = checkboxLayer.bounds
+                    markLayer.lineWidth = max(1.7, checkboxSize * 0.14)
+                    markLayer.path = checkboxMarkPath(in: checkboxLayer.bounds)
+                }
+            }
+        }
+
+        // Update glass background for folders
+        if let glassLayer = containerLayer.sublayers?.first(where: { $0.name == "glass" }) {
+            let glassSize = actualIconSize * 0.8
+            let glassX = (cellWidth - glassSize) / 2
+            let glassY = labelHeight + labelTopSpacing + (actualIconSize - glassSize) / 2
+            glassLayer.frame = CGRect(x: glassX, y: glassY, width: glassSize, height: glassSize)
+            glassLayer.cornerRadius = glassSize * 0.25
+        }
+
+        if let textLayer = containerLayer.sublayers?.first(where: { $0.name == "label" }) as? CATextLayer {
+            let labelWidth = cellWidth - 8
+            textLayer.isHidden = !showLabels
+            textLayer.frame = CGRect(x: 4, y: 0, width: labelWidth, height: labelHeight)
+        }
     }
 
     func refreshBatchSelectionUI() {
@@ -408,23 +448,58 @@ extension CAGridView {
         updateLayout()
         needsLayoutRefresh = false
 
-        // Clamp currentPage to valid range after items/pageCount might have changed
-        let validPage = max(0, min(pageCount - 1, currentPage))
-        if validPage != currentPage {
-            currentPage = validPage
+        if isVerticalMode {
+            // Vertical mode: CAGridView manages scrolling itself (no NSScrollView)
+            // Calculate total content height
+            let labelHeight: CGFloat = showLabels ? (labelFontSize + 8) : 0
+            let labelTopSpacing: CGFloat = showLabels ? 6 : 0
+            let rowHeight = iconSize + labelTopSpacing + labelHeight
+            let totalRows = (items.count + columns - 1) / columns
+            let contentHeight = CGFloat(totalRows) * rowHeight + CGFloat(max(totalRows - 1, 0)) * rowSpacing
+            let totalContainerHeight = max(contentHeight + contentInsets.top + contentInsets.bottom, bounds.height)
+
+            // Clamp scroll offset to valid range
+            // minScrollOffset = bounds.height - totalContainerHeight (negative when content overflows)
+            // scrollOffset = minScrollOffset → showing top items (pageContainer shifted up to align top)
+            // scrollOffset = 0 → showing bottom items (pageContainer bottom at view bottom)
+            let maxScrollDown = bounds.height - totalContainerHeight
+            let minScrollOffset = min(0, maxScrollDown)
+
+            // Start at top if scrollOffset hasn't been set (first layout)
+            if scrollOffset == 0 && minScrollOffset < 0 {
+                scrollOffset = minScrollOffset
+            } else {
+                scrollOffset = max(minScrollOffset, min(0, scrollOffset))
+            }
+            targetScrollOffset = scrollOffset
+
+            // Update container layer to cover the view bounds
+            containerLayer.frame = bounds
+            
+            // Update pageContainerLayer position - Y based on scrollOffset
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            pageContainerLayer.frame = CGRect(x: 0, y: scrollOffset, width: bounds.width, height: totalContainerHeight)
+            CATransaction.commit()
+        } else {
+            // Clamp currentPage to valid range after items/pageCount might have changed
+            let validPage = max(0, min(pageCount - 1, currentPage))
+            if validPage != currentPage {
+                currentPage = validPage
+            }
+
+            // Reposition to current page without animation
+            let pageStride = bounds.width + pageSpacing
+            scrollOffset = -CGFloat(currentPage) * pageStride
+            targetScrollOffset = scrollOffset
+            isScrollAnimating = false
+
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            pageContainerLayer.transform = CATransform3DMakeTranslation(scrollOffset, 0, 0)
+            CATransaction.commit()
+            logIfMismatch("layout")
         }
-
-        // Reposition to current page without animation
-        let pageStride = bounds.width + pageSpacing
-        scrollOffset = -CGFloat(currentPage) * pageStride
-        targetScrollOffset = scrollOffset
-        isScrollAnimating = false
-
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        pageContainerLayer.transform = CATransform3DMakeTranslation(scrollOffset, 0, 0)
-        CATransaction.commit()
-        logIfMismatch("layout")
     }
 
 }
