@@ -69,6 +69,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         // LLMProviderRegistry.shared.register(provider: copilotProvider)
 
         appStore.syncGlobalHotKeyRegistration()
+        appStore.updateActivationPolicy()
         // appStore.syncAIOverlayHotKeyRegistration()
 
         SoundManager.shared.bind(appStore: appStore)

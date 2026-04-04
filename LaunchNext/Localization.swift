@@ -472,6 +472,10 @@ enum LocalizationKey: String {
     case contextMenuGetInfo
     case contextMenuHideFromLaunchNext
     case contextMenuUninstall
+
+    // Dock & Menu Bar
+    case showInDockTitle
+    case showInDockDescription
 }
 
 final class LocalizationManager {
@@ -734,7 +738,11 @@ final class LocalizationManager {
                 .contextMenuAddToDock: "Add to Dock",
                 .contextMenuGetInfo: "Get Info",
                 .contextMenuHideFromLaunchNext: "Hide from LaunchNext",
-                .contextMenuUninstall: "Uninstall"
+                .contextMenuUninstall: "Uninstall",
+
+                // Dock & Menu Bar
+                .showInDockTitle: "Show in Dock",
+                .showInDockDescription: "Show the app icon in the Dock for easy access."
         ],
         .portugueseBrazil: [
             .noAppsFound: "Nenhum app encontrado",

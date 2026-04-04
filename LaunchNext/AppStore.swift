@@ -360,6 +360,7 @@ final class AppStore: ObservableObject {
     static let searchThrottleMsKey = "searchThrottleMs"
     static let searchThrottleLatestKey = "searchThrottleLatest"
     static let layoutModeKey = "layoutMode"
+    static let showInDockKey = "showInDock"
     static let onboardingVersionKey = "onboardingVersionShown"
     static let currentOnboardingVersion = 1
     static let dockDragTriggerDistanceRange: ClosedRange<Double> = 8...72
@@ -1326,6 +1327,26 @@ final class AppStore: ObservableObject {
         switch layoutMode {
         case .paged: return PagedLayoutStrategy()
         case .vertical: return VerticalLayoutStrategy()
+        }
+    }
+
+    // MARK: - Dock & Menu Bar
+
+    @Published var showInDock: Bool = {
+        UserDefaults.standard.bool(forKey: showInDockKey)
+    }() {
+        didSet {
+            guard showInDock != oldValue else { return }
+            UserDefaults.standard.set(showInDock, forKey: Self.showInDockKey)
+            updateActivationPolicy()
+        }
+    }
+
+    func updateActivationPolicy() {
+        if showInDock {
+            NSApp.setActivationPolicy(.regular)
+        } else {
+            NSApp.setActivationPolicy(.accessory)
         }
     }
 

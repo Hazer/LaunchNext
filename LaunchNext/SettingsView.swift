@@ -2785,6 +2785,9 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             layoutModeCard
                 .padding(.top, -10)
 
+            showInDockCard
+                .padding(.top, -10)
+
             Text(appStore.localized(.lockLayoutDescription))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -2900,6 +2903,22 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             }
             .labelsHidden()
             .pickerStyle(.segmented)
+        }
+    }
+
+    private var showInDockCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(appStore.localized(.showInDockTitle))
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Toggle("", isOn: $appStore.showInDock)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+            Text(appStore.localized(.showInDockDescription))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
     }
 
