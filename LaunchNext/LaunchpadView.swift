@@ -531,7 +531,6 @@ struct LaunchpadView: View {
                     clampSelection()
                 }
                 .focused($isSearchFieldFocused)
-                .frame(maxWidth: .infinity)
 
                 HStack(spacing: 8) {
                     Spacer()
@@ -558,9 +557,15 @@ struct LaunchpadView: View {
             }
             .padding(.top)
             .padding(.horizontal)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if appStore.openFolder == nil && !appStore.isFolderNameEditing {
+                    AppDelegate.shared?.hideWindow()
+                }
+            }
             .background(
                 GeometryReader { proxy in
-                    // 记录顶部区域的总高度（包含顶部动态 padding + 此区域本身 + 额外余量）
+                    // Track the total height of the header area (top padding + this region + extra margin)
                     Color.clear.onAppear {
                         let extra: CGFloat = 24
                         let total = (config.isFullscreen ? geo.size.height * config.topPadding : 0) + proxy.size.height + extra
@@ -736,12 +741,25 @@ struct LaunchpadView: View {
                 let topSafe = max(0, headerTotalHeight)
                 let bottomPad = max(config.isFullscreen ? h * config.bottomPadding : 0, 24)
                 let sidePad = max(config.isFullscreen ? w * config.horizontalPadding : 0, 24)
+                let topPaddingHeight = config.isFullscreen ? h * config.topPadding : 0
+                let searchBarAreaHeight = max(0, topSafe - topPaddingHeight)
 
-                // 顶部安全区：透传
                 VStack(spacing: 0) {
+                    // Menubar/padding area: tap to dismiss
                     Rectangle().fill(Color.clear)
-                        .frame(height: topSafe)
-                        .allowsHitTesting(false)
+                        .frame(height: topPaddingHeight)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if appStore.openFolder == nil && !appStore.isFolderNameEditing {
+                                AppDelegate.shared?.hideWindow()
+                            }
+                        }
+                    // Search bar area: pass through to search bar below
+                    if searchBarAreaHeight > 0 {
+                        Rectangle().fill(Color.clear)
+                            .frame(height: searchBarAreaHeight)
+                            .allowsHitTesting(false)
+                    }
                     Spacer()
                     // 底部边距：点击关闭
                     Rectangle().fill(Color.clear)

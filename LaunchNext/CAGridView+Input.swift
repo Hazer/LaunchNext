@@ -552,6 +552,9 @@ extension CAGridView {
                     }
                 }
             }
+        } else if isVerticalMode {
+            // Vertical mode: click on empty area dismisses the window
+            onEmptyAreaClicked?()
         }
     }
 
@@ -1172,41 +1175,60 @@ extension CAGridView {
 
     func iconCenter(for index: Int) -> CGPoint? {
         guard bounds.width > 0, bounds.height > 0 else { return nil }
-        let pageIndex = index / itemsPerPage
-        let localIndex = index % itemsPerPage
-        guard pageIndex >= 0 && pageIndex < pageCount else { return nil }
+        guard index >= 0, index < items.count else { return nil }
 
         let pageWidth = bounds.width
         let pageHeight = bounds.height
-        let pageStride = pageWidth + pageSpacing
 
         let availableWidth = max(0, pageWidth - contentInsets.left - contentInsets.right)
-        let availableHeight = max(0, pageHeight - contentInsets.top - contentInsets.bottom)
         let totalColumnSpacing = columnSpacing * CGFloat(max(columns - 1, 0))
-        let totalRowSpacing = rowSpacing * CGFloat(max(rows - 1, 0))
         let usableWidth = max(0, availableWidth - totalColumnSpacing)
-        let usableHeight = max(0, availableHeight - totalRowSpacing)
         let cellWidth = usableWidth / CGFloat(max(columns, 1))
-        let cellHeight = usableHeight / CGFloat(max(rows, 1))
         let strideX = cellWidth + columnSpacing
 
+        let labelHeight: CGFloat = showLabels ? (labelFontSize + 8) : 0
+        let labelTopSpacing: CGFloat = showLabels ? 6 : 0
+        let totalItemHeight = iconSize + labelTopSpacing + labelHeight
+
+        let localIndex = index % itemsPerPage
         let col = localIndex % columns
         let row = localIndex / columns
 
         let cellOriginX = contentInsets.left + CGFloat(col) * strideX
+        let iconX = cellOriginX + (cellWidth - iconSize) / 2
+        let iconCenterX = iconX + iconSize / 2
+
+        if isVerticalMode {
+            let rowHeight = totalItemHeight
+            let totalRows = (items.count + columns - 1) / columns
+            let contentHeight = CGFloat(totalRows) * rowHeight + CGFloat(max(totalRows - 1, 0)) * rowSpacing
+            let totalContainerHeight = max(contentHeight + contentInsets.top + contentInsets.bottom, pageHeight)
+
+            let cellOriginY = totalContainerHeight - contentInsets.top - CGFloat(row + 1) * rowHeight - CGFloat(row) * rowSpacing
+            let iconY = cellOriginY + labelHeight + labelTopSpacing
+            let iconCenterY = iconY + iconSize / 2 + scrollOffset
+
+            return CGPoint(x: iconCenterX, y: iconCenterY)
+        }
+
+        // Paged mode
+        let pageIndex = index / itemsPerPage
+        guard pageIndex >= 0 && pageIndex < pageCount else { return nil }
+
+        let pageStride = pageWidth + pageSpacing
+        let availableHeight = max(0, pageHeight - contentInsets.top - contentInsets.bottom)
+        let totalRowSpacing = rowSpacing * CGFloat(max(rows - 1, 0))
+        let usableHeight = max(0, availableHeight - totalRowSpacing)
+        let cellHeight = usableHeight / CGFloat(max(rows, 1))
+
         let cellOriginY = pageHeight - contentInsets.top - CGFloat(row + 1) * cellHeight - CGFloat(row) * rowSpacing
 
-        let labelHeight: CGFloat = showLabels ? (labelFontSize + 8) : 0
-        let labelTopSpacing: CGFloat = showLabels ? 6 : 0
-        let totalHeight = iconSize + labelTopSpacing + labelHeight
-
         let containerX = CGFloat(pageIndex) * pageStride + cellOriginX
-        let containerY = cellOriginY + (cellHeight - totalHeight) / 2
+        let containerY = cellOriginY + (cellHeight - totalItemHeight) / 2
 
-        let iconX = containerX + (cellWidth - iconSize) / 2
         let iconY = containerY + labelHeight + labelTopSpacing
 
-        let centerX = iconX + iconSize / 2 + scrollOffset
+        let centerX = containerX + (cellWidth - iconSize) / 2 + iconSize / 2 + scrollOffset
         let centerY = iconY + iconSize / 2
         return CGPoint(x: centerX, y: centerY)
     }
@@ -1394,6 +1416,40 @@ extension CAGridView {
     func gridPositionAt(_ point: CGPoint) -> Int? {
         let pageWidth = bounds.width
         let pageHeight = bounds.height
+
+        if isVerticalMode {
+            let availableWidth = max(0, pageWidth - contentInsets.left - contentInsets.right)
+            let totalColumnSpacing = columnSpacing * CGFloat(max(columns - 1, 0))
+            let usableWidth = max(0, availableWidth - totalColumnSpacing)
+            let cellWidth = usableWidth / CGFloat(max(columns, 1))
+            let strideX = cellWidth + columnSpacing
+
+            let labelHeight: CGFloat = showLabels ? (labelFontSize + 8) : 0
+            let labelTopSpacing: CGFloat = showLabels ? 6 : 0
+            let rowHeight = iconSize + labelTopSpacing + labelHeight
+
+            let totalRows = (items.count + columns - 1) / columns
+            let contentHeight = CGFloat(totalRows) * rowHeight + CGFloat(max(totalRows - 1, 0)) * rowSpacing
+            let totalContainerHeight = max(contentHeight + contentInsets.top + contentInsets.bottom, pageHeight)
+
+            let localX = point.x - contentInsets.left
+            let containerY = point.y - scrollOffset
+            let localY = totalContainerHeight - containerY - contentInsets.top
+
+            let clampedX = max(0, min(localX, availableWidth - 1))
+            let clampedY = max(0, min(localY, contentHeight - 1))
+
+            let col = Int(clampedX / strideX)
+            let row = Int(clampedY / (rowHeight + rowSpacing))
+
+            let clampedCol = max(0, min(col, columns - 1))
+            let clampedRow = max(0, min(row, totalRows - 1))
+
+            let localIndex = clampedRow * columns + clampedCol
+            return localIndex
+        }
+
+        // Paged mode
         let adjustedX = point.x - scrollOffset
 
         // 计算点击的页面
@@ -1603,12 +1659,6 @@ extension CAGridView {
     func itemAt(_ point: CGPoint) -> (LaunchpadItem, Int)? {
         let pageWidth = bounds.width
         let pageHeight = bounds.height
-        let adjustedX = point.x - scrollOffset
-
-        // 计算点击的页面
-        let pageStride = pageWidth + pageSpacing
-        let pageIndex = Int(floor(adjustedX / pageStride))
-        guard pageIndex >= 0 && pageIndex < pageCount else { return nil }
 
         let availableWidth = max(0, pageWidth - contentInsets.left - contentInsets.right)
         let availableHeight = max(0, pageHeight - contentInsets.top - contentInsets.bottom)
@@ -1617,6 +1667,60 @@ extension CAGridView {
         let usableWidth = max(0, availableWidth - totalColumnSpacing)
         let usableHeight = max(0, availableHeight - totalRowSpacing)
         let cellWidth = usableWidth / CGFloat(max(columns, 1))
+
+        let actualIconSize = iconSize
+        let labelHeight: CGFloat = showLabels ? (labelFontSize + 8) : 0
+        let labelTopSpacing: CGFloat = showLabels ? 6 : 0
+        let totalItemHeight = actualIconSize + labelTopSpacing + labelHeight
+
+        if isVerticalMode {
+            // Vertical mode: single page, items flow top-to-bottom
+            // Convert click point to container-local coordinates
+            let containerY = point.y - scrollOffset
+            let rowHeight = totalItemHeight
+            let totalRows = (items.count + columns - 1) / columns
+            let contentHeight = CGFloat(totalRows) * rowHeight + CGFloat(max(totalRows - 1, 0)) * rowSpacing
+            let totalContainerHeight = max(contentHeight + contentInsets.top + contentInsets.bottom, pageHeight)
+
+            let strideX = cellWidth + columnSpacing
+            let localX = point.x - contentInsets.left
+            // Flip Y: distance from top of container
+            let localY = totalContainerHeight - containerY - contentInsets.top
+
+            guard localX >= 0, localY >= 0 else { return nil }
+            guard localX < availableWidth, localY < contentHeight else { return nil }
+
+            let col = Int(localX / strideX)
+            let row = Int(localY / (rowHeight + rowSpacing))
+
+            guard col >= 0, col < columns, row >= 0, row < totalRows else { return nil }
+
+            let cellOriginX = CGFloat(col) * strideX
+            let rowOriginY = CGFloat(row) * (rowHeight + rowSpacing)
+            let cellLocalX = localX - cellOriginX
+            let cellLocalY = localY - rowOriginY
+
+            guard cellLocalX >= 0, cellLocalX <= cellWidth else { return nil }
+            guard cellLocalY >= 0, cellLocalY <= rowHeight else { return nil }
+
+            // Check if click is within icon+label area
+            let itemStartX = (cellWidth - actualIconSize) / 2
+            let itemEndX = itemStartX + actualIconSize
+            guard cellLocalX >= itemStartX && cellLocalX <= itemEndX else { return nil }
+
+            let localIndex = row * columns + col
+            guard localIndex < items.count else { return nil }
+            return (items[localIndex], localIndex)
+        }
+
+        // Paged mode: original logic
+        let adjustedX = point.x - scrollOffset
+
+        // 计算点击的页面
+        let pageStride = pageWidth + pageSpacing
+        let pageIndex = Int(floor(adjustedX / pageStride))
+        guard pageIndex >= 0 && pageIndex < pageCount else { return nil }
+
         let cellHeight = usableHeight / CGFloat(max(rows, 1))
         let strideX = cellWidth + columnSpacing
         let strideY = cellHeight + rowSpacing
@@ -1649,11 +1753,6 @@ extension CAGridView {
         guard globalIndex < items.count else { return nil }
 
         // 检查是否点击在图标+标签区域内（不是单元格的空白部分）
-        let actualIconSize = iconSize
-        let labelHeight: CGFloat = showLabels ? (labelFontSize + 8) : 0
-        let labelTopSpacing: CGFloat = showLabels ? 6 : 0
-        let totalItemHeight = actualIconSize + labelTopSpacing + labelHeight
-
         // 图标+标签区域居中于单元格
         let itemStartX = (cellWidth - actualIconSize) / 2
         let itemEndX = itemStartX + actualIconSize
