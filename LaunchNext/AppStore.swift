@@ -362,6 +362,7 @@ final class AppStore: ObservableObject {
     static let layoutModeKey = "layoutMode"
     static let showInDockKey = "showInDock"
     static let showInMenuBarKey = "showInMenuBar"
+    static let hideMenuBarKey = "hideMenuBar"
     static let onboardingVersionKey = "onboardingVersionShown"
     static let currentOnboardingVersion = 1
     static let dockDragTriggerDistanceRange: ClosedRange<Double> = 8...72
@@ -1146,6 +1147,16 @@ final class AppStore: ObservableObject {
         didSet {
             guard hideDock != oldValue else { return }
             UserDefaults.standard.set(hideDock, forKey: "hideDock")
+        }
+    }
+
+    @Published var hideMenuBar: Bool = {
+        if UserDefaults.standard.object(forKey: hideMenuBarKey) == nil { return true }
+        return UserDefaults.standard.bool(forKey: hideMenuBarKey)
+    }() {
+        didSet {
+            guard hideMenuBar != oldValue else { return }
+            UserDefaults.standard.set(hideMenuBar, forKey: Self.hideMenuBarKey)
         }
     }
     

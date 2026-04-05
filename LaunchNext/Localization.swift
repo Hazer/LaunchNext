@@ -478,6 +478,7 @@ enum LocalizationKey: String {
     case showInDockDescription
     case showInMenuBarTitle
     case showInMenuBarDescription
+    case hideMenuBarOption
 }
 
 final class LocalizationManager {
@@ -746,7 +747,8 @@ final class LocalizationManager {
                 .showInDockTitle: "Show in Dock",
                 .showInDockDescription: "Show the app icon in the Dock for easy access.",
                 .showInMenuBarTitle: "Show in Menu Bar",
-                .showInMenuBarDescription: "Add an icon to the system menu bar for quick access."
+                .showInMenuBarDescription: "Add an icon to the system menu bar for quick access.",
+                .hideMenuBarOption: "Hide Menu Bar"
         ],
         .portugueseBrazil: [
             .noAppsFound: "Nenhum app encontrado",

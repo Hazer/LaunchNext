@@ -4489,6 +4489,14 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             }
 
             HStack {
+                Text(appStore.localized(.hideMenuBarOption))
+                Spacer()
+                Toggle("", isOn: $appStore.hideMenuBar)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+
+            HStack {
                 Text(appStore.localized(.rememberPageTitle))
                 Spacer()
                 Toggle("", isOn: $appStore.rememberLastPage)

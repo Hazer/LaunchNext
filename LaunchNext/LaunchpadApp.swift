@@ -1433,6 +1433,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
                 self?.updateSystemUIVisibility()
             }
             .store(in: &cancellables)
+        appStore.$hideMenuBar
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updateSystemUIVisibility()
+            }
+            .store(in: &cancellables)
     }
 
     private func bindMenuBarVisibility() {
@@ -1447,7 +1454,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
 
     func updateSystemUIVisibility() {
         let shouldHideDock = appStore.hideDock && windowIsVisible
-        let options: NSApplication.PresentationOptions = shouldHideDock ? [.autoHideDock] : []
+        let shouldHideMenuBar = appStore.hideMenuBar && windowIsVisible
+        var options: NSApplication.PresentationOptions = []
+        if shouldHideDock { options.insert(.autoHideDock) }
+        if shouldHideMenuBar { options.insert(.autoHideMenuBar) }
         if options != NSApp.presentationOptions {
             NSApp.presentationOptions = options
         }
@@ -1700,9 +1710,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
 
         let shouldPlaySound = windowIsVisible && !isTerminating
 
+        // Release system UI immediately so menu bar/dock come back without waiting for animation
+        if windowIsVisible {
+            windowIsVisible = false
+            updateSystemUIVisibility()
+        }
+
         let finalize: () -> Void = {
-            self.windowIsVisible = false
-            self.updateSystemUIVisibility()
             window.orderOut(nil)
             window.alphaValue = 1
             window.contentView?.alphaValue = 1
