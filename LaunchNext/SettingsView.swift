@@ -2788,6 +2788,9 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             showInDockCard
                 .padding(.top, -10)
 
+            showInMenuBarCard
+                .padding(.top, -10)
+
             Text(appStore.localized(.lockLayoutDescription))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -2917,6 +2920,22 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     .toggleStyle(.switch)
             }
             Text(appStore.localized(.showInDockDescription))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var showInMenuBarCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(appStore.localized(.showInMenuBarTitle))
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Toggle("", isOn: $appStore.showInMenuBar)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+            Text(appStore.localized(.showInMenuBarDescription))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }

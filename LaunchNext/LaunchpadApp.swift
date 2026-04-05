@@ -51,6 +51,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     private var cliEndpointSocketPath: String?
     private var cliEndpointMonitorTimer: DispatchSourceTimer?
     private var hotCornerMonitor: HotCornerMonitor?
+    private var statusItem: NSStatusItem?
+    private var statusMenu: NSMenu?
     // Experimental low-level gesture monitor.
     // Remove this property if gesture support is dropped together with
     // bindGesturePreference()/updateGestureMonitor()/handleGestureTrigger().
@@ -70,6 +72,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
 
         appStore.syncGlobalHotKeyRegistration()
         appStore.updateActivationPolicy()
+        setupMenuBarItem()
         // appStore.syncAIOverlayHotKeyRegistration()
 
         SoundManager.shared.bind(appStore: appStore)
@@ -86,6 +89,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         bindControllerPreference()
         bindControllerMenuToggle()
         bindSystemUIVisibility()
+        bindMenuBarVisibility()
         bindCLICodePreference()
         bindHotCornerPreference()
         // Experimental gesture wiring entry point.
@@ -1431,12 +1435,92 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
             .store(in: &cancellables)
     }
 
+    private func bindMenuBarVisibility() {
+        appStore.$showInMenuBar
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updateMenuBarItemVisibility()
+            }
+            .store(in: &cancellables)
+    }
+
     func updateSystemUIVisibility() {
         let shouldHideDock = appStore.hideDock && windowIsVisible
         let options: NSApplication.PresentationOptions = shouldHideDock ? [.autoHideDock] : []
         if options != NSApp.presentationOptions {
             NSApp.presentationOptions = options
         }
+    }
+
+    // MARK: - Menu Bar Status Item
+
+    func setupMenuBarItem() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+
+        if let button = statusItem?.button {
+            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+            if let img = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: "LaunchNext") {
+                button.image = img.withSymbolConfiguration(config)
+            }
+            button.action = #selector(menuBarClicked(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            button.target = self
+        }
+
+        // Build the menu but do NOT attach it — attaching overrides left click
+        let menu = NSMenu()
+        menu.addItem(NSMenuItem(
+            title: "Show LaunchNext",
+            action: #selector(menuBarShowClicked),
+            keyEquivalent: ""
+        ))
+        menu.addItem(NSMenuItem(
+            title: "Settings\u{2026}",
+            action: #selector(menuBarSettingsClicked),
+            keyEquivalent: ","
+        ))
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(
+            title: "Quit LaunchNext",
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        ))
+        statusMenu = menu
+
+        updateMenuBarItemVisibility()
+    }
+
+    func updateMenuBarItemVisibility() {
+        statusItem?.isVisible = appStore.showInMenuBar
+    }
+
+    @objc func menuBarClicked(_ sender: Any) {
+        guard let event = NSApp.currentEvent else { return }
+        switch event.type {
+        case .leftMouseUp:
+            if windowIsVisible {
+                hideWindow()
+            } else {
+                showWindow()
+            }
+        case .rightMouseUp:
+            // Temporarily attach menu, trigger display, then detach
+            statusItem?.menu = statusMenu
+            statusItem?.button?.performClick(nil)
+            statusItem?.menu = nil
+        default:
+            break
+        }
+    }
+
+    @objc func menuBarShowClicked() {
+        showWindow()
+    }
+
+    @objc func menuBarSettingsClicked() {
+        appStore.isSetting = true
+        if !windowIsVisible { showWindow() }
     }
 
     private func wasLaunchedAsLoginItem() -> Bool {

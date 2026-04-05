@@ -361,6 +361,7 @@ final class AppStore: ObservableObject {
     static let searchThrottleLatestKey = "searchThrottleLatest"
     static let layoutModeKey = "layoutMode"
     static let showInDockKey = "showInDock"
+    static let showInMenuBarKey = "showInMenuBar"
     static let onboardingVersionKey = "onboardingVersionShown"
     static let currentOnboardingVersion = 1
     static let dockDragTriggerDistanceRange: ClosedRange<Double> = 8...72
@@ -1347,6 +1348,15 @@ final class AppStore: ObservableObject {
             NSApp.setActivationPolicy(.regular)
         } else {
             NSApp.setActivationPolicy(.accessory)
+        }
+    }
+
+    @Published var showInMenuBar: Bool = {
+        UserDefaults.standard.bool(forKey: showInMenuBarKey)
+    }() {
+        didSet {
+            guard showInMenuBar != oldValue else { return }
+            UserDefaults.standard.set(showInMenuBar, forKey: Self.showInMenuBarKey)
         }
     }
 
