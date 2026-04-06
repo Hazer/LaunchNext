@@ -36,6 +36,18 @@ struct GestureStateMachine {
     private let configuration: GestureConfiguration
     private let smoothingAlpha = 0.7
 
+    /// Whether the state machine is actively tracking a potential pinch gesture.
+    /// Used by the magnify-event suppression tap to decide whether to swallow
+    /// the system's magnify events.
+    var isTracking: Bool {
+        switch state {
+        case .arming, .tracking:
+            return true
+        default:
+            return false
+        }
+    }
+
     init(configuration: GestureConfiguration) {
         self.configuration = configuration
     }

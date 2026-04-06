@@ -57,6 +57,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     // Remove this property if gesture support is dropped together with
     // bindGesturePreference()/updateGestureMonitor()/handleGestureTrigger().
     private var gestureMonitor: GestureMonitor?
+    /// Suppresses system magnify events while a four-finger gesture is being
+    /// tracked, preventing the default Launchpad from appearing.
+    private var magnifySuppressor: MagnifyEventSuppressor?
     // Wake recovery work items for the experimental gesture monitor.
     // If gesture support is removed later, delete this together with
     // bindGestureWakeRecovery()/scheduleGestureWakeRecovery().
@@ -84,6 +87,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         setupWindow(showImmediately: !shouldSilentlyLaunch)
         appStore.performInitialScanIfNeeded()
         appStore.startAutoRescan()
+        appStore.startFallbackScanTimer()
 
         bindAppearancePreference()
         bindControllerPreference()
@@ -401,6 +405,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
                 guard let self else { return }
                 guard !self.isTerminating else { return }
                 guard self.appStore.gestureEnabled || self.appStore.gestureTapAction != .off else { return }
+                self.magnifySuppressor?.stop()
+                self.magnifySuppressor?.start()
                 self.gestureMonitor?.restart()
             }
             gestureWakeRecoveryWorkItems.append(workItem)
@@ -464,6 +470,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
             tapTogglesWindow: tapAction == .toggle
         )
 
+        let gestureActive = configuration.isEnabled
+
+        // Start/stop the magnify event suppressor alongside the gesture monitor.
+        if gestureActive && magnifySuppressor == nil {
+            let suppressor = MagnifyEventSuppressor()
+            suppressor.start()
+            magnifySuppressor = suppressor
+        } else if !gestureActive {
+            magnifySuppressor?.stop()
+            magnifySuppressor = nil
+        }
+
         if gestureMonitor == nil {
             gestureMonitor = GestureMonitor(configuration: configuration) { [weak self] action in
                 DispatchQueue.main.async {
@@ -472,6 +490,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
             }
         }
 
+        gestureMonitor?.magnifySuppressor = magnifySuppressor
         gestureMonitor?.update(configuration: configuration)
     }
 

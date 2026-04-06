@@ -713,7 +713,15 @@ final class AppStore: ObservableObject {
             }
         }
     }
-    @Published var searchText: String = ""
+    @Published var searchText: String = "" {
+        didSet {
+            // When the user starts a new search, refresh the app list in the
+            // background to ensure freshly installed/removed apps are reflected.
+            if !searchText.isEmpty && oldValue.isEmpty {
+                scheduleSoftRefreshOnSearch()
+            }
+        }
+    }
     @Published private(set) var searchQuery: String = ""
 
     // MARK: - Search Strategy
@@ -1930,6 +1938,7 @@ final class AppStore: ObservableObject {
     private var pendingChangedAppPaths: Set<String> = []
     private var pendingForceFullScan: Bool = false
     private let fullRescanThreshold: Int = 50
+    private var fallbackScanTimer: DispatchSourceTimer?
 
     // 状态标记
     private var hasPerformedInitialScan: Bool = false
@@ -2901,19 +2910,88 @@ final class AppStore: ObservableObject {
     func performInitialScanIfNeeded() {
         guard !hasPerformedInitialScan else { return }
 
-        // 先尝试加载持久化数据，避免被扫描覆盖（不提前设置标记）
+        // Load persisted order first (before scan can overwrite it)
         if !hasAppliedOrderFromStore {
             loadAllOrder()
         }
-        
-        // 然后进行扫描，但保持现有顺序
+
         hasPerformedInitialScan = true
-        scanApplicationsWithOrderPreservation()
-        
-        // 扫描完成后生成缓存
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            self?.generateCacheAfterScan()
+
+        // Soft check: compare persisted apps against a quick filesystem listing.
+        // Skip the full scan if nothing changed since last time.
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+            let currentPaths = Set(self.apps.map { $0.url.path })
+            var diskPaths = Set<String>()
+            for path in self.applicationSearchPaths {
+                let url = URL(fileURLWithPath: path)
+                guard let enumerator = FileManager.default.enumerator(
+                    at: url,
+                    includingPropertiesForKeys: nil,
+                    options: [.skipsHiddenFiles, .skipsPackageDescendants]
+                ) else { continue }
+                for case let item as URL in enumerator {
+                    let resolved = item.resolvingSymlinksInPath()
+                    guard resolved.pathExtension == "app",
+                          self.isValidApp(at: resolved),
+                          !self.isInsideAnotherApp(resolved) else { continue }
+                    diskPaths.insert(resolved.path)
+                }
+            }
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                if diskPaths == currentPaths {
+                    // Nothing changed — display persisted data as-is
+                    self.generateCacheAfterScan()
+                } else {
+                    self.scanApplicationsWithOrderPreservation()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                        self?.generateCacheAfterScan()
+                    }
+                }
+            }
         }
+    }
+
+    /// Lightweight background check: re-scan if the on-disk app set differs
+    /// from what we have. Runs at low priority so it doesn't interrupt search.
+    private func softRefreshInBackground() {
+        let currentPaths = Set(apps.map { $0.url.path })
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self else { return }
+            var diskPaths = Set<String>()
+            for path in self.applicationSearchPaths {
+                let url = URL(fileURLWithPath: path)
+                guard let enumerator = FileManager.default.enumerator(
+                    at: url,
+                    includingPropertiesForKeys: nil,
+                    options: [.skipsHiddenFiles, .skipsPackageDescendants]
+                ) else { continue }
+                for case let item as URL in enumerator {
+                    let resolved = item.resolvingSymlinksInPath()
+                    guard resolved.pathExtension == "app",
+                          self.isValidApp(at: resolved),
+                          !self.isInsideAnotherApp(resolved) else { continue }
+                    diskPaths.insert(resolved.path)
+                }
+            }
+            if diskPaths != currentPaths {
+                DispatchQueue.main.async { [weak self] in
+                    self?.scanApplicationsWithOrderPreservation()
+                }
+            }
+        }
+    }
+
+    private var searchRefreshWorkItem: DispatchWorkItem?
+
+    private func scheduleSoftRefreshOnSearch() {
+        searchRefreshWorkItem?.cancel()
+        searchRefreshWorkItem = DispatchWorkItem { [weak self] in
+            self?.softRefreshInBackground()
+        }
+        DispatchQueue.main.async(execute: searchRefreshWorkItem!)
     }
 
     func scanApplications(loadPersistedOrder: Bool = true) {
@@ -2936,7 +3014,7 @@ final class AppStore: ObservableObject {
                               !self.isInsideAnotherApp(resolved) else { continue }
                         if !seenPaths.contains(resolved.path) {
                             seenPaths.insert(resolved.path)
-                            found.append(self.appInfo(from: resolved))
+                            found.append(self.appInfo(from: resolved, loadIcon: false))
                         }
                     }
                 }
@@ -2993,7 +3071,7 @@ final class AppStore: ObservableObject {
                                   !self.isInsideAnotherApp(resolved) else { continue }
                             if !localSeenPaths.contains(resolved.path) {
                                 localSeenPaths.insert(resolved.path)
-                                localFound.append(self.appInfo(from: resolved))
+                                localFound.append(self.appInfo(from: resolved, loadIcon: false))
                             }
                         }
                         
@@ -3506,11 +3584,67 @@ final class AppStore: ObservableObject {
         FSEventStreamInvalidate(stream)
         FSEventStreamRelease(stream)
         fsEventStream = nil
+        stopFallbackScanTimer()
     }
 
     func restartAutoRescan() {
         stopAutoRescan()
         startAutoRescan()
+    }
+
+    // MARK: - Fallback periodic scan
+
+    /// Periodically verifies the app list against the filesystem to catch
+    /// changes that FSEvents may have missed (e.g. events dropped during
+    /// app install, or while the process was suspended).
+    private static let fallbackScanInterval: TimeInterval = 5 * 60 // 5 minutes
+
+    func startFallbackScanTimer() {
+        stopFallbackScanTimer()
+        let timer = DispatchSource.makeTimerSource(queue: refreshQueue)
+        timer.schedule(deadline: .now() + Self.fallbackScanInterval,
+                       repeating: Self.fallbackScanInterval)
+        timer.setEventHandler { [weak self] in
+            self?.performFallbackScanIfNeeded()
+        }
+        timer.activate()
+        fallbackScanTimer = timer
+    }
+
+    private func stopFallbackScanTimer() {
+        fallbackScanTimer?.cancel()
+        fallbackScanTimer = nil
+    }
+
+    private func performFallbackScanIfNeeded() {
+        guard !apps.isEmpty else { return }
+        let currentPaths = Set(apps.map { $0.url.path })
+
+        refreshQueue.async { [weak self] in
+            guard let self else { return }
+            var diskPaths = Set<String>()
+            for path in self.applicationSearchPaths {
+                let url = URL(fileURLWithPath: path)
+                if let enumerator = FileManager.default.enumerator(
+                    at: url,
+                    includingPropertiesForKeys: nil,
+                    options: [.skipsHiddenFiles, .skipsPackageDescendants]
+                ) {
+                    for case let item as URL in enumerator {
+                        let resolved = item.resolvingSymlinksInPath()
+                        guard resolved.pathExtension == "app",
+                              self.isValidApp(at: resolved),
+                              !self.isInsideAnotherApp(resolved) else { continue }
+                        diskPaths.insert(resolved.path)
+                    }
+                }
+            }
+            if diskPaths != currentPaths {
+                DispatchQueue.main.async { [weak self] in
+                    self?.scanApplicationsWithOrderPreservation()
+                }
+            }
+        }
     }
 
     @discardableResult
@@ -3618,11 +3752,12 @@ final class AppStore: ObservableObject {
     }
 
     private func scheduleRescan() {
-        // 轻微防抖，避免频繁FSEvents触发造成主线程压力
+        // Debounce to coalesce rapid FSEvents (e.g. app installs write many files).
+        // 1 second lets the dust settle before rescanning.
         rescanWorkItem?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.performImmediateRefresh() }
         rescanWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
     }
 
     private func performImmediateRefresh() {
@@ -3748,11 +3883,12 @@ final class AppStore: ObservableObject {
         NSWorkspace.shared.isFilePackage(atPath: url.path)
     }
 
-    private func appInfo(from url: URL, preferredName: String? = nil) -> AppInfo {
-        AppInfo.from(url: url,
+    private func appInfo(from url: URL, preferredName: String? = nil, loadIcon: Bool? = nil) -> AppInfo {
+        let shouldLoad = loadIcon ?? (PerformanceMode.current == .full)
+        return AppInfo.from(url: url,
                      preferredName: preferredName,
                      customTitle: customTitles[url.path],
-                     loadIcon: PerformanceMode.current == .full)
+                     loadIcon: shouldLoad)
     }
     
     // MARK: - 文件夹管理
