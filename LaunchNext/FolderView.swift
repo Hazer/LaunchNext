@@ -318,7 +318,7 @@ extension FolderView {
             }
         )
         .frame(height: appHeight)
-        // remove matchedGeometryEffect 以reducescroll开销
+        // Remove matchedGeometryEffect to reduce scroll overhead
 
         let isDraggingThisTile = (draggingApp == app)
 
@@ -334,22 +334,22 @@ extension FolderView {
                     DragGesture(minimumDistance: 2, coordinateSpace: .named("folderGrid"))
                         .onChanged { value in
                             guard !appStore.isLayoutLocked else { return }
-                            // ineditstate禁usedrag
+                            // Disable drag in edit state
                             if isEditingName { return }
                         
                         if draggingApp == nil {
                             var tx = Transaction(); tx.disablesAnimations = true
                             withTransaction(tx) { draggingApp = app }
-                            isKeyboardNavigationActive = false // 禁useKeyboard navigation
+                            isKeyboardNavigationActive = false // Disable keyboard navigation
 
-                            // letdragpreviewin心and指针positionconsistent，avoid任何offset
+                            // Keep drag preview center aligned with cursor position, avoid any offset
                             dragPreviewPosition = value.location
                         }
 
-                        // preview跟随指针position（not引入起始offset)，ensure光标andiconin心for齐
+                        // Preview follows cursor position (no starting offset), ensure cursor and icon center aligned
                         dragPreviewPosition = value.location
 
-                        // 检测是否拖出folderrangeand 驻留
+                        // detectwhetherdrag outfolderrangeand resident
                         let isOutside: Bool = (value.location.x < 0 || value.location.y < 0 ||
                                                value.location.x > containerSize.width ||
                                                value.location.y > containerSize.height)
@@ -357,13 +357,13 @@ extension FolderView {
                         if isOutside {
                             if outOfBoundsBeganAt == nil { outOfBoundsBeganAt = now }
                             if !hasHandedOffDrag, let start = outOfBoundsBeganAt, now.timeIntervalSince(start) >= outOfBoundsDwell, let dragging = draggingApp {
-                                // 接力tooutsidelayer：app移出folderand Close folder
+                                // relaytooutsidelayer：appremove fromfolderand Close folder
                                 hasHandedOffDrag = true
                                 pendingDropIndex = nil
                                 appStore.handoffDraggingApp = dragging
                                 appStore.handoffDragScreenLocation = NSEvent.mouseLocation
                                 appStore.removeAppFromFolder(dragging, folder: folder)
-                                // 清理inside部dragstateand Close folder
+                                // cleaninsidepartdragstateand Close folder
                                 draggingApp = nil
                                 outOfBoundsBeganAt = nil
                                 withAnimation(LNAnimations.springFast) {
@@ -379,15 +379,15 @@ extension FolderView {
                                                        containerSize: containerSize,
                                                        columnWidth: columnWidth,
                                                        appHeight: appHeight) {
-                            // "hoverinmostafter一格child"视asinserttoend，from而推动mostafter一backwardlet位
+                            // "hoverinthen one cellchild"viewasinserttoend，fromdriven bythen onebackwardletposition
                             let count = visualApps.count
                             if count > 0,
                                hoveringIndex == count - 1,
                                let dragging = draggingApp,
                                dragging != visualApps[hoveringIndex] {
-                                pendingDropIndex = count // end插slot
+                                pendingDropIndex = count // endinsertslot
                             } else {
-                                // 若命是"end插slot"（== count)，maintainas count；its余as格childindex
+                                // if hit is"endinsertslot"（== count)，maintainas count；itsremainingascellchildindex
                                 pendingDropIndex = hoveringIndex
                             }
                         } else {
@@ -404,11 +404,11 @@ extension FolderView {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
                                 draggingApp = nil
                                 pendingDropIndex = nil
-                                // dragendafternot自动resumeKeyboard navigation，maintainconsistent体验
+                                // dragendafternotautoresumeKeyboard navigation，maintain consistencyexperience
                             }
                         }
 
-                        // 若already接力tooutsidelayer，thennotin此处Processdrop point
+                        // ifalreadyrelaytooutsidelayer，thennotinhereProcessdrop point
                         if hasHandedOffDrag {
                             hasHandedOffDrag = false
                             outOfBoundsBeganAt = nil
@@ -416,7 +416,7 @@ extension FolderView {
                         }
 
                         if let finalIndex = pendingDropIndex {
-                            // visualsnapposition：directlyusefinalIndex，ensure准确snaptoitem 标position
+                            // visualsnapposition：directlyusefinalIndex，ensureaccuratesnaptoitem markposition
                             let dropDisplayIndex = finalIndex
                             let targetCenter = cellCenter(for: dropDisplayIndex,
                                                           containerSize: containerSize,
@@ -436,7 +436,7 @@ extension FolderView {
                                 folder.apps = apps
                                 appStore.notifyFolderContentChanged(folder)
                                 
-                                // folderinsidedragendafteralsotrigger压缩，ensure主UIemptyitemitem movetopageend
+                                // folderinsidedragendafteralsotriggercompact，ensuremainUIemptyitemitem movetopageend
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                     appStore.compactItemsWithinPages()
                                 }
@@ -496,7 +496,7 @@ extension FolderView {
                                                       scrollOffsetY: scrollOffsetY) else { return nil }
         
         let count = visualApps.count
-        // 允许return count 作as"end插slot"，implementation拖tomostafter一afterlet位
+        // allowreturn count asas"endinsertslot"，implementationdragtothen oneafterletposition
         if count == 0 { return 0 }
         return min(max(offsetInPage, 0), count)
     }
@@ -575,7 +575,7 @@ extension FolderView {
     }
 
     private func handleKeyEvent(_ event: NSEvent) -> NSEvent? {
-        // 正ineditfoldernamewhen，放rowinput
+        // correctineditfoldernamewhen，placerowinput
         if isTextFieldFocused { return event }
 
         // Esc Close folder
@@ -584,7 +584,7 @@ extension FolderView {
             return nil
         }
 
-        // 回车：activateorlaunch选择
+        // Enter：activateorlaunchselect
         if event.keyCode == 36 {
             if !isKeyboardNavigationActive {
                 isKeyboardNavigationActive = true
@@ -605,7 +605,7 @@ extension FolderView {
             return event
         }
 
-        // Tab：and回车consistent，先activateKeyboard navigation
+        // Tab：andEnterconsistent，firstactivateKeyboard navigation
         if event.keyCode == 48 {
             if !isKeyboardNavigationActive {
                 isKeyboardNavigationActive = true
@@ -617,7 +617,7 @@ extension FolderView {
             return event
         }
 
-        // 向：先activate导航
+        // direction：firstactivatenavigation
         if event.keyCode == 125 {
             if !isKeyboardNavigationActive {
                 isKeyboardNavigationActive = true
@@ -630,7 +630,7 @@ extension FolderView {
             return nil
         }
 
-        // 左右/一般箭头
+        // left/right/regular arrow
         if let (dx, dy) = arrowDelta(for: event.keyCode) {
             guard isKeyboardNavigationActive else { return event }
             moveSelection(dx: dx, dy: dy)

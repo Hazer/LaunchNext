@@ -2419,7 +2419,7 @@ extension LaunchpadView {
                                     appStore.cleanupUnusedNewPage()
                                     appStore.removeEmptyPages()
                                     
-                                    // ensuredrag操作CompleteafterImmediately save
+                                    // Ensure drag operation completes before immediately saving
                                     appStore.saveAllOrder()
                                 }
                             }
@@ -2473,7 +2473,7 @@ extension LaunchpadView {
         // Cache geometry to avoid repeating layout math.
         let cacheKey = "center_\(globalIndex)_\(pageIndex)_\(containerSize.width)_\(containerSize.height)_\(columnWidth)_\(appHeight)"
         
-        // checkcache是否valid
+        // Check if cache is valid
         let now = Date()
         if now.timeIntervalSince(Self.lastGeometryUpdate) < geometryCacheTimeout,
            let cached = Self.geometryCache[cacheKey] {
@@ -2540,7 +2540,7 @@ extension LaunchpadView {
                               width: columnWidth,
                               height: appHeight)
 
-        // and LaunchpadItemButton layoutmaintainconsistent：by钮Contents有 8pt insidemargin，iconandlabelverticalspacing 8pt
+        // Maintain consistent layout with LaunchpadItemButton: button content has 8pt inside margin, icon and label vertical spacing 8pt
         let horizontalPadding: CGFloat = 8
         let verticalPadding: CGFloat = 8
         let labelWidth = columnWidth * 0.9
@@ -2601,7 +2601,7 @@ extension LaunchpadView {
                                       columnWidth: CGFloat,
                                       appHeight: CGFloat,
                                       iconSize: CGFloat) -> Bool {
-        // performanceoptimization：usecacheavoid重复calculate
+        // Performance optimization: use cache to avoid redundant calculations
         let cacheKey = "centerArea_\(targetIndex)_\(pageIndex)_\(containerSize.width)_\(containerSize.height)_\(columnWidth)_\(appHeight)_\(iconSize)"
         
         let now = Date()
@@ -2628,7 +2628,7 @@ extension LaunchpadView {
             height: centerAreaSize
         )
         
-        // asyncupdatecache，avoidinviewupdate期间修改state
+        // Async update cache, avoid modifying state during view update
         DispatchQueue.main.async {
             Self.geometryCache[cacheKey] = targetCenter
             Self.lastGeometryUpdate = now
@@ -2817,7 +2817,7 @@ struct ScrollEventCatcher: NSViewRepresentable {
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             if let monitor = eventMonitor { NSEvent.removeMonitor(monitor); eventMonitor = nil }
-            // globalmonitorcurrentwindowscrollevent，not消费event
+            // globalmonitorcurrentwindowscrollevent，notconsumeevent
             eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel]) { [weak self] event in
                 let phase = event.phase != [] ? event.phase : event.momentumPhase
                 let isMomentum = event.momentumPhase != []
@@ -2832,7 +2832,7 @@ struct ScrollEventCatcher: NSViewRepresentable {
         }
 
         override func hitTest(_ point: NSPoint) -> NSView? {
-            // not拦截命in测试，letlayerviewProcessclick/dragetc.
+            // notintercept hitintest，letlayerviewProcessclick/dragetc.
             return nil
         }
 
@@ -2881,10 +2881,10 @@ extension LaunchpadView {
         currentAppHeight = appHeight
         currentIconSize = iconSize
         
-        // performanceoptimization：清理过期geometrycache
+        // performanceoptimization：clean expiredgeometrycache
         let now = Date()
         if now.timeIntervalSince(Self.lastGeometryUpdate) > geometryCacheTimeout * 2 {
-            // async清理cache，avoidinviewupdate期间修改state
+            // asynccleancache，avoid modifying state during view update cycle
             DispatchQueue.main.async {
                 Self.geometryCache.removeAll()
                 Self.lastGeometryUpdate = now
@@ -2898,7 +2898,7 @@ extension LaunchpadView {
                                       in containerSize: CGSize) -> Bool {
         let edgeMargin: CGFloat = config.pageNavigation.edgeFlipMargin
         
-        // checkPage turn冷却state
+        // checkPage turncooldownstate
         pageFlipManager.autoFlipInterval = config.pageNavigation.autoFlipInterval
         guard pageFlipManager.canFlip() else { return false }
 
@@ -2912,12 +2912,12 @@ extension LaunchpadView {
             pageFlipManager.recordFlip()
             return true
         } else if iconCenter.x >= containerSize.width - edgeMargin {
-            // check是否needCreatenewpage
+            // checkwhetherneedCreatenewpage
             let nextPage = appStore.currentPage + 1
             let itemsPerPage = config.itemsPerPage
             let nextPageStart = nextPage * itemsPerPage
             
-            // ifdragtonewpage，ensure有足够nil/empty间
+            // ifdragtonewpage，ensurehas enoughnil/emptybetween
             if nextPageStart >= currentItems.count {
                 let neededItems = nextPageStart + itemsPerPage - currentItems.count
                 for _ in 0..<neededItems {
@@ -2958,9 +2958,9 @@ extension LaunchpadView {
             let nextPage = appStore.currentPage + 1
             let nextPageStart = nextPage * itemsPerPage
 
-            // ifdragtonewpage，ensureable tocorrect预测tonewpageNo.一position
+            // ifdragtonewpage，ensureable tocorrectpredictiontonewpageNo.oneposition
             if nextPageStart >= currentItems.count {
-                // dragto全newpage，returnnewpageNo.一position
+                // dragtoallnewpage，returnnewpageNo.oneposition
                 return nextPageStart
             } else {
                 return min(nextPageStart, currentItems.count - 1)
@@ -3006,7 +3006,7 @@ struct GridConfig {
 
     struct PageNavigation {
         let edgeFlipMargin: CGFloat = 15
-        let autoFlipInterval: TimeInterval = 0.8 // drag贴边Page turn两time(s)betweeninterval0.8秒
+        let autoFlipInterval: TimeInterval = 0.8 // dragedge-alignedPage turntwotime(s)betweeninterval0.8s
         let scrollPageThreshold: CGFloat = 0.75
         let scrollFinishThreshold: CGFloat = 0.5
     }
@@ -3032,7 +3032,7 @@ struct DragPreviewItem: View {
     let labelWidth: CGFloat
     var scale: CGFloat = 1.2
 
-    // performanceoptimization：useComputed propertiesavoidstate修改
+    // performanceoptimization：useComputed propertiesavoidstatemodify
     private var displayIcon: NSImage {
         switch item {
         case .app(let app):
@@ -3182,13 +3182,13 @@ func arrowDelta(for keyCode: UInt16) -> (dx: Int, dy: Int)? {
     }
 }
 
-// MARK: - cache管理extension
+// MARK: - cachemanagementextension
 
 extension LaunchpadView {
     /// checkCache state
     private func checkCacheStatus() {
         guard !appStore.shouldShowOnboarding else { return }
-        // ifcacheinvalid，trigger重newscan
+        // ifcacheinvalid，triggerrenewscan
         if !AppCacheManager.shared.isCacheValid {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 guard !self.appStore.shouldShowOnboarding else { return }
@@ -3200,7 +3200,7 @@ extension LaunchpadView {
     // MARK: - SimplifydragProcessfunction
     private func handleDragChange(_ value: DragGesture.Value, item: LaunchpadItem, in containerSize: CGSize, columnWidth: CGFloat, appHeight: CGFloat, iconSize: CGFloat) {
         guard !appStore.isLayoutLocked else { return }
-        // initial化drag
+        // initializedrag
         if draggingItem == nil {
             var tx = Transaction(); tx.disablesAnimations = true
             withTransaction(tx) { draggingItem = item }
@@ -3229,7 +3229,7 @@ extension LaunchpadView {
                         iconSize: iconSize)
     }
 
-    // unifieddragendProcess逻辑（normal dragandrelay drag共use)
+    // unifieddragendProcesslogic（normal dragandrelay dragshareduse)
     private func finalizeDragOperation(containerSize: CGSize, columnWidth: CGFloat, appHeight: CGFloat, iconSize: CGFloat) {
         guard let dragging = draggingItem else { return }
         defer { dragPointerOffset = .zero }
@@ -3241,7 +3241,7 @@ extension LaunchpadView {
             return
         }
 
-        // ProcessfolderCreate逻辑
+        // ProcessfolderCreatelogic
         if appStore.isDragCreatingFolder, case .app(let app) = dragging {
             if let targetApp = appStore.folderCreationTarget {
                 if let insertAt = filteredItems.firstIndex(of: .app(targetApp)) {
@@ -3297,15 +3297,15 @@ extension LaunchpadView {
             return
         }
         
-        // Processnormal drag逻辑
+        // Processnormal draglogic
         if let finalIndex = pendingDropIndex,
            let _ = filteredItems.firstIndex(of: dragging) {
-            // check是否asCross-page drag
+            // checkwhetherasCross-page drag
             let sourceIndexInItems = appStore.items.firstIndex(of: dragging) ?? 0
             let targetPage = finalIndex / config.itemsPerPage
             let sourcePage = sourceIndexInItems / config.itemsPerPage
             
-            // visualsnaptoitem 标格in心
+            // visualsnaptoitem gridcenter
             let dropDisplayIndex = finalIndex
             let finalPage = pageOf(index: dropDisplayIndex)
             let targetCenter = cellCenter(for: dropDisplayIndex,
@@ -3319,7 +3319,7 @@ extension LaunchpadView {
             }
             
             if targetPage == sourcePage {
-                // same页insidemove：use原有页insideorder/sort逻辑
+                // samepagemove：useoriginalpageorder/sortlogic
                 let pageStart = (finalIndex / config.itemsPerPage) * config.itemsPerPage
                 let pageEnd = min(pageStart + config.itemsPerPage, appStore.items.count)
                 var newItems = appStore.items
@@ -3336,28 +3336,28 @@ extension LaunchpadView {
                 appStore.triggerGridRefresh()
                 appStore.saveAllOrder()
                 
-                // same页insidedragendafteralso进row压缩，ensureemptyitemitem movetopageend
+                // samepagedragendafteralsoenterrowcompact，ensureemptyitemitem movetopageend
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     appStore.compactItemsWithinPages()
                 }
             } else {
-                // Cross-page drag：use级联insert逻辑
+                // Cross-page drag：usecascadeinsertlogic
                 appStore.moveItemAcrossPagesWithCascade(item: dragging, to: finalIndex)
             }
         } else {
-            // 兜底逻辑：if没有validitem 标index，app放置tocurrent页end
+            // fallback logic：ifnovaliditem markindex，appplacetocurrentpageend
             if let draggingIndex = filteredItems.firstIndex(of: dragging) {
                 let currentPageStart = appStore.currentPage * config.itemsPerPage
                 let currentPageEnd = min(currentPageStart + config.itemsPerPage, appStore.items.count)
                 let targetIndex = currentPageEnd
                 
-                // use级联insertensureapp能correct放置
+                // usecascadeinsertensureappcancorrectplace
                 appStore.moveItemAcrossPagesWithCascade(item: dragging, to: targetIndex)
             }
         }
     }
 
-    // unifieddragupdate逻辑（normal dragandrelay drag共use)
+    // unifieddragupdatelogic（normal dragandrelay dragshareduse)
     private func applyDragUpdate(at point: CGPoint,
                                  containerSize: CGSize,
                                  columnWidth: CGFloat,
@@ -3373,15 +3373,15 @@ extension LaunchpadView {
             iconCenter = clamped
             hoverPoint = clamped
         }
-        // performanceoptimization：减少频繁positionupdate
+        // performanceoptimization：reduce frequencypositionupdate
         let distance = sqrt(pow(dragPreviewPosition.x - iconCenter.x, 2) + pow(dragPreviewPosition.y - iconCenter.y, 2))
-        if distance < 2.0 { return } // ifmovedistanceless than2像素，Skipupdate
+        if distance < 2.0 { return } // ifmovedistanceless than2pixel，Skipupdate
 
         dragPreviewPosition = iconCenter
         
-        // performanceoptimization：usesection流机制减少calculatefrequency
+        // performanceoptimization：usesectionflow mechanism to reducecalculatefrequency
         let now = Date()
-        if now.timeIntervalSince(Self.lastGeometryUpdate) < 0.016 { // 约60fps
+        if now.timeIntervalSince(Self.lastGeometryUpdate) < 0.016 { // about60fps
             return
         }
         
@@ -3539,7 +3539,7 @@ extension LaunchpadView {
         folderHoverBeganAt = nil
     }
     
-    // performance监控辅助function
+    // performancemonitoring assistancefunction
     private func measurePerformance<T>(_ operation: String, _ block: () -> T) -> T {
         guard enablePerformanceMonitoring else { return block() }
         
@@ -3548,8 +3548,8 @@ extension LaunchpadView {
         let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
         
         performanceMetrics[operation] = timeElapsed
-        if timeElapsed > 0.016 { // 超过16ms（60fpsthreshold)
-            print("⚠️ performancewarning: \(operation) 耗when \(String(format: "%.3f", timeElapsed * 1000))ms")
+        if timeElapsed > 0.016 { // exceed16ms（60fpsthreshold)
+            print("⚠️ performancewarning: \(operation) costwhen \(String(format: "%.3f", timeElapsed * 1000))ms")
         }
         
         return result

@@ -402,7 +402,7 @@ class NativeLaunchpadImporter {
                 convertedFolders += 1
             }
 
-            // 2.3) 补齐nil/empty位
+            // 2.3) Fill nil/empty positions
             if maxPos >= 0 {
                 for pos in 0...maxPos where !occupied.contains(pos) {
                     try saveEmptySlot(pageIndex: pageIndex, position: pos)
@@ -420,12 +420,12 @@ class NativeLaunchpadImporter {
     }
 
     private func buildHierarchy(from data: LaunchpadData) -> LaunchpadHierarchy {
-        // Description（old版 schema structure)：
+        // Description (legacy schema structure)：
         // hierarchyrelationas Root(type=1) → TopContainers(type=3) → Pages(type=2) → Slots(type=3) → Apps(type=4)
-        // pageorder应当by：TopContainers  ordering，re-byeach TopContainer  Pages  ordering 依time(s)expand。
+        // Page order should be by: TopContainers ordering, then by each TopContainer Pages ordering expanded sequentially。
         // slotorder：by Page directlychilditem Slots(type=3)  ordering。
 
-        // build parent -> children index，for快速find
+        // Build parent -> children index for quick lookup
         var childrenByParent: [Int: [LaunchpadDBItem]] = [:]
         for item in data.items {
             childrenByParent[item.parentId, default: []].append(item)
@@ -434,28 +434,28 @@ class NativeLaunchpadImporter {
             childrenByParent[key]?.sort { $0.ordering < $1.ordering }
         }
 
-        // 寻找 Root sectiondot（may存in多 type=1，only取作parent级那些)
+        // Find root section (may have multiple type=1, only take those that serve as parent level)
         let roots = data.items.filter { $0.type == 1 }
         let rootIds: [Int]
         if roots.isEmpty {
-            rootIds = [1] // 兜底：典型old库in root as 1
+            rootIds = [1] // fallback：typicalolddatabasein root as 1
         } else {
-            // by ordering order/sort（若无意义，then自然order)
+            // by ordering order/sort（if meaningless，thennaturalorder)
             rootIds = roots.sorted { $0.ordering < $1.ordering }.map { intValue($0.rowId) }
         }
 
-        // Top-level container（directly隶属于 Root  type=3)
+        // Top-level container（directlybelongs to Root  type=3)
         var topContainers: [(rootIndex: Int, container: LaunchpadDBItem)] = []
         for (idx, rootId) in rootIds.enumerated() {
             let containers = (childrenByParent[rootId] ?? []).filter { $0.type == 3 }
             for c in containers { topContainers.append((rootIndex: idx, container: c)) }
         }
-        // only保留“真正承载page”container（itsdirectlychilditeminclude type=2)
+        // onlypreserve“actually containspage”container（itsdirectlychilditeminclude type=2)
         topContainers = topContainers.filter { entry in
             let pid = intValue(entry.container.rowId)
             return (childrenByParent[pid] ?? []).contains(where: { $0.type == 2 })
         }
-        // 以 (rootIndex, container.ordering) order/sort，maintaineach Root inside部order
+        // to (rootIndex, container.ordering) order/sort，maintaineach Root insidepartorder
         topContainers.sort { lhs, rhs in
             if lhs.rootIndex == rhs.rootIndex { return lhs.container.ordering < rhs.container.ordering }
             return lhs.rootIndex < rhs.rootIndex
@@ -465,7 +465,7 @@ class NativeLaunchpadImporter {
         print("🧭 top-layercontainerorder: \(tcIds.joined(separator: ", "))")
         #endif
 
-        // calculatepageorder：each topContainer  pages(type=2) 依time(s)追加
+        // calculatepageorder：each topContainer  pages(type=2) bytime(s)append
         var orderedPages: [LaunchpadDBItem] = []
         for entry in topContainers {
             let parentId = intValue(entry.container.rowId)
@@ -477,7 +477,7 @@ class NativeLaunchpadImporter {
         print("🧭 pageorder: \(pageIds.joined(separator: ", "))")
         #endif
 
-        // slot（each页directlychilditem type=3)
+        // slot（eachpagedirectlychilditem type=3)
         var pages: [LaunchpadPage] = []
         for page in orderedPages {
             let pid = intValue(page.rowId)
@@ -485,7 +485,7 @@ class NativeLaunchpadImporter {
             pages.append(LaunchpadPage(items: slots))
         }
 
-        // folder映射：任意 containerId(type=3) → itschildapp(type=4)
+        // foldermapping：any containerId(type=3) → itschildapp(type=4)
         var slotIdToApps: [String: [LaunchpadDBItem]] = [:]
         for item in data.items where item.type == 4 {
             slotIdToApps[String(item.parentId), default: []].append(item)
@@ -502,14 +502,14 @@ class NativeLaunchpadImporter {
     }
 
     private func findLocalApp(bundleId: String, title: String) -> AppInfo? {
-        // 优先use NSWorkspace find
+        // preferuse NSWorkspace find
         if let appPath = NSWorkspace.shared.absolutePathForApplication(withBundleIdentifier: bundleId) {
             return AppInfo.from(url: URL(fileURLWithPath: appPath),
                                 preferredName: title,
                                 loadIcon: PerformanceMode.current == .full)
         }
 
-        // 备use方案：in常见pathinsearch
+        // backupuseapproach：incommonpathinsearch
         let searchPaths = [
             "/Applications",
             "/System/Applications",
@@ -537,13 +537,13 @@ class NativeLaunchpadImporter {
         for case let url as URL in enumerator {
             if url.pathExtension == "app" {
                 if let bundle = Bundle(url: url) {
-                    // 精确match bundle ID
+                    // precisematch bundle ID
                     if bundle.bundleIdentifier == bundleId {
                         return AppInfo.from(url: url,
                                             preferredName: title,
                                             loadIcon: PerformanceMode.current == .full)
                     }
-                    // 备use：namematch
+                    // backupuse：namematch
                     if let appName = bundle.infoDictionary?["CFBundleName"] as? String,
                        appName == title {
                         return AppInfo.from(url: url,
@@ -573,8 +573,8 @@ class NativeLaunchpadImporter {
     }
 
     private func findSingleApp(inContainerId containerId: String, launchpadData: LaunchpadData, hierarchy: LaunchpadHierarchy) -> AppInfo? {
-        // old版 schema：单appstop-layeritem通常是一 type=3 container，
-        // its挂着一 type=4 appitem。这in取No.一 app childitem。
+        // oldversion schema：singleappstop-layeritemtypically a type=3 container，
+        // itshanging on a type=4 appitem。thisingetNo.one app childitem。
         if let items = hierarchy.folderItems[containerId] {
             if let appItem = items.first, let app = launchpadData.apps[appItem.rowId] {
                 return findLocalApp(bundleId: app.bundleId, title: app.title)
@@ -601,8 +601,8 @@ class NativeLaunchpadImporter {
             "untitled folder",
             "folder",
             "new folder",
-            "not yet命name",
-            "not yet命namefolder"
+            "not yethitname",
+            "not yethitnamefolder"
         ]
         return placeholders.contains(lower)
     }
