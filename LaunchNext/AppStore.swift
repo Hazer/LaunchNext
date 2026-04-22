@@ -78,7 +78,20 @@ private struct SemanticVersion: Comparable, Equatable {
     }
 }
 
-final class AppStore: ObservableObject {
+/// Batch-reads all UserDefaults keys into memory in one IPC call,
+/// eliminating per-key round-trips to cfprefsd during init().
+private struct DefaultsCache {
+    let store: [String: Any]
+    init() { self.store = UserDefaults.standard.dictionaryRepresentation() }
+    func containsKey(_ key: String) -> Bool { store[key] != nil }
+    func bool(forKey key: String) -> Bool { store[key] as? Bool ?? false }
+    func double(forKey key: String) -> Double { store[key] as? Double ?? 0.0 }
+    func string(forKey key: String) -> String? { store[key] as? String }
+    func integer(forKey key: String) -> Int { store[key] as? Int ?? 0 }
+    func object<T>(forKey key: String) -> T? { store[key] as? T }
+}
+
+@MainActor final class AppStore: ObservableObject {
     enum UpdateState: Equatable {
         case idle
         case checking
@@ -1935,6 +1948,14 @@ final class AppStore: ObservableObject {
 
     // MARK: - Auto rescan (FSEvents)
     private var fsEventStream: FSEventStreamRef?
+    private var fsEventContextPointer: UnsafeMutableRawPointer?
+
+    /// Wrapper for FSEventStream context that holds a weak reference to AppStore,
+    /// avoiding the retain cycle that passRetained(self) would create.
+    private final class FSEventContextBox {
+        weak var store: AppStore?
+        init(store: AppStore) { self.store = store }
+    }
     private var pendingChangedAppPaths: Set<String> = []
     private var pendingForceFullScan: Bool = false
     private let fullRescanThreshold: Int = 50
@@ -2330,156 +2351,158 @@ final class AppStore: ObservableObject {
     }
 
     init() {
-        if UserDefaults.standard.object(forKey: "isFullscreenMode") == nil {
+        let cache = DefaultsCache()
+
+        if !cache.containsKey("isFullscreenMode") {
             self.isFullscreenMode = true // 新用户默认 Classic (Fullscreen)
             UserDefaults.standard.set(true, forKey: "isFullscreenMode")
         } else {
-            self.isFullscreenMode = UserDefaults.standard.bool(forKey: "isFullscreenMode")
+            self.isFullscreenMode = cache.bool(forKey: "isFullscreenMode")
         }
-        if UserDefaults.standard.object(forKey: PerformanceMode.userDefaultsKey) == nil {
+        if !cache.containsKey(PerformanceMode.userDefaultsKey) {
             PerformanceMode.persist(.lean)
         }
-        let defaults = UserDefaults.standard
+        let defaults = UserDefaults.standard // kept for write-backs only
 
-        let shouldRememberPage = defaults.object(forKey: Self.rememberPageKey) == nil ? true : defaults.bool(forKey: Self.rememberPageKey)
-        let savedPageIndex = defaults.object(forKey: Self.rememberedPageIndexKey) as? Int
+        let shouldRememberPage = !cache.containsKey(Self.rememberPageKey) ? true : cache.bool(forKey: Self.rememberPageKey)
+        let savedPageIndex = cache.object(forKey: Self.rememberedPageIndexKey) as Int?
 
         let initialScrollSensitivity: Double
-        if defaults.object(forKey: "scrollSensitivity") == nil {
+        if !cache.containsKey("scrollSensitivity") {
             initialScrollSensitivity = 0.8
             defaults.set(initialScrollSensitivity, forKey: "scrollSensitivity")
         } else {
-            let storedSensitivity = defaults.double(forKey: "scrollSensitivity")
+            let storedSensitivity = cache.double(forKey: "scrollSensitivity")
             initialScrollSensitivity = storedSensitivity == 0 ? Self.defaultScrollSensitivity : storedSensitivity
         }
         scrollSensitivity = initialScrollSensitivity
 
-        let storedColumns = defaults.object(forKey: Self.gridColumnsKey) as? Int ?? 7
+        let storedColumns = cache.object(forKey: Self.gridColumnsKey) ?? 7
         let clampedColumns = Self.clampColumns(storedColumns)
         self.gridColumnsPerPage = clampedColumns
 
         defaults.set(clampedColumns, forKey: Self.gridColumnsKey)
 
-        let storedRows = defaults.object(forKey: Self.gridRowsKey) as? Int ?? 5
+        let storedRows = cache.object(forKey: Self.gridRowsKey) ?? 5
         let clampedRows = Self.clampRows(storedRows)
         self.gridRowsPerPage = clampedRows
         defaults.set(clampedRows, forKey: Self.gridRowsKey)
 
-        let storedColumnSpacing = defaults.object(forKey: Self.columnSpacingKey) as? Double ?? 20.0
+        let storedColumnSpacing = cache.object(forKey: Self.columnSpacingKey) ?? 20.0
         let clampedColumnSpacing = Self.clampColumnSpacing(storedColumnSpacing)
         self.iconColumnSpacing = clampedColumnSpacing
         defaults.set(clampedColumnSpacing, forKey: Self.columnSpacingKey)
 
-        let storedRowSpacing = defaults.object(forKey: Self.rowSpacingKey) as? Double ?? 14.0
+        let storedRowSpacing = cache.object(forKey: Self.rowSpacingKey) ?? 14.0
         let clampedRowSpacing = Self.clampRowSpacing(storedRowSpacing)
         self.iconRowSpacing = clampedRowSpacing
         defaults.set(clampedRowSpacing, forKey: Self.rowSpacingKey)
-        let storedDropZoneScale = defaults.object(forKey: Self.folderDropZoneScaleKey) as? Double ?? Self.defaultFolderDropZoneScale
+        let storedDropZoneScale = cache.object(forKey: Self.folderDropZoneScaleKey) ?? Self.defaultFolderDropZoneScale
         let clampedDropZoneScale = Self.clampFolderDropZoneScale(storedDropZoneScale)
         self.folderDropZoneScale = clampedDropZoneScale
         defaults.set(clampedDropZoneScale, forKey: Self.folderDropZoneScaleKey)
-        if defaults.object(forKey: Self.pageIndicatorTopPaddingKey) == nil {
+        if !cache.containsKey(Self.pageIndicatorTopPaddingKey) {
             defaults.set(Self.defaultPageIndicatorTopPadding, forKey: Self.pageIndicatorTopPaddingKey)
         }
-        if defaults.object(forKey: Self.pageIndicatorPerDisplayEnabledKey) == nil {
+        if !cache.containsKey(Self.pageIndicatorPerDisplayEnabledKey) {
             defaults.set(false, forKey: Self.pageIndicatorPerDisplayEnabledKey)
         }
-        let storedTopPadding = defaults.object(forKey: Self.pageIndicatorTopPaddingKey) as? Double ?? Self.defaultPageIndicatorTopPadding
+        let storedTopPadding = cache.object(forKey: Self.pageIndicatorTopPaddingKey) ?? Self.defaultPageIndicatorTopPadding
         let clampedTopPadding = Self.clampPageIndicatorTopPadding(storedTopPadding)
         self.pageIndicatorTopPadding = clampedTopPadding
         defaults.set(clampedTopPadding, forKey: Self.pageIndicatorTopPaddingKey)
         // 读取图标缩放默认值
-        if let v = UserDefaults.standard.object(forKey: "iconScale") as? Double {
+        if let v = cache.object(forKey: "iconScale") as Double? {
             self.iconScale = v
         }
-        if UserDefaults.standard.object(forKey: "enableDropPrediction") == nil {
-            UserDefaults.standard.set(true, forKey: "enableDropPrediction")
+        if !cache.containsKey("enableDropPrediction") {
+            defaults.set(true, forKey: "enableDropPrediction")
         }
-        if UserDefaults.standard.object(forKey: "useLocalizedThirdPartyTitles") == nil {
-            UserDefaults.standard.set(true, forKey: "useLocalizedThirdPartyTitles")
+        if !cache.containsKey("useLocalizedThirdPartyTitles") {
+            defaults.set(true, forKey: "useLocalizedThirdPartyTitles")
         }
-        if UserDefaults.standard.object(forKey: "enableAnimations") == nil {
-            UserDefaults.standard.set(true, forKey: "enableAnimations")
+        if !cache.containsKey("enableAnimations") {
+            defaults.set(true, forKey: "enableAnimations")
         }
-        if UserDefaults.standard.object(forKey: AppStore.followScrollPagingKey) == nil {
-            UserDefaults.standard.set(false, forKey: AppStore.followScrollPagingKey)
+        if !cache.containsKey(AppStore.followScrollPagingKey) {
+            defaults.set(false, forKey: AppStore.followScrollPagingKey)
         }
-        if UserDefaults.standard.object(forKey: AppStore.reverseWheelPagingKey) == nil {
-            UserDefaults.standard.set(false, forKey: AppStore.reverseWheelPagingKey)
+        if !cache.containsKey(AppStore.reverseWheelPagingKey) {
+            defaults.set(false, forKey: AppStore.reverseWheelPagingKey)
         }
-        if defaults.object(forKey: Self.dockDragEnabledKey) == nil {
-            let legacySideRaw = defaults.string(forKey: Self.dockDragSideKey)
+        if !cache.containsKey(Self.dockDragEnabledKey) {
+            let legacySideRaw = cache.string(forKey: Self.dockDragSideKey)
             defaults.set(legacySideRaw != DockDragSide.disabled.rawValue, forKey: Self.dockDragEnabledKey)
         }
-        if defaults.object(forKey: Self.dockDragSideKey) == nil {
+        if !cache.containsKey(Self.dockDragSideKey) {
             defaults.set(DockDragSide.bottom.rawValue, forKey: Self.dockDragSideKey)
         }
-        let storedDockDragDistance = defaults.object(forKey: Self.dockDragTriggerDistanceKey) as? Double ?? Self.defaultDockDragTriggerDistance
+        let storedDockDragDistance = cache.object(forKey: Self.dockDragTriggerDistanceKey) ?? Self.defaultDockDragTriggerDistance
         let clampedDockDragDistance = Self.clampDockDragTriggerDistance(storedDockDragDistance)
         defaults.set(clampedDockDragDistance, forKey: Self.dockDragTriggerDistanceKey)
-        if defaults.object(forKey: Self.hotCornerEnabledKey) == nil {
+        if !cache.containsKey(Self.hotCornerEnabledKey) {
             defaults.set(false, forKey: Self.hotCornerEnabledKey)
         }
-        if defaults.object(forKey: Self.hotCornerPositionKey) == nil {
+        if !cache.containsKey(Self.hotCornerPositionKey) {
             defaults.set(HotCornerPosition.topLeft.rawValue, forKey: Self.hotCornerPositionKey)
         }
-        let storedHotCornerDelay = defaults.object(forKey: Self.hotCornerTriggerDelayKey) as? Double ?? Self.defaultHotCornerTriggerDelay
+        let storedHotCornerDelay = cache.object(forKey: Self.hotCornerTriggerDelayKey) ?? Self.defaultHotCornerTriggerDelay
         let clampedHotCornerDelay = Self.clampHotCornerTriggerDelay(storedHotCornerDelay)
         defaults.set(clampedHotCornerDelay, forKey: Self.hotCornerTriggerDelayKey)
-        let storedHotCornerHitboxSize = defaults.object(forKey: Self.hotCornerHitboxSizeKey) as? Double ?? Self.defaultHotCornerHitboxSize
+        let storedHotCornerHitboxSize = cache.object(forKey: Self.hotCornerHitboxSizeKey) ?? Self.defaultHotCornerHitboxSize
         let clampedHotCornerHitboxSize = Self.clampHotCornerHitboxSize(storedHotCornerHitboxSize)
         defaults.set(clampedHotCornerHitboxSize, forKey: Self.hotCornerHitboxSizeKey)
-        if defaults.object(forKey: Self.hotCornerToggleWhenOpenKey) == nil {
+        if !cache.containsKey(Self.hotCornerToggleWhenOpenKey) {
             defaults.set(false, forKey: Self.hotCornerToggleWhenOpenKey)
         }
-        if defaults.object(forKey: Self.gestureEnabledKey) == nil {
+        if !cache.containsKey(Self.gestureEnabledKey) {
             defaults.set(false, forKey: Self.gestureEnabledKey)
         }
-        if defaults.object(forKey: Self.gestureCloseOnPinchOutKey) == nil {
+        if !cache.containsKey(Self.gestureCloseOnPinchOutKey) {
             defaults.set(false, forKey: Self.gestureCloseOnPinchOutKey)
         }
         // Keep a one-time migration path from the older tap booleans so users
         // do not lose settings if gesture support remains enabled.
-        if defaults.object(forKey: Self.gestureTapActionKey) == nil {
-            let legacyEnabled = defaults.object(forKey: "gestureTapEnabled") as? Bool ?? false
-            let legacyToggle = defaults.object(forKey: "gestureTapToggleWhenOpen") as? Bool ?? false
+        if !cache.containsKey(Self.gestureTapActionKey) {
+            let legacyEnabled = cache.object(forKey: "gestureTapEnabled") ?? false
+            let legacyToggle = cache.object(forKey: "gestureTapToggleWhenOpen") ?? false
             let migratedAction: GestureTapAction = legacyEnabled ? (legacyToggle ? .toggle : .open) : .off
             defaults.set(migratedAction.rawValue, forKey: Self.gestureTapActionKey)
         }
-        if defaults.object(forKey: Self.gameControllerMenuToggleKey) == nil {
+        if !cache.containsKey(Self.gameControllerMenuToggleKey) {
             defaults.set(true, forKey: Self.gameControllerMenuToggleKey)
         }
-        if defaults.object(forKey: Self.useCAGridRendererKey) == nil {
+        if !cache.containsKey(Self.useCAGridRendererKey) {
             defaults.set(true, forKey: Self.useCAGridRendererKey)
         }
-        if defaults.object(forKey: Self.developmentEnableCLICodeKey) == nil {
+        if !cache.containsKey(Self.developmentEnableCLICodeKey) {
             defaults.set(false, forKey: Self.developmentEnableCLICodeKey)
         }
-        if defaults.object(forKey: Self.backgroundMaskEnabledKey) == nil {
+        if !cache.containsKey(Self.backgroundMaskEnabledKey) {
             defaults.set(false, forKey: Self.backgroundMaskEnabledKey)
         }
-        if defaults.object(forKey: Self.backgroundMaskLightKey) == nil {
+        if !cache.containsKey(Self.backgroundMaskLightKey) {
             Self.persistBackgroundMaskColor(Self.defaultBackgroundMaskColor, forKey: Self.backgroundMaskLightKey)
         }
-        if defaults.object(forKey: Self.backgroundMaskDarkKey) == nil {
+        if !cache.containsKey(Self.backgroundMaskDarkKey) {
             Self.persistBackgroundMaskColor(Self.defaultBackgroundMaskColor, forKey: Self.backgroundMaskDarkKey)
         }
-        if UserDefaults.standard.object(forKey: "iconLabelFontSize") == nil {
-            UserDefaults.standard.set(11.0, forKey: "iconLabelFontSize")
+        if !cache.containsKey("iconLabelFontSize") {
+            defaults.set(11.0, forKey: "iconLabelFontSize")
         }
-        if UserDefaults.standard.object(forKey: AppStore.iconLabelFontWeightKey) == nil {
-            UserDefaults.standard.set(IconLabelFontWeightOption.medium.rawValue, forKey: AppStore.iconLabelFontWeightKey)
+        if !cache.containsKey(AppStore.iconLabelFontWeightKey) {
+            defaults.set(IconLabelFontWeightOption.medium.rawValue, forKey: AppStore.iconLabelFontWeightKey)
         }
-        if UserDefaults.standard.object(forKey: "animationDuration") == nil {
-            UserDefaults.standard.set(0.3, forKey: "animationDuration")
+        if !cache.containsKey("animationDuration") {
+            defaults.set(0.3, forKey: "animationDuration")
         }
-        if defaults.object(forKey: Self.windowOpenAnimationKey) == nil {
+        if !cache.containsKey(Self.windowOpenAnimationKey) {
             defaults.set(true, forKey: Self.windowOpenAnimationKey)
         }
-        if UserDefaults.standard.object(forKey: "showFPSOverlay") == nil {
-            UserDefaults.standard.set(false, forKey: "showFPSOverlay")
+        if !cache.containsKey("showFPSOverlay") {
+            defaults.set(false, forKey: "showFPSOverlay")
         }
-        if defaults.object(forKey: "pageIndicatorOffset") == nil {
+        if !cache.containsKey("pageIndicatorOffset") {
             defaults.set(27.0, forKey: "pageIndicatorOffset")
         }
 
@@ -2494,22 +2517,22 @@ final class AppStore: ObservableObject {
             }
         }
 
-        let storedDuration = UserDefaults.standard.double(forKey: "animationDuration")
+        let storedDuration = cache.double(forKey: "animationDuration")
         self.animationDuration = storedDuration == 0 ? 0.3 : storedDuration
-        self.enableWindowOpenAnimation = defaults.object(forKey: Self.windowOpenAnimationKey) as? Bool ?? true
-        self.dockDragEnabled = defaults.object(forKey: Self.dockDragEnabledKey) as? Bool ?? true
-        let storedDockDragSide = DockDragSide(rawValue: defaults.string(forKey: Self.dockDragSideKey) ?? "")
+        self.enableWindowOpenAnimation = cache.object(forKey: Self.windowOpenAnimationKey) ?? true
+        self.dockDragEnabled = cache.object(forKey: Self.dockDragEnabledKey) ?? true
+        let storedDockDragSide = DockDragSide(rawValue: cache.string(forKey: Self.dockDragSideKey) ?? "")
         self.dockDragSide = storedDockDragSide == .disabled ? .bottom : (storedDockDragSide ?? .bottom)
         self.dockDragTriggerDistance = clampedDockDragDistance
-        self.hotCornerEnabled = defaults.object(forKey: Self.hotCornerEnabledKey) as? Bool ?? false
-        self.hotCornerPosition = HotCornerPosition(rawValue: defaults.string(forKey: Self.hotCornerPositionKey) ?? "") ?? .topLeft
+        self.hotCornerEnabled = cache.object(forKey: Self.hotCornerEnabledKey) ?? false
+        self.hotCornerPosition = HotCornerPosition(rawValue: cache.string(forKey: Self.hotCornerPositionKey) ?? "") ?? .topLeft
         self.hotCornerTriggerDelay = clampedHotCornerDelay
         self.hotCornerHitboxSize = clampedHotCornerHitboxSize
-        self.hotCornerToggleWhenOpen = defaults.object(forKey: Self.hotCornerToggleWhenOpenKey) as? Bool ?? false
-        self.gestureEnabled = defaults.object(forKey: Self.gestureEnabledKey) as? Bool ?? false
-        self.gestureCloseOnPinchOut = defaults.object(forKey: Self.gestureCloseOnPinchOutKey) as? Bool ?? false
-        self.gestureTapAction = GestureTapAction(rawValue: defaults.string(forKey: Self.gestureTapActionKey) ?? "") ?? .off
-        self.enableAnimations = UserDefaults.standard.object(forKey: "enableAnimations") as? Bool ?? true
+        self.hotCornerToggleWhenOpen = cache.object(forKey: Self.hotCornerToggleWhenOpenKey) ?? false
+        self.gestureEnabled = cache.object(forKey: Self.gestureEnabledKey) ?? false
+        self.gestureCloseOnPinchOut = cache.object(forKey: Self.gestureCloseOnPinchOutKey) ?? false
+        self.gestureTapAction = GestureTapAction(rawValue: cache.string(forKey: Self.gestureTapActionKey) ?? "") ?? .off
+        self.enableAnimations = cache.object(forKey: "enableAnimations") ?? true
         self.customIconFileURL = AppStore.customIconFileURL
 
         let fallbackIcon = (NSApplication.shared.applicationIconImage?.copy() as? NSImage) ?? NSImage(size: NSSize(width: 512, height: 512))
@@ -3521,10 +3544,12 @@ final class AppStore: ObservableObject {
     // }
 
     deinit {
-        autoCheckTimer?.cancel()
-        stopAutoRescan()
-        let center = NSWorkspace.shared.notificationCenter
-        volumeObservers.forEach { center.removeObserver($0) }
+        MainActor.assumeIsolated {
+            autoCheckTimer?.cancel()
+            stopAutoRescan()
+            let center = NSWorkspace.shared.notificationCenter
+            volumeObservers.forEach { center.removeObserver($0) }
+        }
     }
 
     // MARK: - FSEvents wiring
@@ -3533,9 +3558,13 @@ final class AppStore: ObservableObject {
 
         let pathsToWatch = applicationSearchPaths
         guard !pathsToWatch.isEmpty else { return }
+
+        let box = FSEventContextBox(store: self)
+        let ptr = Unmanaged.passRetained(box).toOpaque()
+        fsEventContextPointer = UnsafeMutableRawPointer(ptr)
         var context = FSEventStreamContext(
             version: 0,
-            info: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()),
+            info: fsEventContextPointer,
             retain: nil,
             release: nil,
             copyDescription: nil
@@ -3543,7 +3572,8 @@ final class AppStore: ObservableObject {
 
         let callback: FSEventStreamCallback = { (_, clientInfo, numEvents, eventPaths, eventFlags, _) in
             guard let info = clientInfo else { return }
-            let appStore = Unmanaged<AppStore>.fromOpaque(info).takeUnretainedValue()
+            let box = Unmanaged<FSEventContextBox>.fromOpaque(info).takeUnretainedValue()
+            guard let appStore = box.store else { return }
 
             guard numEvents > 0 else {
                 appStore.handleFSEvents(paths: [], flagsPointer: eventFlags, count: 0)
@@ -3570,6 +3600,9 @@ final class AppStore: ObservableObject {
             latency,
             flags
         ) else {
+            // Balance the passRetained if stream creation fails
+            Unmanaged<FSEventContextBox>.fromOpaque(ptr).release()
+            fsEventContextPointer = nil
             return
         }
 
@@ -3579,6 +3612,11 @@ final class AppStore: ObservableObject {
     }
 
     func stopAutoRescan() {
+        // Balance the passRetained from startAutoRescan
+        if let ptr = fsEventContextPointer {
+            Unmanaged<FSEventContextBox>.fromOpaque(ptr).release()
+            fsEventContextPointer = nil
+        }
         guard let stream = fsEventStream else { return }
         FSEventStreamStop(stream)
         FSEventStreamInvalidate(stream)

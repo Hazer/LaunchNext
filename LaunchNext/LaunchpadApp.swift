@@ -5,6 +5,7 @@ import Combine
 import QuartzCore
 import Carbon
 import Carbon.HIToolbox
+import CoreServices
 
 extension Notification.Name {
     static let launchpadWindowShown = Notification.Name("LaunchpadWindowShown")
@@ -32,8 +33,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     private var cancellables = Set<AnyCancellable>()
     private var hotKeyRef: EventHotKeyRef?
     private var hotKeyEventHandler: EventHandlerRef?
+    private var f4HotKeyRef: EventHotKeyRef?
     // private var aiHotKeyRef: EventHotKeyRef?
     private let launchpadHotKeySignature = fourCharCode("LNXK")
+    private let f4HotKeySignature = fourCharCode("F4KY")
     // private let aiOverlayHotKeySignature = fourCharCode("AIOV")
     
     let appStore = AppStore()
@@ -53,17 +56,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     private var hotCornerMonitor: HotCornerMonitor?
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
-    // Experimental low-level gesture monitor.
-    // Remove this property if gesture support is dropped together with
-    // bindGesturePreference()/updateGestureMonitor()/handleGestureTrigger().
+    // Gesture monitor (now uses unified HID-level event tap).
     private var gestureMonitor: GestureMonitor?
-    /// Suppresses system magnify events while a four-finger gesture is being
-    /// tracked, preventing the default Launchpad from appearing.
-    private var magnifySuppressor: MagnifyEventSuppressor?
-    // Wake recovery work items for the experimental gesture monitor.
-    // If gesture support is removed later, delete this together with
-    // bindGestureWakeRecovery()/scheduleGestureWakeRecovery().
-    private var gestureWakeRecoveryWorkItems: [DispatchWorkItem] = []
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         if runHeadlessModeIfRequested() { return }
@@ -76,6 +70,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         appStore.syncGlobalHotKeyRegistration()
         appStore.updateActivationPolicy()
         setupMenuBarItem()
+        registerF4HotKey()
         // appStore.syncAIOverlayHotKeyRegistration()
 
         SoundManager.shared.bind(appStore: appStore)
@@ -99,9 +94,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         // Experimental gesture wiring entry point.
         // Remove this call if the gesture feature is removed later.
         bindGesturePreference()
-        // Experimental wake recovery for low-level gesture input.
-        // Remove this call if gesture support is removed later.
-        bindGestureWakeRecovery()
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.applyAppearancePreference(self.appStore.appearancePreference)
@@ -369,56 +361,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         .store(in: &cancellables)
     }
 
-    // Rebuilds the experimental gesture listener after sleep/wake.
-    // The low-level multitouch listener can become stale after wake even when
-    // its local "isListening" flag still looks healthy. If gesture support is
-    // removed later, delete this binder together with schedule/cancel helpers.
-    private func bindGestureWakeRecovery() {
-        let center = NSWorkspace.shared.notificationCenter
-
-        center.publisher(for: NSWorkspace.willSleepNotification)
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                self?.cancelGestureWakeRecovery()
-            }
-            .store(in: &cancellables)
-
-        center.publisher(for: NSWorkspace.didWakeNotification)
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                self?.scheduleGestureWakeRecovery()
-            }
-            .store(in: &cancellables)
-    }
-
-    private func scheduleGestureWakeRecovery() {
-        guard appStore.gestureEnabled || appStore.gestureTapAction != .off else { return }
-        guard !isTerminating else { return }
-
-        cancelGestureWakeRecovery()
-
-        // Rebuild twice: once after the initial wake settles, then again as a
-        // fallback for longer sleep/wake paths where the trackpad comes back
-        // later than NSWorkspaceDidWakeNotification.
-        for delay in [0.8, 2.0] {
-            let workItem = DispatchWorkItem { [weak self] in
-                guard let self else { return }
-                guard !self.isTerminating else { return }
-                guard self.appStore.gestureEnabled || self.appStore.gestureTapAction != .off else { return }
-                self.magnifySuppressor?.stop()
-                self.magnifySuppressor?.start()
-                self.gestureMonitor?.restart()
-            }
-            gestureWakeRecoveryWorkItems.append(workItem)
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
-        }
-    }
-
-    private func cancelGestureWakeRecovery() {
-        gestureWakeRecoveryWorkItems.forEach { $0.cancel() }
-        gestureWakeRecoveryWorkItems.removeAll()
-    }
-
     private func updateHotCornerMonitor(enabled: Bool,
                                         position: AppStore.HotCornerPosition,
                                         triggerDelay: Double,
@@ -456,10 +398,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         showWindow()
     }
 
-    // Bridges Settings state into the experimental gesture monitor.
-    // If gesture support needs to be removed later, this is one of the main seams:
-    // delete LaunchNext/Gesture/, remove the Gesture settings/AppStore fields,
-    // then remove this method together with bindGesturePreference().
+    // Bridges Settings state into the gesture monitor.
     private func updateGestureMonitor(enabled: Bool,
                                       closeOnPinchOut: Bool,
                                       tapAction: AppStore.GestureTapAction) {
@@ -470,18 +409,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
             tapTogglesWindow: tapAction == .toggle
         )
 
-        let gestureActive = configuration.isEnabled
-
-        // Start/stop the magnify event suppressor alongside the gesture monitor.
-        if gestureActive && magnifySuppressor == nil {
-            let suppressor = MagnifyEventSuppressor()
-            suppressor.start()
-            magnifySuppressor = suppressor
-        } else if !gestureActive {
-            magnifySuppressor?.stop()
-            magnifySuppressor = nil
-        }
-
         if gestureMonitor == nil {
             gestureMonitor = GestureMonitor(configuration: configuration) { [weak self] action in
                 DispatchQueue.main.async {
@@ -490,7 +417,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
             }
         }
 
-        gestureMonitor?.magnifySuppressor = magnifySuppressor
         gestureMonitor?.update(configuration: configuration)
     }
 
@@ -1334,11 +1260,63 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     // }
 
     private func cleanUpHotKeyEventHandlerIfNeeded() {
-        // if hotKeyRef == nil && aiHotKeyRef == nil, let handler = hotKeyEventHandler {
-        if hotKeyRef == nil, let handler = hotKeyEventHandler {
+        // if hotKeyRef == nil && aiHotKeyRef == nil && f4HotKeyRef == nil, let handler = hotKeyEventHandler {
+        if hotKeyRef == nil && f4HotKeyRef == nil, let handler = hotKeyEventHandler {
             RemoveEventHandler(handler)
             hotKeyEventHandler = nil
         }
+    }
+
+    // MARK: - F4 / Launchpad Key Interception
+
+    /// Finds the system Launchpad symbolic hot key (typically F4) using HIServices.
+    private func findLaunchpadSymbolicHotKey() -> (keyCode: UInt32, modifiers: UInt32)? {
+        var hotKeys: Unmanaged<CFArray>?
+        let status = CopySymbolicHotKeys(&hotKeys)
+        guard status == noErr, let cfArray = hotKeys?.takeRetainedValue() else { return nil }
+        let array = cfArray as NSArray
+        for i in 0..<array.count {
+            guard let dict = array[i] as? [String: Any] else { continue }
+            guard dict[kHISymbolicHotKeyEnabled as String] as? Bool == true else { continue }
+            guard let code = dict[kHISymbolicHotKeyCode as String] as? Int,
+                  let mods = dict[kHISymbolicHotKeyModifiers as String] as? Int else { continue }
+            // F4 key code is 118 on ANSI keyboards — the standard Launchpad key
+            if code == 118 && mods == 0 {
+                return (UInt32(code), UInt32(mods))
+            }
+        }
+        return nil
+    }
+
+    private func registerF4HotKey() {
+        ensureHotKeyEventHandler()
+        guard let f4Info = findLaunchpadSymbolicHotKey() else {
+            NSLog("LaunchNext: F4/Launchpad symbolic hot key not found")
+            return
+        }
+        let hotKeyID = EventHotKeyID(signature: f4HotKeySignature, id: 1)
+        var ref: EventHotKeyRef?
+        let status = RegisterEventHotKey(
+            f4Info.keyCode,
+            f4Info.modifiers,
+            hotKeyID,
+            GetEventDispatcherTarget(),
+            0,
+            &ref
+        )
+        if status != noErr {
+            NSLog("LaunchNext: Failed to register F4 hotkey (status %d)", status)
+        } else {
+            f4HotKeyRef = ref
+        }
+    }
+
+    private func unregisterF4HotKey() {
+        if let ref = f4HotKeyRef {
+            UnregisterEventHotKey(ref)
+            f4HotKeyRef = nil
+        }
+        cleanUpHotKeyEventHandlerIfNeeded()
     }
 
     private func ensureHotKeyEventHandler() {
@@ -1355,6 +1333,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
             guard let self else { return }
             switch (signature, id) {
             case (self.launchpadHotKeySignature, 1):
+                self.toggleWindow()
+            case (self.f4HotKeySignature, 1):
                 self.toggleWindow()
             // case (self.aiOverlayHotKeySignature, 1):
             //     self.appStore.toggleAIOverlayPreview()
@@ -1827,6 +1807,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
 
     func applicationWillTerminate(_ notification: Notification) {
         stopCLIEndpointMonitor()
+        unregisterF4HotKey()
         ControllerInputManager.shared.stop()
     }
     

@@ -1,18 +1,23 @@
 import Foundation
 import os
 
+/// High-level gesture monitor that wraps HIDGestureMonitor (actor-based).
+///
+/// Translates HIDGestureMonitor.Action into GestureTriggerAction and
+/// manages the monitor lifecycle. The underlying HIDGestureMonitor uses
+/// a single CGEventTap for both gesture detection and system event suppression,
+/// eliminating the need for OMS and a separate MagnifyEventSuppressor.
+@MainActor
 final class GestureMonitor: Sendable {
     typealias Configuration = GestureConfiguration
 
-    private let provider = GestureTouchProvider()
     private let onTrigger: @Sendable (GestureTriggerAction) -> Void
-    private let configurationBox: OSAllocatedUnfairLock<Configuration>
-    private let monitorTaskBox = OSAllocatedUnfairLock<Task<Void, Never>?>(uncheckedState: nil)
+    private let configurationBox = OSAllocatedUnfairLock<Configuration>(uncheckedState:
+        Configuration(isEnabled: false)
+    )
 
-    /// Optional reference to the magnify-event suppressor. When set, the
-    /// monitor drives its ``MagnifyEventSuppressor/flag`` based on the
-    /// state machine's tracking state.
-    weak var magnifySuppressor: MagnifyEventSuppressor?
+    /// Underlying HID-level actor monitor
+    private var hidMonitor: HIDGestureMonitor?
 
     var configuration: Configuration {
         get { configurationBox.withLockUnchecked { $0 } }
@@ -20,16 +25,18 @@ final class GestureMonitor: Sendable {
     }
 
     init(configuration: Configuration, onTrigger: @escaping @Sendable (GestureTriggerAction) -> Void) {
-        self.configurationBox = OSAllocatedUnfairLock(uncheckedState: configuration)
+        self.configurationBox.withLockUnchecked { $0 = configuration }
         self.onTrigger = onTrigger
     }
 
+    // nonisolated deinit needed because self is actor-isolated
+    // but we need to clean up the actor monitor
     deinit {
-        stop()
+        // HIDGestureMonitor's own deinit handles stop()
+        hidMonitor = nil
     }
 
     func update(configuration newConfiguration: Configuration) {
-        let previousConfiguration = configuration
         configuration = newConfiguration
 
         if !newConfiguration.isEnabled {
@@ -37,38 +44,38 @@ final class GestureMonitor: Sendable {
             return
         }
 
-        if monitorTaskBox.withLockUnchecked({ $0 != nil }), previousConfiguration != newConfiguration {
-            stop()
-        }
+        let hidConfig = HIDGestureMonitor.Configuration(
+            isEnabled: newConfiguration.isEnabled,
+            closeOnPinchOutEnabled: newConfiguration.closeOnPinchOutEnabled,
+            requiredFingerCount: newConfiguration.requiredFingerCount,
+            openTriggerScaleRatio: newConfiguration.openTriggerScaleRatio,
+            closeTriggerScaleRatio: newConfiguration.closeTriggerScaleRatio,
+            minimumConsecutiveMatches: newConfiguration.requiredConsecutiveMatches,
+            cooldownDuration: newConfiguration.cooldownDuration,
+            smoothingAlpha: 0.7
+        )
 
-        let isListening = provider.isListening
-        let hasTask = monitorTaskBox.withLockUnchecked({ $0 != nil })
-        if !hasTask || !isListening {
-            start()
+        if let hidMonitor {
+            Task { await hidMonitor.update(configuration: hidConfig) }
+        } else {
+            let monitor = HIDGestureMonitor(configuration: hidConfig) { [weak self] action in
+                guard let self else { return }
+                let mapped: GestureTriggerAction = switch action {
+                case .open: .open
+                case .close: .close
+                }
+                Task { @MainActor in
+                    self.onTrigger(mapped)
+                }
+            }
+            hidMonitor = monitor
+            Task { await monitor.start() }
         }
     }
 
     func start() {
         guard configuration.isEnabled else { return }
-        guard monitorTaskBox.withLockUnchecked({ $0 == nil }) else { return }
-
-        guard provider.startListening() else { return }
-        let config = configuration
-        let suppressor = self.magnifySuppressor
-        let task = Task { [provider, onTrigger] in
-            var machine = GestureStateMachine(configuration: config)
-            for await samples in provider.touchDataStream {
-                if Task.isCancelled { break }
-                suppressor?.flag.withLockUnchecked { $0 = machine.isTracking }
-                if let action = machine.consume(samples: samples) {
-                    await MainActor.run {
-                        onTrigger(action)
-                    }
-                }
-            }
-            suppressor?.flag.withLockUnchecked { $0 = false }
-        }
-        monitorTaskBox.withLockUnchecked { $0 = task }
+        update(configuration: configuration)
     }
 
     func restart() {
@@ -77,8 +84,8 @@ final class GestureMonitor: Sendable {
     }
 
     func stop() {
-        monitorTaskBox.withLockUnchecked { $0?.cancel(); $0 = nil }
-        _ = provider.stopListening()
-        magnifySuppressor?.flag.withLockUnchecked { $0 = false }
+        if let hidMonitor {
+            Task { await hidMonitor.stop() }
+        }
     }
 }
