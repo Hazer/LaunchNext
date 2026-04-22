@@ -1,3 +1,4 @@
+import LaunchNextCore
 import CoreGraphics
 import Foundation
 import os
@@ -17,22 +18,40 @@ import os
 /// avoiding manual lock management.
 ///
 /// Architecture inspired by reverse-engineering LaunchOS v1.5.5.
-actor HIDGestureMonitor {
+public actor HIDGestureMonitor {
 
     // MARK: - Types
 
-    struct Configuration: Sendable, Equatable {
-        var isEnabled: Bool
-        var closeOnPinchOutEnabled: Bool = false
-        var requiredFingerCount: Int = 4
-        var openTriggerScaleRatio: Double = 0.84
-        var closeTriggerScaleRatio: Double = 1.10
-        var minimumConsecutiveMatches: Int = 2
-        var cooldownDuration: Double = 0.5
-        var smoothingAlpha: Double = 0.7
+    public struct Configuration: Sendable, Equatable {
+        public var isEnabled: Bool
+        public var closeOnPinchOutEnabled: Bool = false
+        public var requiredFingerCount: Int = 4
+        public var openTriggerScaleRatio: Double = 0.84
+        public var closeTriggerScaleRatio: Double = 1.10
+        public var minimumConsecutiveMatches: Int = 2
+        public var cooldownDuration: Double = 0.5
+        public var smoothingAlpha: Double = 0.7
+
+        public init(isEnabled: Bool,
+                    closeOnPinchOutEnabled: Bool = false,
+                    requiredFingerCount: Int = 4,
+                    openTriggerScaleRatio: Double = 0.84,
+                    closeTriggerScaleRatio: Double = 1.10,
+                    minimumConsecutiveMatches: Int = 2,
+                    cooldownDuration: Double = 0.5,
+                    smoothingAlpha: Double = 0.7) {
+            self.isEnabled = isEnabled
+            self.closeOnPinchOutEnabled = closeOnPinchOutEnabled
+            self.requiredFingerCount = requiredFingerCount
+            self.openTriggerScaleRatio = openTriggerScaleRatio
+            self.closeTriggerScaleRatio = closeTriggerScaleRatio
+            self.minimumConsecutiveMatches = minimumConsecutiveMatches
+            self.cooldownDuration = cooldownDuration
+            self.smoothingAlpha = smoothingAlpha
+        }
     }
 
-    enum Action: Sendable {
+    public enum Action: Sendable {
         case open
         case close
     }
@@ -43,26 +62,26 @@ actor HIDGestureMonitor {
     private static let gestureEventType = CGEventType(rawValue: 29)
 
     /// CGEventField for gesture subtype
-    static let gestureSubtypeField = CGEventField(rawValue: 59)!
+    public static let gestureSubtypeField = CGEventField(rawValue: 59)!
 
     /// Magnify gesture subtype value
-    static let magnifySubtype: Int64 = 2
+    public static let magnifySubtype: Int64 = 2
 
     /// Number of fingers in the gesture
-    static let gestureFingerCountField = CGEventField(rawValue: 44)!
+    public static let gestureFingerCountField = CGEventField(rawValue: 44)!
 
     /// Gesture phase field
-    static let gesturePhaseField = CGEventField(rawValue: 51)!
+    public static let gesturePhaseField = CGEventField(rawValue: 51)!
 
     /// Gesture magnification value field
-    static let gestureMagnificationField = CGEventField(rawValue: 61)!
+    public static let gestureMagnificationField = CGEventField(rawValue: 61)!
 
     /// HID-level event tap location
     private static let hidEventTap = CGEventTapLocation(rawValue: 0)!
 
     // MARK: - Gesture phase raw values (shared with CallbackContext)
 
-    enum GesturePhaseRaw: Int64 {
+    public enum GesturePhaseRaw: Int64 {
         case began = 1
         case changed = 2
         case ended = 4
@@ -92,21 +111,21 @@ actor HIDGestureMonitor {
 
     // MARK: - Init
 
-    init(configuration: Configuration, onTrigger: @escaping @Sendable (Action) -> Void) {
+    public init(configuration: Configuration, onTrigger: @escaping @Sendable (Action) -> Void) {
         self.configuration = configuration
         self.onTrigger = onTrigger
     }
 
     // MARK: - Public interface
 
-    func update(configuration: Configuration) {
+    public func update(configuration: Configuration) {
         self.configuration = configuration
         if !configuration.isEnabled {
             stop()
         }
     }
 
-    func start() async {
+    public func start() async {
         guard configuration.isEnabled else { return }
         guard tap == nil else { return }
         guard let gestureEventType = Self.gestureEventType else { return }
@@ -160,7 +179,7 @@ actor HIDGestureMonitor {
         self.runLoopSource = source
     }
 
-    func stop() {
+    public func stop() {
         if let runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         }
@@ -178,7 +197,7 @@ actor HIDGestureMonitor {
         suppressFlag.withLockUnchecked { $0 = false }
     }
 
-    func restart() async {
+    public func restart() async {
         stop()
         await start()
     }

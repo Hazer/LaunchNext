@@ -1,24 +1,24 @@
 import SwiftUI
 
-enum LNAnimations {
+public enum LNAnimations {
     // MARK: - Springs - Performance-optimized animation configuration
-    static var springFast: Animation {
+    public static var springFast: Animation {
         guard AnimationPreferences.isEnabled else { return .linear(duration: 0.0001) }
         return .spring(response: AnimationPreferences.springResponse, dampingFraction: 0.8)
     }
-    
+
     // MARK: - Performance-optimized animations
-    static var dragPreview: Animation {
+    public static var dragPreview: Animation {
         guard AnimationPreferences.isEnabled else { return .linear(duration: 0.0001) }
         return .easeOut(duration: AnimationPreferences.baseDuration)
     }
-    static var gridUpdate: Animation {
+    public static var gridUpdate: Animation {
         guard AnimationPreferences.isEnabled else { return .linear(duration: 0.0001) }
         return .easeInOut(duration: AnimationPreferences.baseDuration)
     }
-    
+
     // MARK: - Transitions
-    static var folderOpenTransition: AnyTransition {
+    public static var folderOpenTransition: AnyTransition {
         if AnimationPreferences.isEnabled {
             return AnyTransition.scale(scale: 0.95).combined(with: .opacity)
         } else {

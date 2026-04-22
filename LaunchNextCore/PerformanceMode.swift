@@ -1,12 +1,12 @@
 import Foundation
 
-enum PerformanceMode: String, CaseIterable, Identifiable {
+public enum PerformanceMode: String, CaseIterable, Identifiable {
     case full
     case lean
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    static let userDefaultsKey = "performanceMode"
+    public static let userDefaultsKey = "performanceMode"
 
     private static let activeMode: PerformanceMode = {
         if let raw = UserDefaults.standard.string(forKey: userDefaultsKey),
@@ -16,9 +16,9 @@ enum PerformanceMode: String, CaseIterable, Identifiable {
         return .lean
     }()
 
-    static var current: PerformanceMode { activeMode }
+    public static var current: PerformanceMode { activeMode }
 
-    static func persist(_ mode: PerformanceMode) {
+    public static func persist(_ mode: PerformanceMode) {
         UserDefaults.standard.set(mode.rawValue, forKey: userDefaultsKey)
     }
 }

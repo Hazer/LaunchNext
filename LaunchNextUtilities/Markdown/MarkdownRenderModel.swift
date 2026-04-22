@@ -1,13 +1,18 @@
 import Foundation
 
-struct MarkdownRenderModel {
-    let blocks: [MarkdownBlock]
-    let previewText: String
+public struct MarkdownRenderModel {
+    public let blocks: [MarkdownBlock]
+    public let previewText: String
 
-    nonisolated static let empty = MarkdownRenderModel(blocks: [], previewText: "")
+    nonisolated public static let empty = MarkdownRenderModel(blocks: [], previewText: "")
+
+    public init(blocks: [MarkdownBlock], previewText: String) {
+        self.blocks = blocks
+        self.previewText = previewText
+    }
 }
 
-enum MarkdownBlock: Identifiable {
+public enum MarkdownBlock: Identifiable {
     case heading(UUID, level: Int, text: String)
     case paragraph(UUID, text: String)
     case bulletList(UUID, items: [String])
@@ -17,7 +22,7 @@ enum MarkdownBlock: Identifiable {
     case image(UUID, alt: String, source: String)
     case divider(UUID)
 
-    var id: UUID {
+    public var id: UUID {
         switch self {
         case .heading(let id, _, _),
              .paragraph(let id, _),

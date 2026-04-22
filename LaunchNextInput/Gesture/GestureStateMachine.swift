@@ -1,6 +1,7 @@
+import LaunchNextCore
 import Foundation
 
-enum GestureTriggerAction {
+public enum GestureTriggerAction {
     case open
     case close
     case toggle

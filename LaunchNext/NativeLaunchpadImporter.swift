@@ -1,3 +1,4 @@
+import LaunchNextCore
 import Foundation
 import AppKit
 import SwiftData

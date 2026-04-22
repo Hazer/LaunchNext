@@ -38,6 +38,7 @@ let project = Project(
         ]
     ),
     targets: [
+        // MARK: - App Target
         .target(
             name: "LaunchNext",
             destinations: .macOS,
@@ -81,6 +82,13 @@ let project = Project(
                     basedOnDependencyAnalysis: false
                 ),
             ],
+            dependencies: [
+                .target(name: "LaunchNextCore"),
+                .target(name: "LaunchNextUtilities"),
+                .target(name: "LaunchNextInput"),
+                .target(name: "LaunchNextStrategies"),
+                .target(name: "LaunchNextCLI"),
+            ],
             settings: .settings(base: [
                 "PRODUCT_NAME": "$(TARGET_NAME)",
                 "PRODUCT_BUNDLE_IDENTIFIER": "io.roversx.launchnext",
@@ -95,6 +103,109 @@ let project = Project(
                 "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
                 "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
                 "CLANG_ENABLE_MODULES": "YES",
+                "SWIFT_EMIT_LOC_STRINGS": "YES",
+            ])
+        ),
+
+        // MARK: - Core Framework
+        .target(
+            name: "LaunchNextCore",
+            destinations: .macOS,
+            product: .framework,
+            bundleId: "io.roversx.launchnext.core",
+            deploymentTargets: .macOS("26.0"),
+            infoPlist: .extendingDefault(with: [:]),
+            sources: ["LaunchNextCore/**/*.swift"],
+            dependencies: [],
+            settings: .settings(base: [
+                "PRODUCT_NAME": "$(TARGET_NAME)",
+                "PRODUCT_BUNDLE_IDENTIFIER": "io.roversx.launchnext.core",
+                "CODE_SIGN_STYLE": "Automatic",
+                "DEFINES_MODULE": "YES",
+                "SWIFT_EMIT_LOC_STRINGS": "YES",
+            ])
+        ),
+
+        // MARK: - Utilities Framework
+        .target(
+            name: "LaunchNextUtilities",
+            destinations: .macOS,
+            product: .framework,
+            bundleId: "io.roversx.launchnext.utilities",
+            deploymentTargets: .macOS("26.0"),
+            infoPlist: .extendingDefault(with: [:]),
+            sources: ["LaunchNextUtilities/**/*.swift"],
+            dependencies: [
+                .target(name: "LaunchNextCore"),
+            ],
+            settings: .settings(base: [
+                "PRODUCT_NAME": "$(TARGET_NAME)",
+                "PRODUCT_BUNDLE_IDENTIFIER": "io.roversx.launchnext.utilities",
+                "CODE_SIGN_STYLE": "Automatic",
+                "DEFINES_MODULE": "YES",
+                "SWIFT_EMIT_LOC_STRINGS": "YES",
+            ])
+        ),
+
+        // MARK: - Input Framework
+        .target(
+            name: "LaunchNextInput",
+            destinations: .macOS,
+            product: .framework,
+            bundleId: "io.roversx.launchnext.input",
+            deploymentTargets: .macOS("26.0"),
+            infoPlist: .extendingDefault(with: [:]),
+            sources: ["LaunchNextInput/**/*.swift"],
+            dependencies: [
+                .target(name: "LaunchNextCore"),
+            ],
+            settings: .settings(base: [
+                "PRODUCT_NAME": "$(TARGET_NAME)",
+                "PRODUCT_BUNDLE_IDENTIFIER": "io.roversx.launchnext.input",
+                "CODE_SIGN_STYLE": "Automatic",
+                "DEFINES_MODULE": "YES",
+                "SWIFT_EMIT_LOC_STRINGS": "YES",
+            ])
+        ),
+
+        // MARK: - Strategies Framework
+        .target(
+            name: "LaunchNextStrategies",
+            destinations: .macOS,
+            product: .framework,
+            bundleId: "io.roversx.launchnext.strategies",
+            deploymentTargets: .macOS("26.0"),
+            infoPlist: .extendingDefault(with: [:]),
+            sources: ["LaunchNextStrategies/**/*.swift"],
+            dependencies: [
+                .target(name: "LaunchNextCore"),
+            ],
+            settings: .settings(base: [
+                "PRODUCT_NAME": "$(TARGET_NAME)",
+                "PRODUCT_BUNDLE_IDENTIFIER": "io.roversx.launchnext.strategies",
+                "CODE_SIGN_STYLE": "Automatic",
+                "DEFINES_MODULE": "YES",
+                "SWIFT_EMIT_LOC_STRINGS": "YES",
+            ])
+        ),
+
+        // MARK: - CLI Framework
+        .target(
+            name: "LaunchNextCLI",
+            destinations: .macOS,
+            product: .framework,
+            bundleId: "io.roversx.launchnext.cli",
+            deploymentTargets: .macOS("26.0"),
+            infoPlist: .extendingDefault(with: [:]),
+            sources: ["LaunchNextCLI/**/*.swift"],
+            dependencies: [
+                .target(name: "LaunchNextCore"),
+            ],
+            settings: .settings(base: [
+                "PRODUCT_NAME": "$(TARGET_NAME)",
+                "PRODUCT_BUNDLE_IDENTIFIER": "io.roversx.launchnext.cli",
+                "CODE_SIGN_STYLE": "Automatic",
+                "DEFINES_MODULE": "YES",
                 "SWIFT_EMIT_LOC_STRINGS": "YES",
             ])
         ),

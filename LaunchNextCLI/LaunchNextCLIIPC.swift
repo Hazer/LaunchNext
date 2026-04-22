@@ -1,11 +1,12 @@
+import LaunchNextCore
 import Foundation
 import Dispatch
 import Darwin
 
-enum LaunchNextCLIIPCConfig {
-    static let socketFileName = "cli.sock"
+public enum LaunchNextCLIIPCConfig {
+    public static let socketFileName = "cli.sock"
 
-    static func socketPath() -> String? {
+    public static func socketPath() -> String? {
         let fm = FileManager.default
         guard let caches = try? fm.url(for: .cachesDirectory,
                                        in: .userDomainMask,
@@ -40,8 +41,8 @@ private struct LaunchNextCLIIPCResponse: Codable {
     }
 }
 
-enum LaunchNextCLIIPCClient {
-    static func execute(request: LaunchNextCLIRequest, socketPath: String) -> LaunchNextCLICommandResult {
+public enum LaunchNextCLIIPCClient {
+    public static func execute(request: LaunchNextCLIRequest, socketPath: String) -> LaunchNextCLICommandResult {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else {
             return .failure("Failed to create CLI socket.")
@@ -118,7 +119,7 @@ enum LaunchNextCLIIPCClient {
         return try? JSONDecoder().decode(LaunchNextCLIIPCResponse.self, from: lineData)
     }
 
-    static func writeAll(fd: Int32, data: Data) -> Bool {
+    public static func writeAll(fd: Int32, data: Data) -> Bool {
         var written = 0
         return data.withUnsafeBytes { raw in
             guard let base = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return false }
@@ -137,7 +138,7 @@ enum LaunchNextCLIIPCClient {
         }
     }
 
-    static func readLine(fd: Int32) -> Data? {
+    public static func readLine(fd: Int32) -> Data? {
         var data = Data()
         var buffer = [UInt8](repeating: 0, count: 2048)
         let deadline = Date().addingTimeInterval(2.0)
@@ -163,8 +164,8 @@ enum LaunchNextCLIIPCClient {
     }
 }
 
-final class LaunchNextCLIIPCServer {
-    typealias CommandHandler = (String, [String: String]) -> LaunchNextCLICommandResult
+public final class LaunchNextCLIIPCServer {
+    public typealias CommandHandler = (String, [String: String]) -> LaunchNextCLICommandResult
 
     private let socketPath: String
     private let commandHandler: CommandHandler
@@ -173,12 +174,12 @@ final class LaunchNextCLIIPCServer {
     private var listeningFD: Int32 = -1
     private var acceptSource: DispatchSourceRead?
 
-    init(socketPath: String, commandHandler: @escaping CommandHandler) {
+    public init(socketPath: String, commandHandler: @escaping CommandHandler) {
         self.socketPath = socketPath
         self.commandHandler = commandHandler
     }
 
-    func start() throws {
+    public func start() throws {
         stop()
 
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
@@ -209,7 +210,7 @@ final class LaunchNextCLIIPCServer {
         source.resume()
     }
 
-    func stop() {
+    public func stop() {
         acceptSource?.cancel()
         acceptSource = nil
 

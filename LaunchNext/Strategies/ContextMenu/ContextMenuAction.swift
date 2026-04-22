@@ -1,3 +1,4 @@
+import LaunchNextCore
 import AppKit
 
 // MARK: - Context Menu Action Protocol

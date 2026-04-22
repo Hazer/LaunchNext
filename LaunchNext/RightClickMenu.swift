@@ -1,3 +1,4 @@
+import LaunchNextCore
 import SwiftUI
 import AppKit
 

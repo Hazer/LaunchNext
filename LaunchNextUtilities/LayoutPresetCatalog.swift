@@ -1,24 +1,29 @@
 import Foundation
 
-struct LayoutPresetDefinition {
-    let id: String
-    let slots: [LayoutPresetSlot]
+public struct LayoutPresetDefinition {
+    public let id: String
+    public let slots: [LayoutPresetSlot]
+
+    public init(id: String, slots: [LayoutPresetSlot]) {
+        self.id = id
+        self.slots = slots
+    }
 }
 
-enum LayoutPresetSlot {
+public enum LayoutPresetSlot {
     case app(bundleIdentifiers: [String], aliases: [String])
     case utilitiesFolder
 }
 
-enum LayoutPresetCatalog {
-    static let utilityRootPaths: [String] = [
+public enum LayoutPresetCatalog {
+    public static let utilityRootPaths: [String] = [
         "/System/Applications/Utilities",
         "/Applications/Utilities"
     ].map { URL(fileURLWithPath: $0).standardized.path }
 
     // Extra apps that should fall back into the "Other" folder when still unused.
     // Matching priority remains: bundle identifier/path first, alias only as final fallback.
-    static let otherExtraBundleIDs: Set<String> = Set([
+    public static let otherExtraBundleIDs: Set<String> = Set([
         "com.apple.backup.launcher",
         "com.apple.FontBook",
         "com.apple.exposelauncher",
@@ -35,7 +40,7 @@ enum LayoutPresetCatalog {
         "com.apple.siri.launcher"
     ].map { $0.lowercased() })
 
-    static let otherExtraAliases: [String] = [
+    public static let otherExtraAliases: [String] = [
         "Time Machine",
         "Font Book",
         "Mission Control",
@@ -49,7 +54,7 @@ enum LayoutPresetCatalog {
         "Siri"
     ]
 
-    static let otherExtraPathSuffixes: [String] = [
+    public static let otherExtraPathSuffixes: [String] = [
         "/time machine.app",
         "/font book.app",
         "/mission control.app",
@@ -63,7 +68,7 @@ enum LayoutPresetCatalog {
         "/siri.app"
     ]
 
-    static let macOS26Default = LayoutPresetDefinition(
+    public static let macOS26Default = LayoutPresetDefinition(
         id: "macos26_default",
         slots: [
             .app(bundleIdentifiers: ["com.apple.AppStore"], aliases: ["App Store"]),

@@ -1,41 +1,42 @@
+import LaunchNextCore
 import Foundation
 import Darwin
 
-enum LaunchNextCLICommandResult {
+public enum LaunchNextCLICommandResult {
     case success(String)
     case failure(String)
 }
 
-struct LaunchNextCLIRequest {
-    let command: String
-    let arguments: [String: String]
+public struct LaunchNextCLIRequest {
+    public let command: String
+    public let arguments: [String: String]
 
-    init(command: String, arguments: [String: String] = [:]) {
+    public init(command: String, arguments: [String: String] = [:]) {
         self.command = command
         self.arguments = arguments
     }
 }
 
-struct LaunchNextCLIContext {
-    let executeRemoteCommand: ((LaunchNextCLIRequest) -> LaunchNextCLICommandResult)?
+public struct LaunchNextCLIContext {
+    public let executeRemoteCommand: ((LaunchNextCLIRequest) -> LaunchNextCLICommandResult)?
 
-    init(executeRemoteCommand: ((LaunchNextCLIRequest) -> LaunchNextCLICommandResult)? = nil) {
+    public init(executeRemoteCommand: ((LaunchNextCLIRequest) -> LaunchNextCLICommandResult)? = nil) {
         self.executeRemoteCommand = executeRemoteCommand
     }
 }
 
-enum LaunchNextRuntimeMode {
+public enum LaunchNextRuntimeMode {
     case gui
     case tui
     case cli
 }
 
-struct LaunchNextCLIArguments {
-    let mode: LaunchNextRuntimeMode
-    let command: String?
-    let commandArguments: [String]
+public struct LaunchNextCLIArguments {
+    public let mode: LaunchNextRuntimeMode
+    public let command: String?
+    public let commandArguments: [String]
 
-    static func parse(_ arguments: [String] = CommandLine.arguments) -> LaunchNextCLIArguments {
+    public static func parse(_ arguments: [String] = CommandLine.arguments) -> LaunchNextCLIArguments {
         let rawArgs = Array(arguments.dropFirst())
         // Ignore LaunchServices-injected args when app starts from Finder (e.g. "-psn_0_12345").
         let args = rawArgs.filter { arg in
@@ -74,11 +75,11 @@ struct LaunchNextCLIArguments {
     }
 }
 
-enum LaunchNextCLI {
+public enum LaunchNextCLI {
     private static let cliHistoryMaxCount = 200
 
     @discardableResult
-    static func run(parsed: LaunchNextCLIArguments = .parse(), context: LaunchNextCLIContext = LaunchNextCLIContext()) -> Int32 {
+    public static func run(parsed: LaunchNextCLIArguments = .parse(), context: LaunchNextCLIContext = LaunchNextCLIContext()) -> Int32 {
         switch parsed.mode {
         case .gui:
             return 0
@@ -113,7 +114,7 @@ enum LaunchNextCLI {
         }
     }
 
-    static func printHelp() {
+    public static func printHelp() {
         let text = """
         LaunchNext CLI
 
@@ -1072,10 +1073,10 @@ enum LaunchNextCLI {
 
     private static func printTUIBanner() {
         let banner = #"""
- _                           _                     _      ____ _     ___ 
+ _                           _                     _      ____ _     ___
 | |    __ _ _   _ _ __   ___| |__  _ __   _____  _| |_   / ___| |   |_ _|
-| |   / _` | | | | '_ \ / __| '_ \| '_ \ / _ \ \/ / __| | |   | |    | | 
-| |__| (_| | |_| | | | | (__| | | | | | |  __/>  <| |_  | |___| |___ | | 
+| |   / _` | | | | '_ \ / __| '_ \| '_ \ / _ \ \/ / __| | |   | |    | |
+| |__| (_| | |_| | | | | (__| | | | | | |  __/>  <| |_  | |___| |___ | |
 |_____\__,_|\__,_|_| |_|\___|_| |_|_| |_|\___/_/\_\\__|  \____|_____|___|
 """#
         print(banner)

@@ -2,32 +2,32 @@ import Foundation
 import AppKit
 import SwiftData
 
-struct FolderInfo: Identifiable, Equatable {
-    let id: String
-    var name: String
-    var apps: [AppInfo]
-    let createdAt: Date
-    
-    init(id: String = UUID().uuidString, name: String = "Untitled", apps: [AppInfo] = [], createdAt: Date = Date()) {
+public struct FolderInfo: Identifiable, Equatable {
+    public let id: String
+    public var name: String
+    public var apps: [AppInfo]
+    public let createdAt: Date
+
+    public init(id: String = UUID().uuidString, name: String = "Untitled", apps: [AppInfo] = [], createdAt: Date = Date()) {
         self.id = id
         self.name = name
         self.apps = apps
         self.createdAt = createdAt
     }
-    
-    var folderIcon: NSImage {
+
+    public var folderIcon: NSImage {
         // Use cache to generate folder icon, avoid redundant rendering
         let icon = icon(of: 72)
         return icon
     }
 
-    func icon(of side: CGFloat) -> NSImage {
-        let useHighRes = UserDefaults.standard.object(forKey: AppStore.folderPreviewHighResKey) as? Bool ?? true
+    public func icon(of side: CGFloat) -> NSImage {
+        let useHighRes = UserDefaults.standard.object(forKey: "folderPreviewHighRes") as? Bool ?? true
         let scale = useHighRes ? (NSScreen.main?.backingScaleFactor ?? 1) : 1
         return icon(of: side, scale: scale)
     }
 
-    func icon(of side: CGFloat, scale: CGFloat) -> NSImage {
+    public func icon(of side: CGFloat, scale: CGFloat) -> NSImage {
         let normalizedSide = max(16, side)
         let normalizedScale = max(1, scale)
         let cacheKey = folderPreviewCacheKey(for: normalizedSide, scale: normalizedScale)
@@ -90,7 +90,7 @@ struct FolderInfo: Identifiable, Equatable {
             let x = startX + CGFloat(col) * (tile + spacing)
             let y = startYTop - CGFloat(row + 1) * tile - CGFloat(row) * spacing
             let iconRect = NSRect(x: x, y: y, width: tile, height: tile)
-            
+
             // iconFallback: if app icon size is 0，fall back to system file icon
             let iconToDraw: NSImage = {
                 let baseIcon = IconStore.shared.icon(for: app)
@@ -118,19 +118,19 @@ struct FolderInfo: Identifiable, Equatable {
         let scaleKey = Int((scale * 100).rounded())
         return "folderPreview_\(id)_\(sizeKey)_\(scaleKey)_\(contentHash)"
     }
-    
-    static func == (lhs: FolderInfo, rhs: FolderInfo) -> Bool {
+
+    public static func == (lhs: FolderInfo, rhs: FolderInfo) -> Bool {
         lhs.id == rhs.id
     }
 }
 
-enum LaunchpadItem: Identifiable, Equatable {
+public enum LaunchpadItem: Identifiable, Equatable {
     case app(AppInfo)
     case folder(FolderInfo)
     case empty(String)
     case missingApp(MissingAppPlaceholder)
-    
-    var id: String {
+
+    public var id: String {
         switch self {
         case .app(let app):
             return "app_\(app.id)"
@@ -142,8 +142,8 @@ enum LaunchpadItem: Identifiable, Equatable {
             return "missing_\(placeholder.bundlePath)"
         }
     }
-    
-    var name: String {
+
+    public var name: String {
         switch self {
         case .app(let app):
             return app.name
@@ -156,7 +156,7 @@ enum LaunchpadItem: Identifiable, Equatable {
         }
     }
 
-    var icon: NSImage {
+    public var icon: NSImage {
         switch self {
         case .app(let app):
             return app.icon
@@ -171,35 +171,35 @@ enum LaunchpadItem: Identifiable, Equatable {
         }
     }
 
-    // Convenience check: if .app returns AppInfo，otherwise nil
-    var appInfoIfApp: AppInfo? {
+    // Convenience check: if .app returns AppInfo, otherwise nil
+    public var appInfoIfApp: AppInfo? {
         if case let .app(app) = self { return app }
         return nil
     }
-    
-    static func == (lhs: LaunchpadItem, rhs: LaunchpadItem) -> Bool {
+
+    public static func == (lhs: LaunchpadItem, rhs: LaunchpadItem) -> Bool {
         lhs.id == rhs.id
     }
 }
 
-// MARK: - Unified persistence model（Top-level item: app or folder)
+// MARK: - Unified persistence model (Top-level item: app or folder)
 @Model
-final class TopItemData {
-    // Unified primary key: use appPath for apps，use folderId for folders
-    @Attribute(.unique) var id: String
-    var kind: String                 // "app" or "folder"
-    var orderIndex: Int              // Top-level mixed order index
-    // appfield
-    var appPath: String?
-    // folderfield
-    var folderName: String?
-    var appPaths: [String]           // folderinsideapporder
+public final class TopItemData {
+    // Unified primary key: use appPath for apps, use folderId for folders
+    @Attribute(.unique) public var id: String
+    public var kind: String                 // "app" or "folder"
+    public var orderIndex: Int              // Top-level mixed order index
+    // app field
+    public var appPath: String?
+    // folder field
+    public var folderName: String?
+    public var appPaths: [String]           // folder inside app order
     // timestamp
-    var createdAt: Date
-    var updatedAt: Date
+    public var createdAt: Date
+    public var updatedAt: Date
 
-    // folderConstructor
-    init(folderId: String,
+    // folder constructor
+    public init(folderId: String,
          folderName: String,
          appPaths: [String],
          orderIndex: Int,
@@ -215,8 +215,8 @@ final class TopItemData {
         self.updatedAt = updatedAt
     }
 
-    // appConstructor
-    init(appPath: String,
+    // app constructor
+    public init(appPath: String,
          orderIndex: Int,
          createdAt: Date = Date(),
          updatedAt: Date = Date()) {
@@ -230,8 +230,8 @@ final class TopItemData {
         self.updatedAt = updatedAt
     }
 
-    // empty slotConstructor
-    init(emptyId: String,
+    // empty slot constructor
+    public init(emptyId: String,
          orderIndex: Int,
          createdAt: Date = Date(),
          updatedAt: Date = Date()) {
@@ -246,28 +246,28 @@ final class TopItemData {
     }
 }
 
-// MARK: - eachpage independenceorder/sortPersistencemodel（by“page-slot”store)
+// MARK: - each page independence order/sort Persistence model (by "page-slot" store)
 @Model
-final class PageEntryData {
+public final class PageEntryData {
     // Slot unique key: e.g. "page-0-pos-3"
-    @Attribute(.unique) var slotId: String
-    var pageIndex: Int
-    var position: Int
-    var kind: String          // "app" | "folder" | "empty" | "missing"
+    @Attribute(.unique) public var slotId: String
+    public var pageIndex: Int
+    public var position: Int
+    public var kind: String          // "app" | "folder" | "empty" | "missing"
     // App entry
-    var appPath: String?
-    var appDisplayName: String?
+    public var appPath: String?
+    public var appDisplayName: String?
     // Folder entry
-    var folderId: String?
-    var folderName: String?
-    var appPaths: [String]
+    public var folderId: String?
+    public var folderName: String?
+    public var appPaths: [String]
     // Removable source records which removable directory the missing app came from, for cleanup
-    var removableSource: String?
+    public var removableSource: String?
     // timestamp
-    var createdAt: Date
-    var updatedAt: Date
+    public var createdAt: Date
+    public var updatedAt: Date
 
-    init(slotId: String,
+    public init(slotId: String,
          pageIndex: Int,
          position: Int,
          kind: String,
@@ -294,14 +294,20 @@ final class PageEntryData {
     }
 }
 
-struct MissingAppPlaceholder: Equatable, Hashable, Identifiable {
-    let bundlePath: String
-    let displayName: String
-    let removableSource: String?
-    var id: String { bundlePath }
-    var icon: NSImage { Self.defaultIcon }
+public struct MissingAppPlaceholder: Equatable, Hashable, Identifiable {
+    public let bundlePath: String
+    public let displayName: String
+    public let removableSource: String?
+    public var id: String { bundlePath }
+    public var icon: NSImage { Self.defaultIcon }
 
-    static let defaultIcon: NSImage = {
+    public init(bundlePath: String, displayName: String, removableSource: String? = nil) {
+        self.bundlePath = bundlePath
+        self.displayName = displayName
+        self.removableSource = removableSource
+    }
+
+    public static let defaultIcon: NSImage = {
         let dimension: CGFloat = 256
         let size = NSSize(width: dimension, height: dimension)
         let image = NSImage(size: size)

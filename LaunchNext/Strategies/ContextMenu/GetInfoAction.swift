@@ -1,3 +1,4 @@
+import LaunchNextCore
 import AppKit
 
 struct GetInfoAction: ContextMenuAction {

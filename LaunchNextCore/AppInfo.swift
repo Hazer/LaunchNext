@@ -2,12 +2,18 @@ import Foundation
 import AppKit
 import CoreServices
 
-struct AppInfo: Identifiable, Equatable, Hashable {
-    let name: String
-    let icon: NSImage
-    let url: URL
+public struct AppInfo: Identifiable, Equatable, Hashable {
+    public let name: String
+    public let icon: NSImage
+    public let url: URL
 
-    static let transparentPlaceholderIcon: NSImage = {
+    public init(name: String, icon: NSImage, url: URL) {
+        self.name = name
+        self.icon = icon
+        self.url = url
+    }
+
+    public static let transparentPlaceholderIcon: NSImage = {
         let size = NSSize(width: 1, height: 1)
         let image = NSImage(size: size)
         image.lockFocus()
@@ -19,18 +25,18 @@ struct AppInfo: Identifiable, Equatable, Hashable {
     }()
 
     // Use app path as stable unique identifier
-    var id: String { url.path }
+    public var id: String { url.path }
 
-    static func == (lhs: AppInfo, rhs: AppInfo) -> Bool {
+    public static func == (lhs: AppInfo, rhs: AppInfo) -> Bool {
         lhs.url == rhs.url
     }
 
-    func hash(into hasher: inout Hasher) {
+    public func hash(into hasher: inout Hasher) {
         hasher.combine(url.path)
     }
 
     // MARK: - Create AppInfo
-    static func from(url: URL, preferredName: String? = nil, customTitle: String? = nil, loadIcon: Bool = true) -> AppInfo {
+    public static func from(url: URL, preferredName: String? = nil, customTitle: String? = nil, loadIcon: Bool = true) -> AppInfo {
         let fallbackName = normalizeCandidate(url.deletingPathExtension().lastPathComponent)
         let bundle = Bundle(url: url)
         let localizedName = localizedAppName(for: url,

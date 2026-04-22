@@ -1,7 +1,7 @@
 import SwiftUI
 
-struct ReleaseNotesMarkdownView: View {
-    enum Mode {
+public struct ReleaseNotesMarkdownView: View {
+    public enum Mode {
         case preview
         case full
     }
@@ -10,17 +10,17 @@ struct ReleaseNotesMarkdownView: View {
     private let mode: Mode
     private let imageCornerRadius: CGFloat = 14
 
-    init(model: MarkdownRenderModel, mode: Mode) {
+    public init(model: MarkdownRenderModel, mode: Mode) {
         self.model = model
         self.mode = mode
     }
 
-    init(source: String, mode: Mode) {
+    public init(source: String, mode: Mode) {
         self.model = SimpleMarkdownParser.parse(source)
         self.mode = mode
     }
 
-    var body: some View {
+    public var body: some View {
         switch mode {
         case .preview:
             VStack(alignment: .leading, spacing: 10) {

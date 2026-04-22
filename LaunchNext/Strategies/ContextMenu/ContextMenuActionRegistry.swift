@@ -1,3 +1,4 @@
+import LaunchNextCore
 import Foundation
 
 // MARK: - Context Menu Action Registry

@@ -1,7 +1,7 @@
 import Foundation
 
-enum SimpleMarkdownParser {
-    nonisolated static func parse(_ source: String) -> MarkdownRenderModel {
+public enum SimpleMarkdownParser {
+    nonisolated public static func parse(_ source: String) -> MarkdownRenderModel {
         let normalized = source
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")

@@ -1,3 +1,6 @@
+import LaunchNextStrategies
+import LaunchNextUtilities
+import LaunchNextCore
 import SwiftUI
 import Combine
 import AppKit
@@ -3092,7 +3095,7 @@ struct DragPreviewItem: View {
                         }
                     }
                 Text(app.name)
-                    .font(.default)
+                    .font(.launchpadDefault)
                     .foregroundColor(isMissing ? .secondary : .primary)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -3124,7 +3127,7 @@ struct DragPreviewItem: View {
                             .padding(iconSize * 0.1)
                     )
                 Text(placeholder.displayName)
-                    .font(.default)
+                    .font(.launchpadDefault)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -3155,7 +3158,7 @@ struct DragPreviewItem: View {
                 }
                 
                 Text(folder.name)
-                    .font(.default)
+                    .font(.launchpadDefault)
                     .foregroundColor(.primary)
                     .lineLimit(1)
                     .truncationMode(.tail)

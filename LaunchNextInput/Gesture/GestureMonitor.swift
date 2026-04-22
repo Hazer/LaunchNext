@@ -1,3 +1,4 @@
+import LaunchNextCore
 import Foundation
 import os
 
@@ -8,8 +9,8 @@ import os
 /// a single CGEventTap for both gesture detection and system event suppression,
 /// eliminating the need for OMS and a separate MagnifyEventSuppressor.
 @MainActor
-final class GestureMonitor: Sendable {
-    typealias Configuration = GestureConfiguration
+public final class GestureMonitor: Sendable {
+    public typealias Configuration = GestureConfiguration
 
     private let onTrigger: @Sendable (GestureTriggerAction) -> Void
     private let configurationBox = OSAllocatedUnfairLock<Configuration>(uncheckedState:
@@ -19,12 +20,12 @@ final class GestureMonitor: Sendable {
     /// Underlying HID-level actor monitor
     private var hidMonitor: HIDGestureMonitor?
 
-    var configuration: Configuration {
+    public var configuration: Configuration {
         get { configurationBox.withLockUnchecked { $0 } }
         set { configurationBox.withLockUnchecked { $0 = newValue } }
     }
 
-    init(configuration: Configuration, onTrigger: @escaping @Sendable (GestureTriggerAction) -> Void) {
+    public init(configuration: Configuration, onTrigger: @escaping @Sendable (GestureTriggerAction) -> Void) {
         self.configurationBox.withLockUnchecked { $0 = configuration }
         self.onTrigger = onTrigger
     }
@@ -36,7 +37,7 @@ final class GestureMonitor: Sendable {
         hidMonitor = nil
     }
 
-    func update(configuration newConfiguration: Configuration) {
+    public func update(configuration newConfiguration: Configuration) {
         configuration = newConfiguration
 
         if !newConfiguration.isEnabled {
@@ -73,17 +74,17 @@ final class GestureMonitor: Sendable {
         }
     }
 
-    func start() {
+    public func start() {
         guard configuration.isEnabled else { return }
         update(configuration: configuration)
     }
 
-    func restart() {
+    public func restart() {
         stop()
         start()
     }
 
-    func stop() {
+    public func stop() {
         if let hidMonitor {
             Task { await hidMonitor.stop() }
         }

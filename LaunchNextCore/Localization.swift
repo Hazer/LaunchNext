@@ -1,6 +1,6 @@
 import Foundation
 
-enum AppLanguage: String, CaseIterable, Identifiable {
+public enum AppLanguage: String, CaseIterable, Identifiable {
     case system = "system"
     case english = "en"
     case simplifiedChinese = "zh-Hans"
@@ -16,9 +16,9 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case vietnamese = "vi"
     case portugueseBrazil = "pt-BR"
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    static func resolveSystemDefault() -> AppLanguage {
+    public static func resolveSystemDefault() -> AppLanguage {
         guard let preferred = Locale.preferredLanguages.first else { return .english }
         let lower = preferred.lowercased()
         if lower.hasPrefix("zh") { return .simplifiedChinese }
@@ -37,7 +37,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
 }
 
-enum LocalizationKey: String {
+public enum LocalizationKey: String {
     case noAppsFound
     case searchPlaceholder
     case appTitle
@@ -481,8 +481,8 @@ enum LocalizationKey: String {
     case hideMenuBarOption
 }
 
-final class LocalizationManager {
-    static let shared = LocalizationManager()
+public final class LocalizationManager {
+    public static let shared = LocalizationManager()
 
     private let translations: [AppLanguage: [LocalizationKey: String]]
 
@@ -5796,7 +5796,7 @@ final class LocalizationManager {
         translations = builder
     }
 
-    func localized(_ key: LocalizationKey, language: AppLanguage) -> String {
+    public func localized(_ key: LocalizationKey, language: AppLanguage) -> String {
         let lang = language == .system ? AppLanguage.resolveSystemDefault() : language
         if let value = translations[lang]?[key] {
             return value
@@ -5804,7 +5804,7 @@ final class LocalizationManager {
         return translations[.english]?[key] ?? key.rawValue
     }
 
-    func languageDisplayName(for language: AppLanguage, displayLanguage: AppLanguage) -> String {
+    public func languageDisplayName(for language: AppLanguage, displayLanguage: AppLanguage) -> String {
         let resolvedDisplay = displayLanguage == .system ? AppLanguage.resolveSystemDefault() : displayLanguage
         switch language {
         case .system:
