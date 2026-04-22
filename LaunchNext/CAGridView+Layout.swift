@@ -8,7 +8,7 @@ extension CAGridView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
 
-        // 清除旧层
+        // Clear old layers
         for pageLayers in iconLayers {
             for layer in pageLayers {
                 layer.removeFromSuperlayer()
@@ -22,7 +22,7 @@ extension CAGridView {
             return
         }
 
-        // 为每页创建图层
+        // Create layers for each page
         let totalPages = pageCount
         // print("🔧 [CAGrid] rebuildLayers: \(items.count) items, \(totalPages) pages, \(itemsPerPage) per page")
 
@@ -92,7 +92,7 @@ extension CAGridView {
 
         containerLayer.addSublayer(iconLayer)
 
-        // 文字标签层 - 匹配原 SwiftUI 样式
+        // Text label layer - match original SwiftUI style
         let textLayer = CATextLayer()
         textLayer.name = "label"
         textLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 2.0
@@ -103,7 +103,7 @@ extension CAGridView {
         textLayer.truncationMode = .end
         textLayer.isWrapped = false
 
-        // 性能优化：栅格化文字层
+        // Performance optimization: rasterize text layer
         textLayer.shouldRasterize = true
         textLayer.rasterizationScale = NSScreen.main?.backingScaleFactor ?? 2.0
 
@@ -111,7 +111,7 @@ extension CAGridView {
         textLayer.foregroundColor = currentLabelColor().cgColor
         textLayer.shadowOpacity = 0
 
-        // 设置文字内容
+        // Set text content
         switch item {
         case .app(let app):
             textLayer.string = app.name
@@ -125,7 +125,7 @@ extension CAGridView {
 
         containerLayer.addSublayer(textLayer)
 
-        // 设置图标
+        // Set icon
         setIcon(for: iconLayer, item: item)
 
         if case .app = item {
@@ -159,11 +159,11 @@ extension CAGridView {
             if let cgImage = getCachedIcon(for: app.url.path) {
                 layer.contents = cgImage
             } else {
-                // 异步加载 - 直接从系统获取图标
+                // Async load - get icon directly from system
                 DispatchQueue.global(qos: .userInitiated).async { [weak self, weak layer] in
                     guard let self = self, let layer = layer else { return }
                     guard layer.value(forKey: "iconPath") as? String == path else { return }
-                    // 使用 IconStore 获取图标（CA 模式走 Next Engine 逻辑）
+                    // Use IconStore to get icon (CA mode uses Next Engine logic)
                     let icon = IconStore.shared.icon(forPath: path)
                     if let cgImage = self.loadIcon(for: path, icon: icon) {
                         DispatchQueue.main.async {
@@ -177,7 +177,7 @@ extension CAGridView {
                 }
             }
         case .folder(let folder):
-            // 异步加载文件夹图标
+            // Async load folder icon
             let folderIconSize = iconSize
             let previewScale = folderPreviewScale
             DispatchQueue.global(qos: .userInitiated).async { [weak layer] in
@@ -214,7 +214,7 @@ extension CAGridView {
         }
         iconCacheLock.unlock()
 
-        // 渲染为 CGImage
+        // Render as CGImage
         let size = NSSize(width: iconSize * 2, height: iconSize * 2) // Retina
         let image = NSImage(size: size)
         image.lockFocus()
@@ -424,10 +424,10 @@ extension CAGridView {
 
     override func viewWillDraw() {
         super.viewWillDraw()
-        // 确保视图是第一响应者和滚轮监听器已安装
+        // Ensure view is first responder and scroll wheel listener is installed
         if window != nil {
             makeFirstResponderIfAvailable()
-            // 确保滚轮监听器存在
+            // Ensure scroll wheel listener exists
             if scrollEventMonitor == nil {
                 setupScrollEventMonitor()
             }

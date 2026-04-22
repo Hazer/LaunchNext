@@ -16,7 +16,7 @@ struct FolderInfo: Identifiable, Equatable {
     }
     
     var folderIcon: NSImage {
-        // 使用缓存生成文件夹图标，避免重复渲染
+        // Use cache to generate folder icon, avoid redundant rendering
         let icon = icon(of: 72)
         return icon
     }
@@ -72,7 +72,7 @@ struct FolderInfo: Identifiable, Equatable {
         let innerInset = round(contentRect.width * 0.08)
         let innerRect = contentRect.insetBy(dx: innerInset, dy: innerInset)
 
-        // 外层缩略图：3x3 马赛克
+        // Outer thumbnail: 3x3 mosaic
         let cols = 3
         let rows = 3
         let spacing = max(1, round(innerRect.width * 0.02))
@@ -91,7 +91,7 @@ struct FolderInfo: Identifiable, Equatable {
             let y = startYTop - CGFloat(row + 1) * tile - CGFloat(row) * spacing
             let iconRect = NSRect(x: x, y: y, width: tile, height: tile)
             
-            // 图标兜底：若应用图标尺寸为0，回退到系统文件图标
+            // iconFallback: if app icon size is 0，fall back to system file icon
             let iconToDraw: NSImage = {
                 let baseIcon = IconStore.shared.icon(for: app)
                 if baseIcon.size.width > 0 && baseIcon.size.height > 0 {
@@ -164,14 +164,14 @@ enum LaunchpadItem: Identifiable, Equatable {
             let icon = folder.folderIcon
             return icon
         case .empty:
-            // 透明占位
+            // Transparent placeholder
             return NSImage(size: .zero)
         case .missingApp(let placeholder):
             return placeholder.icon
         }
     }
 
-    // 方便判断：若为 .app 返回 AppInfo，否则为 nil
+    // Convenience check: if .app returns AppInfo，otherwise nil
     var appInfoIfApp: AppInfo? {
         if case let .app(app) = self { return app }
         return nil
@@ -182,23 +182,23 @@ enum LaunchpadItem: Identifiable, Equatable {
     }
 }
 
-// MARK: - 统一持久化模型（顶层项：应用或文件夹）
+// MARK: - Unified persistence model（Top-level item: app or folder)
 @Model
 final class TopItemData {
-    // 统一主键：对于应用可使用 appPath，对于文件夹使用 folderId
+    // Unified primary key: use appPath for apps，use folderId for folders
     @Attribute(.unique) var id: String
     var kind: String                 // "app" or "folder"
-    var orderIndex: Int              // 顶层混合顺序索引
-    // 应用字段
+    var orderIndex: Int              // Top-level mixed order index
+    // appfield
     var appPath: String?
-    // 文件夹字段
+    // folderfield
     var folderName: String?
-    var appPaths: [String]           // 文件夹内的应用顺序
-    // 时间戳
+    var appPaths: [String]           // folderinsideapporder
+    // timestamp
     var createdAt: Date
     var updatedAt: Date
 
-    // 文件夹构造
+    // folderConstructor
     init(folderId: String,
          folderName: String,
          appPaths: [String],
@@ -215,7 +215,7 @@ final class TopItemData {
         self.updatedAt = updatedAt
     }
 
-    // 应用构造
+    // appConstructor
     init(appPath: String,
          orderIndex: Int,
          createdAt: Date = Date(),
@@ -230,7 +230,7 @@ final class TopItemData {
         self.updatedAt = updatedAt
     }
 
-    // 空槽位构造
+    // empty slotConstructor
     init(emptyId: String,
          orderIndex: Int,
          createdAt: Date = Date(),
@@ -246,24 +246,24 @@ final class TopItemData {
     }
 }
 
-// MARK: - 每页独立排序持久化模型（按“页-槽位”存储）
+// MARK: - eachpage independenceorder/sortPersistencemodel（by“页-slot”store)
 @Model
 final class PageEntryData {
-    // 槽位唯一键：例如 "page-0-pos-3"
+    // Slot unique key: e.g. "page-0-pos-3"
     @Attribute(.unique) var slotId: String
     var pageIndex: Int
     var position: Int
     var kind: String          // "app" | "folder" | "empty" | "missing"
-    // app 条目
+    // App entry
     var appPath: String?
     var appDisplayName: String?
-    // folder 条目
+    // Folder entry
     var folderId: String?
     var folderName: String?
     var appPaths: [String]
-    // removable source 记录该缺失应用来自哪个可移除目录，便于清理
+    // Removable source records which removable directory the missing app came from, for cleanup
     var removableSource: String?
-    // 时间戳
+    // timestamp
     var createdAt: Date
     var updatedAt: Date
 

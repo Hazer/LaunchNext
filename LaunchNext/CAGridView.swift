@@ -11,7 +11,7 @@ extension Array {
 }
 
 // MARK: - Core Animation Grid View
-/// 使用 Core Animation 实现的高性能网格视图，支持 120Hz ProMotion
+/// Use Core Animation High-performance grid view implementation，supports 120Hz ProMotion
 final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
 
     // MARK: - Properties
@@ -22,7 +22,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     var iconLayers: [[CALayer]] = []  // [page][item]
     let fadeMaskLayer = CAGradientLayer()
 
-    // 网格配置
+    // Grid configuration
     var columns: Int = 7 { didSet { rebuildLayers() } }
     var rows: Int = 5 { didSet { rebuildLayers() } }
     var iconSize: CGFloat = 72 {
@@ -34,7 +34,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     }
     var columnSpacing: CGFloat = 24 { didSet { updateLayout() } }
     var rowSpacing: CGFloat = 36 { didSet { updateLayout() } }
-    var labelFontSize: CGFloat = 12 { didSet { rebuildLayers() } }  // 默认 12pt，比原来大一点
+    var labelFontSize: CGFloat = 12 { didSet { rebuildLayers() } }  // Default 12pt，slightly larger than before
     var labelFontWeight: NSFont.Weight = .medium { didSet { updateLabelFonts() } }
     var showLabels: Bool = true { didSet { updateLabelVisibility() } }
     var isLayoutLocked: Bool = false
@@ -56,7 +56,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     }
     var needsLayoutRefresh = true
 
-    // 分页
+    // Paging
     var currentPage: Int = 0
     var itemsPerPage: Int {
         layoutStrategy.itemsPerPage(columns: columns, rows: rows)
@@ -80,7 +80,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     }
     var isVerticalMode: Bool { layoutMode == .vertical }
 
-    // 滚动状态
+    // Scroll state
     var scrollOffset: CGFloat = 0
     var targetScrollOffset: CGFloat = 0
     var scrollVelocity: CGFloat = 0
@@ -105,18 +105,18 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     var dragStartOffset: CGFloat = 0
     var accumulatedDelta: CGFloat = 0
 
-    // 性能监控
+    // Performance monitoring
     var lastFrameTime: CFAbsoluteTime = 0
     var frameCount: Int = 0
     var currentFPS: Double = 120
     var frameTimes: [Double] = []
 
-    // 图标缓存
+    // Icon cache
     var iconCache: [String: CGImage] = [:]
     let iconCacheLock = NSLock()
     var enableIconPreload: Bool = false
 
-    // 回调
+    // Callbacks
     var onItemClicked: ((LaunchpadItem, Int) -> Void)?
     var onItemDoubleClicked: ((LaunchpadItem, Int) -> Void)?
     var onPageChanged: ((Int) -> Void)?
@@ -125,11 +125,11 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     var onHideApp: ((AppInfo) -> Void)?
     var onDissolveFolder: ((FolderInfo) -> Void)?
     var onUninstallWithTool: ((AppInfo) -> Void)?
-    var onCreateFolder: ((AppInfo, AppInfo, Int) -> Void)?  // (拖拽的app, 目标app, 位置)
-    var onMoveToFolder: ((AppInfo, FolderInfo) -> Void)?    // 移动到已有文件夹
-    var onReorderItems: ((Int, Int) -> Void)?               // 重新排序 (fromIndex, toIndex)
-    var onReorderAppBatch: (([String], Int) -> Void)?       // 批量重排（按路径顺序）
-    var onRequestNewPage: (() -> Void)?                     // 请求创建新页面
+    var onCreateFolder: ((AppInfo, AppInfo, Int) -> Void)?  // (dragged app, target app, position)
+    var onMoveToFolder: ((AppInfo, FolderInfo) -> Void)?    // Move to existing folder
+    var onReorderItems: ((Int, Int) -> Void)?               // Reorder (fromIndex, toIndex)
+    var onReorderAppBatch: (([String], Int) -> Void)?       // Batch reorder (by path order)
+    var onRequestNewPage: (() -> Void)?                     // Request new page creation
     var hideAppMenuTitle: String = "Hide application"
     var dissolveFolderMenuTitle: String = "Dissolve folder"
     var uninstallWithToolMenuTitle: String = "Uninstall with configured tool"
@@ -152,7 +152,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     var batchDraggingAppPathsOrdered: [String] = []
     var batchHiddenCompanionIndices: [Int] = []
 
-    // 拖拽状态
+    // Drag state
     var isDraggingItem = false
     var draggingIndex: Int?
     var draggingItem: LaunchpadItem?
@@ -164,10 +164,10 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     let longPressDuration: TimeInterval = 0.5
     var pressedIndex: Int?
 
-    // 跨页拖拽
+    // Cross-page drag
     var edgeDragTimer: Timer?
-    let edgeDragThreshold: CGFloat = 60  // 边缘检测区域宽度
-    let edgeDragDelay: TimeInterval = 0.4  // 触发翻页延迟
+    let edgeDragThreshold: CGFloat = 60  // Edge detection area width
+    let edgeDragDelay: TimeInterval = 0.4  // Page turn trigger delay
 
     // Live reorder during drag
     var currentHoverIndex: Int?
@@ -176,23 +176,23 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     var hoverUpdateTimer: Timer?
     let hoverUpdateDelay: TimeInterval = 0.15  // Delay before updating icon positions
 
-    // 鼠标拖拽翻页
+    // Mouse drag paging
     var isPageDragging = false
     var pageDragStartX: CGFloat = 0
     var pageDragStartOffset: CGFloat = 0
 
-    // 事件监听器
+    // Event listeners
     var scrollEventMonitor: Any?
-    var wasWindowVisible = false  // 跟踪窗口可见状态
+    var wasWindowVisible = false  // Track window visibility state
     
-    // 鼠标滚轮分页状态（仅用于非精准滚动设备）
+    // Scroll wheel paging state (for non-precision scroll devices only)
     var wheelAccumulatedDelta: CGFloat = 0
     var wheelLastDirection: Int = 0
     var wheelLastFlipAt: Date?
     let wheelFlipCooldown: TimeInterval = 0.15
     // Legacy reference:
     // var wheelSnapTimer: Timer?
-    // let wheelSnapDelay: TimeInterval = 0.15  // 停止滚动后多久触发 snap
+    // let wheelSnapDelay: TimeInterval = 0.15  // Delay after scrolling stops before snap snap
     let debugScrollMismatch = false
     var externalDragActive = false
     var externalAppDragSessionActive = false
@@ -218,7 +218,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
         // print("⚠️ [CAGrid #\(instanceId)] \(tag) mismatch: currentPage=\(currentPage)\(appInfo), scroll=\(scrollOffset), expected=\(expectedOffset), transform=\(transformOffset), boundsW=\(bounds.width), pageSpacing=\(pageSpacing)")
     }
 
-    // 实例追踪
+    // Instance tracking
     private static var instanceCounter = 0
     let instanceId: Int
 
@@ -249,10 +249,10 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
         wantsLayer = true
         layerContentsRedrawPolicy = .onSetNeedsDisplay
 
-        // 创建容器层
+        // Create container layer
         containerLayer = CALayer()
         containerLayer.frame = bounds
-        containerLayer.masksToBounds = false  // 不裁剪，让滑动时内容可以超出边界
+        containerLayer.masksToBounds = false  // No clipping, allow content to exceed bounds during scrolling
         layer?.addSublayer(containerLayer)
 
         // Top/bottom fade mask (vertical scroll mode only)
@@ -269,20 +269,20 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
         fadeMaskLayer.isHidden = true
         containerLayer.mask = fadeMaskLayer
 
-        // 页面容器层（用于整体偏移）
+        // Page container layer (for overall offset)
         pageContainerLayer = CALayer()
         pageContainerLayer.frame = bounds
         containerLayer.addSublayer(pageContainerLayer)
 
-        // 禁用隐式动画
+        // Disable implicit animations
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         CATransaction.commit()
 
-        // 在初始化时就注册 launchpad 窗口通知（确保始终能接收）
+        // Register at initialization launchpad window notifications (ensure events always received)
         NotificationCenter.default.addObserver(self, selector: #selector(launchpadWindowDidShow(_:)), name: .launchpadWindowShown, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(launchpadWindowDidHide(_:)), name: .launchpadWindowHidden, object: nil)
-        // 监听应用激活事件（作为备用方案）
+        // Monitor app activation events (as fallback)
         NotificationCenter.default.addObserver(self, selector: #selector(appDidBecomeActive(_:)), name: NSApplication.didBecomeActiveNotification, object: nil)
 
         // print("✅ [CAGrid #\(instanceId)] Core Animation grid initialized")
@@ -300,15 +300,15 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
         if let window = window {
             window.acceptsMouseMovedEvents = true
             setupDisplayLink()
-            // 始终安装滚轮事件监听器（更可靠）
+            // Always install scroll wheel event listener (more reliable)
             setupScrollEventMonitor()
-            // 确保视图成为第一响应者
+            // Ensure view becomes first responder
             DispatchQueue.main.async { [weak self] in
                 self?.makeFirstResponderIfAvailable()
             }
             // print("✅ [CAGrid #\(instanceId)] View moved to window, scroll monitor installed")
 
-            // 监听窗口显示/隐藏事件
+            // Monitor window show/hide events
             NotificationCenter.default.removeObserver(self, name: NSWindow.didBecomeKeyNotification, object: nil)
             NotificationCenter.default.removeObserver(self, name: NSWindow.didBecomeMainNotification, object: nil)
             NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeOcclusionStateNotification, object: nil)
@@ -316,10 +316,10 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
             NotificationCenter.default.addObserver(self, selector: #selector(windowDidActivate(_:)), name: NSWindow.didBecomeKeyNotification, object: window)
             NotificationCenter.default.addObserver(self, selector: #selector(windowDidActivate(_:)), name: NSWindow.didBecomeMainNotification, object: window)
             NotificationCenter.default.addObserver(self, selector: #selector(windowOcclusionChanged(_:)), name: NSWindow.didChangeOcclusionStateNotification, object: window)
-            // launchpad 窗口通知在 setup() 中注册，这里不需要重复注册
+            // launchpad window notifications registered in setup()() , no need to re-register here
         } else {
-            // 视图从窗口移除时清理窗口相关的事件监听器
-            // 注意：launchpad 窗口通知不在这里移除，因为它们在 setup() 中注册
+            // Clean up window-related event listeners when view is removed from window
+            // Note: launchpad window notifications are not removed here since they are registered in setup()  registered
             removeScrollEventMonitor()
             NotificationCenter.default.removeObserver(self, name: NSWindow.didBecomeKeyNotification, object: nil)
             NotificationCenter.default.removeObserver(self, name: NSWindow.didBecomeMainNotification, object: nil)
@@ -341,28 +341,28 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     }
 
     @objc func launchpadWindowDidShow(_ notification: Notification) {
-        // 只有有窗口的实例才响应
+        // Only instances with a window respond
         guard let window = window else {
             // print("⚠️ [CAGrid #\(instanceId)] Launchpad window shown - but no window, ignoring")
             return
         }
         // print("🚀 [CAGrid #\(instanceId)] Launchpad window shown, hasMonitor=\(scrollEventMonitor != nil)")
 
-        // 立即安装滚轮事件监听器（如果没有）
+        // Install scroll wheel event listener immediately (if not present)
         if scrollEventMonitor == nil {
             // print("🔄 [CAGrid #\(instanceId)] Reinstalling scroll monitor on window show")
             setupScrollEventMonitor()
         }
 
-        // 确保成为第一响应者
+        // Ensure first responder
         makeFirstResponderIfAvailable()
 
-        // 延迟再次确认（防止其他组件抢占）
+        // Delayed reconfirmation (prevent other components from taking over)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             guard let self = self, let win = self.window else { return }
             // print("🔄 [CAGrid #\(self.instanceId)] Delayed check, isFirstResponder=\(win.firstResponder === self), hasMonitor=\(self.scrollEventMonitor != nil)")
             self.makeFirstResponderIfAvailable()
-            // 确保滚轮监听器存在
+            // Ensure scroll wheel listener exists
             if self.scrollEventMonitor == nil {
                 self.setupScrollEventMonitor()
             }
@@ -370,32 +370,32 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     }
 
     @objc func launchpadWindowDidHide(_ notification: Notification) {
-        // 只有有窗口的实例才响应
+        // Only instances with a window respond
         guard window != nil else {
             // print("⚠️ [CAGrid #\(instanceId)] Window hidden - but no window, ignoring")
             return
         }
         // print("🚀 [CAGrid #\(instanceId)] Window hidden, hasMonitor=\(scrollEventMonitor != nil)")
-        // 不再移除监听器 - 让它保持活跃，这样窗口重新显示时就能立即使用
+        // Do not remove listener - keep it active so it works immediately when window reshows
         // removeScrollEventMonitor()
         wasWindowVisible = false
     }
 
     @objc func appDidBecomeActive(_ notification: Notification) {
-        // 应用激活时检查是否需要安装滚轮监听器
+        // Check if scroll wheel listener needs installation on app activation
         // print("🔔 [CAGrid #\(instanceId)] App became active notification received, window=\(window != nil), isVisible=\(window?.isVisible ?? false)")
         guard let window = window else {
             // print("🔔 [CAGrid #\(instanceId)] App became active - no window")
             return
         }
 
-        // 立即尝试重新安装滚轮监听器（不管窗口是否可见）
-        // 因为窗口可能正在动画中，isVisible 可能还是 false
+        // Try reinstalling scroll wheel listener immediately (regardless of window visibility)
+        // Because the window may be animating，isVisible may still be false
         // print("🔔 [CAGrid #\(instanceId)] Reinstalling scroll monitor immediately on app activate")
         setupScrollEventMonitor()
         makeFirstResponderIfAvailable()
 
-        // 延迟再次检查，确保滚轮监听器存在
+        // Delayed recheck to ensure scroll wheel listener exists
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
             guard let self = self, let win = self.window else { return }
             // print("🔔 [CAGrid #\(self.instanceId)] Delayed check: isVisible=\(win.isVisible), scrollMonitor=\(self.scrollEventMonitor != nil)")
@@ -408,10 +408,10 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     }
 
     func setupScrollEventMonitor() {
-        // 移除旧的监听器
+        // Remove old listener
         removeScrollEventMonitor()
 
-        // 确保有窗口才设置监听器（可见性在事件处理时动态检查）
+        // Only set up listener when window exists (visibility checked dynamically in event handler)
         guard window != nil else {
             // print("⚠️ [CAGrid #\(instanceId)] setupScrollEventMonitor: no window, skipping")
             return
@@ -424,16 +424,16 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
             guard self.isScrollEnabled else { return event }
             guard let window = self.window else { return event }
             
-            // 只在窗口可见且是 key window 时处理
+            // Only when window is visible and is key window handle
             guard window.isVisible && window.isKeyWindow else { return event }
             
-            // 检查事件是否在视图范围内
+            // Check if event is within view bounds
             let locationInWindow = event.locationInWindow
             let locationInView = self.convert(locationInWindow, from: nil)
             guard self.bounds.contains(locationInView) else { return event }
             
             self.handleScrollWheel(with: event)
-            // 消费事件，不再传递，防止双重处理
+            // Consume event, prevent propagation to avoid double handling
             return nil
         }
         // print("✅ [CAGrid #\(instanceId)] Scroll event monitor installed")
@@ -467,9 +467,9 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     }
 
     @objc func displayLinkFired(_ link: CADisplayLink) {
-        // 只在动画时才更新
+        // Only update during animation
         guard isScrollAnimating || isDraggingItem else {
-            // 空闲时重置帧计数
+            // Reset frame count when idle
             if frameCount > 0 {
                 frameCount = 0
                 lastFrameTime = 0
@@ -477,12 +477,12 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
             return
         }
 
-        // 计算实时帧率（仅在动画时）
+        // Calculate real-time FPS (only during animation)
         let now = CFAbsoluteTimeGetCurrent()
         if lastFrameTime > 0 {
             let delta = now - lastFrameTime
             let instantFPS = 1.0 / delta
-            // 使用滑动窗口平均，减少数组操作
+            // Use sliding window average to reduce array operations
             if frameTimes.count >= 30 {
                 frameTimes.removeFirst()
             }
@@ -492,13 +492,13 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
         lastFrameTime = now
 
         frameCount += 1
-        // 每 60 帧输出一次（约 0.5 秒）
+        // Every 60  frames output once (approx.  0.5 s)
         if frameCount % 60 == 0 {
             onFPSUpdate?(currentFPS)
             // print("🎮 [CAGrid] Avg FPS: \(String(format: "%.1f", currentFPS))")
         }
 
-        // 更新滚动动画
+        // Update scroll animation
         if isScrollAnimating {
             updateScrollAnimation()
         }
@@ -515,7 +515,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
             let diff = targetScrollOffset - scrollOffset
             let snapThreshold: CGFloat = 0.5
             if abs(diff) > snapThreshold {
-                // 非时间控制：指数收敛，距离越远移动越快
+                // Non-time-based: exponential convergence, faster when further away
                 let t: CGFloat = 0.18
                 scrollOffset += diff * t
             } else {
@@ -525,7 +525,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
             }
         }
 
-        // 更新页面容器位置
+        // Update page container position
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         CATransaction.setAnimationDuration(0)
@@ -633,7 +633,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
         let pageChanged = newPage != currentPage
         currentPage = newPage
 
-        // 如果 bounds 还没准备好，只更新 currentPage，实际滚动交给 layout() 处理
+        // If  bounds  is not ready, only update currentPage，, actual scrolling deferred to layout() handling
         guard bounds.width > 0 else {
             if pageChanged {
                 onPageChanged?(currentPage)
@@ -644,13 +644,13 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
         let pageStride = bounds.width + pageSpacing
         targetScrollOffset = -CGFloat(currentPage) * pageStride
 
-        // 检查是否需要动画（包括弹回原位的情况）
+        // Check if animation is needed (including snap-back to original position)
         let needsAnimation = animated && abs(scrollOffset - targetScrollOffset) > 0.5
         
         if needsAnimation && animationsEnabled {
             isScrollAnimating = true
         } else {
-            // 立即跳转
+            // Jump immediately
             isScrollAnimating = false
             scrollOffset = targetScrollOffset
             CATransaction.begin()
@@ -771,7 +771,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
 
     func snapToCurrentPageIfNeeded() {
         guard !isVerticalMode else { return }
-        // 如果用户正在拖拽或动画正在进行，不要强制 snap
+        // If user is dragging or animation is in progress, do not force snap
         guard !isDragging && !isScrollAnimating && !isPageDragging else { return }
         guard bounds.width > 0 else { return }
         
@@ -811,14 +811,14 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
         CATransaction.commit()
     }
 
-    /// 确保滚轮事件监听器已安装（供外部调用）
+    /// Ensure scroll wheel event listener is installed (for external calls)
     func ensureScrollMonitorInstalled() {
         guard let window = window else {
             // print("⚠️ [CAGrid #\(instanceId)] ensureScrollMonitorInstalled: no window")
             return
         }
 
-        // 只要有窗口且没有监听器就安装（可见性在事件处理时检查）
+        // Install whenever there is a window and no listener (visibility checked in event handler)
         if scrollEventMonitor == nil {
             // print("🔄 [CAGrid #\(instanceId)] ensureScrollMonitorInstalled: monitor missing, installing")
             setupScrollEventMonitor()
@@ -826,6 +826,6 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
         }
     }
 
-    /// 获取实例ID（用于调试）
+    /// Get instance ID (for debugging)
     var debugInstanceId: Int { instanceId }
 }

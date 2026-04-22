@@ -18,7 +18,7 @@ struct AppInfo: Identifiable, Equatable, Hashable {
         return image
     }()
 
-    // 使用应用路径作为稳定唯一标识
+    // Use app path as stable unique identifier
     var id: String { url.path }
 
     static func == (lhs: AppInfo, rhs: AppInfo) -> Bool {
@@ -29,7 +29,7 @@ struct AppInfo: Identifiable, Equatable, Hashable {
         hasher.combine(url.path)
     }
 
-    // MARK: - 创建 AppInfo
+    // MARK: - Create AppInfo
     static func from(url: URL, preferredName: String? = nil, customTitle: String? = nil, loadIcon: Bool = true) -> AppInfo {
         let fallbackName = normalizeCandidate(url.deletingPathExtension().lastPathComponent)
         let bundle = Bundle(url: url)
@@ -60,7 +60,7 @@ struct AppInfo: Identifiable, Equatable, Hashable {
         return AppInfo(name: chosenName, icon: icon, url: url)
     }
 
-    // MARK: - 获取本地化应用名
+    // MARK: - Get localized app name
     private static func localizedAppName(for url: URL,
                                          preferredName: String?,
                                          fallbackName: String,

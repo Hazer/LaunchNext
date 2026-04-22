@@ -5,18 +5,18 @@ import Combine
 struct FolderView: View {
     @ObservedObject var appStore: AppStore
     @Binding var folder: FolderInfo
-    // 若提供，将强制使用与外层一致的图标尺寸
+    // If provided, forces icon size to match the outer grid
     var preferredIconSize: CGFloat? = nil
     @State private var folderName: String = ""
     @State private var isEditingName = false
     @State private var forceRefreshTrigger: UUID = UUID()
     @FocusState private var isTextFieldFocused: Bool
     @Namespace private var reorderNamespaceFolder
-    // 键盘导航
+    // Keyboard navigation
     @State private var selectedIndex: Int? = nil
     @State private var isKeyboardNavigationActive: Bool = false
     @State private var keyMonitor: Any?
-    // 拖拽相关状态
+    // Drag-related state
     @State private var draggingApp: AppInfo? = nil
     @State private var dragPreviewPosition: CGPoint = .zero
     @State private var dragPreviewScale: CGFloat = 1.2
@@ -33,9 +33,9 @@ struct FolderView: View {
         FileManager.default.fileExists(atPath: app.url.path)
     }
     
-    // 优化间距和布局参数
+    // Optimized spacing and layout parameters
     private let spacing: CGFloat = 30
-    // 动态列数，根据窗口宽度与单元最小宽度自适应
+    // Dynamic column count, auto-adapts based on window width and minimum cell width
     @State private var columnsCount: Int = 4
     private let gridPadding: CGFloat = 16
     private let titlePadding: CGFloat = 16
@@ -54,10 +54,10 @@ struct FolderView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // 优化的文件夹标题区域
+            // Optimized folder title area
             folderTitleSection
             
-            // 应用网格区域
+            // App grid area
             GeometryReader { geo in
                 appGridSection(geometry: geo)
             }
@@ -66,7 +66,7 @@ struct FolderView: View {
         .liquidGlass(in: RoundedRectangle(cornerRadius: 30))
         .transition(LNAnimations.folderOpenTransition)
         .onTapGesture {
-            // 当点击文件夹视图的非编辑区域时，如果正在编辑名称，则退出编辑模式
+            // When tapping non-editing area of folder view, exit editing mode if active
             if isEditingName {
                 finishEditing()
             }
@@ -75,7 +75,7 @@ struct FolderView: View {
             folderName = folder.name
             setupKeyHandlers()
             setupInitialSelection()
-            // 如果是通过回车键打开的文件夹，则自动启用导航并选中第一项
+            // If folder was opened via Enter key, auto-enable navigation and select first item
             if appStore.openFolderActivatedByKeyboard {
                 isKeyboardNavigationActive = true
                 setSelectionToStart()
@@ -91,7 +91,7 @@ struct FolderView: View {
         }
         .onChange(of: folder.apps) {
             clampSelection()
-            // 当应用列表变化时，强制刷新视图
+            // Force view refresh when app list changes
             forceRefreshTrigger = UUID()
         }
         .onChange(of: appStore.voiceFeedbackEnabled) { _, enabled in
@@ -102,23 +102,23 @@ struct FolderView: View {
             }
         }
         .onChange(of: folder.name) {
-            // 监听文件夹名称变化，确保界面立即更新
+            // Monitor folder name changes to ensure immediate UI update
             if !isEditingName {
                 folderName = folder.name
-                // 强制刷新视图
+                // Force refresh view
                 forceRefreshTrigger = UUID()
             }
         }
         .onChange(of: appStore.folderUpdateTrigger) {
-            // 强制刷新文件夹视图，确保图标和名称显示最新状态
+            // Force refresh folder view，Ensure icons and names show latest state
             forceRefreshTrigger = UUID()
-            // 触发视图重新渲染
+            // Trigger view re-render
             folderName = folder.name
         }
         .onChange(of: appStore.gridRefreshTrigger) {
-            // 强制刷新网格视图，确保应用图标和布局显示最新状态
+            // Force refresh grid view，Ensure app icons and layout show latest state
             forceRefreshTrigger = UUID()
-            // 触发视图重新渲染
+            // Trigger view re-render
             folderName = folder.name
         }
         .onReceive(ControllerInputManager.shared.commands.receive(on: RunLoop.main)) { command in
@@ -157,7 +157,7 @@ struct FolderView: View {
                         .simultaneousGesture(
                             TapGesture()
                                 .onEnded { _ in
-                                    // 点击编辑框时阻止事件冒泡到父视图
+                                    // Prevent event bubbling to parent view when clicking edit field
                                 }
                         )
                 } else {
@@ -165,14 +165,14 @@ struct FolderView: View {
                         .font(.title)
                         .foregroundColor(.primary)
                         .padding()
-                        .contentShape(Rectangle()) // 确保整个区域都可以点击
+                        .contentShape(Rectangle()) // Ensure entire area is clickable
                         .onTapGesture(count: 2) {
                             startEditing()
                         }
                         .onTapGesture {
-                            // 单击时不做任何操作，避免意外触发
+                            // Do nothing on single click，Avoid accidental triggers
                         }
-                        .id(forceRefreshTrigger) // 使用forceRefreshTrigger强制刷新
+                        .id(forceRefreshTrigger) // Use forceRefreshTrigger to force refresh
                 }
             }
             Spacer()
@@ -182,17 +182,17 @@ struct FolderView: View {
     
     @ViewBuilder
     private func appGridSection(geometry geo: GeometryProxy) -> some View {
-        // 初步估算（用当前列数）
+        // Initial estimate (using current column count)
         let baseColumnWidth = computeColumnWidth(containerWidth: geo.size.width, columns: columnsCount)
         let baseAppHeight = computeAppHeight(containerHeight: geo.size.height, columns: columnsCount)
         let computedIcon = min(baseColumnWidth, baseAppHeight) * 0.75
         let iconSize: CGFloat = preferredIconSize ?? computedIcon
-        // 固定为 6 列（还原文件夹内部原布局）
+        // Fixed 6 columns (restore original folder internal layout)
         let desiredColumns = 6
-        // 使用自适应列数重新计算尺寸
+        // Recalculate size using adaptive column count
         let recomputedColumnWidth = computeColumnWidth(containerWidth: geo.size.width, columns: desiredColumns)
         let recomputedAppHeight = computeAppHeight(containerHeight: geo.size.height, columns: desiredColumns)
-        // 保障单元格至少能容纳传入的图标尺寸与标签区域
+        // Ensure cell can at least fit the given icon size and label area
         let columnWidth = max(recomputedColumnWidth, iconSize)
         let appHeight = max(recomputedAppHeight, iconSize + 32)
         let labelWidth: CGFloat = columnWidth * 0.9
@@ -218,15 +218,15 @@ struct FolderView: View {
                     }
                 }
                 .animation(LNAnimations.gridUpdate, value: pendingDropIndex)
-                .id(forceRefreshTrigger) // 使用forceRefreshTrigger强制刷新应用网格
+                .id(forceRefreshTrigger) // Use forceRefreshTrigger to force refreshappgrid
                 .padding(EdgeInsets(top: gridPadding, leading: gridPadding, bottom: gridPadding, trailing: gridPadding))
             }
             .scrollIndicators(.hidden)
-            .disabled(isEditingName) // 编辑状态下禁用滚动
+            .disabled(isEditingName) // Disable scrolling in edit state
             .onAppear { columnsCount = desiredColumns }
             .onChange(of: geo.size) { _ in columnsCount = desiredColumns }
 
-            // 拖拽预览层
+            // Drag preview layer
             if let draggingApp {
                 DragPreviewItem(item: .app(draggingApp),
                                 iconSize: iconSize,
@@ -240,7 +240,7 @@ struct FolderView: View {
         .coordinateSpace(name: "folderGrid")
     }
     
-    // 拖拽视觉重排
+    // Drag visual reorder
     
     private func startEditing() {
         isEditingName = true
@@ -252,7 +252,7 @@ struct FolderView: View {
     private func finishEditing() {
         isEditingName = false
         appStore.isFolderNameEditing = false
-        // 允许名称为纯空格（用户自定义视觉占位），仅阻止完全空字符串
+        // Allow name to be pure spaces (user custom visual placeholder), only block completely empty string
         if !folderName.isEmpty {
             let newName = folderName
             if newName != folder.name {
@@ -268,21 +268,21 @@ struct FolderView: View {
 // MARK: - Drag helpers & builders (mirror outer logic, without folder creation)
 extension FolderView {
     private func computeAppHeight(containerHeight: CGFloat, columns: Int) -> CGFloat {
-        // 自适应列数下估算行高
+        // Estimate row height with adaptive column count
         let maxRowsPerPage = Int(ceil(Double(folder.apps.count) / Double(max(columns, 1))))
         let totalRowSpacing = spacing * CGFloat(max(0, maxRowsPerPage - 1))
         let height = (containerHeight - totalRowSpacing) / CGFloat(maxRowsPerPage == 0 ? 1 : maxRowsPerPage)
-        return max(60, min(120, height)) // 优化高度范围
+        return max(60, min(120, height)) // Optimized height range
     }
     
     private func computeColumnWidth(containerWidth: CGFloat, columns: Int) -> CGFloat {
         let cols = max(columns, 1)
         let totalColumnSpacing = spacing * CGFloat(max(0, cols - 1))
         let width = (containerWidth - totalColumnSpacing) / CGFloat(cols)
-        return max(50, width) // 优化最小宽度
+        return max(50, width) // Optimized minimum width
     }
 
-    // 拖拽命中与单元格几何计算（在下方扩展中实现）
+    // Drag hit-test and cell geometry calculation (implemented in extension below)
 
     @ViewBuilder
     private func appDraggable(app: AppInfo,
@@ -307,7 +307,7 @@ extension FolderView {
             activePressEffectEnabled: appStore.enableActivePressEffect,
             activePressScale: CGFloat(appStore.activePressScale),
             onTap: {
-                // 在编辑状态下不启动应用
+                // Do not launch app in edit state
                 if draggingApp == nil && !isEditingName {
                     if canLaunch(app) {
                         onLaunchApp(app)
@@ -318,7 +318,7 @@ extension FolderView {
             }
         )
         .frame(height: appHeight)
-        // 移除 matchedGeometryEffect 以降低滚动开销
+        // remove matchedGeometryEffect 以reducescroll开销
 
         let isDraggingThisTile = (draggingApp == app)
 
@@ -334,22 +334,22 @@ extension FolderView {
                     DragGesture(minimumDistance: 2, coordinateSpace: .named("folderGrid"))
                         .onChanged { value in
                             guard !appStore.isLayoutLocked else { return }
-                            // 在编辑状态下禁用拖拽
+                            // ineditstate禁usedrag
                             if isEditingName { return }
                         
                         if draggingApp == nil {
                             var tx = Transaction(); tx.disablesAnimations = true
                             withTransaction(tx) { draggingApp = app }
-                            isKeyboardNavigationActive = false // 禁用键盘导航
+                            isKeyboardNavigationActive = false // 禁useKeyboard navigation
 
-                            // 让拖拽预览中心与指针位置一致，避免任何偏移
+                            // letdragpreviewin心and指针positionconsistent，avoid任何offset
                             dragPreviewPosition = value.location
                         }
 
-                        // 预览跟随指针位置（不引入起始偏移），确保光标与图标中心对齐
+                        // preview跟随指针position（not引入起始offset)，ensure光标andiconin心for齐
                         dragPreviewPosition = value.location
 
-                        // 检测是否拖出文件夹范围并驻留
+                        // 检测是否拖出folderrangeand 驻留
                         let isOutside: Bool = (value.location.x < 0 || value.location.y < 0 ||
                                                value.location.x > containerSize.width ||
                                                value.location.y > containerSize.height)
@@ -357,13 +357,13 @@ extension FolderView {
                         if isOutside {
                             if outOfBoundsBeganAt == nil { outOfBoundsBeganAt = now }
                             if !hasHandedOffDrag, let start = outOfBoundsBeganAt, now.timeIntervalSince(start) >= outOfBoundsDwell, let dragging = draggingApp {
-                                // 接力到外层：将应用移出文件夹并关闭文件夹
+                                // 接力tooutsidelayer：app移出folderand Close folder
                                 hasHandedOffDrag = true
                                 pendingDropIndex = nil
                                 appStore.handoffDraggingApp = dragging
                                 appStore.handoffDragScreenLocation = NSEvent.mouseLocation
                                 appStore.removeAppFromFolder(dragging, folder: folder)
-                                // 清理内部拖拽状态并关闭文件夹
+                                // 清理inside部dragstateand Close folder
                                 draggingApp = nil
                                 outOfBoundsBeganAt = nil
                                 withAnimation(LNAnimations.springFast) {
@@ -379,15 +379,15 @@ extension FolderView {
                                                        containerSize: containerSize,
                                                        columnWidth: columnWidth,
                                                        appHeight: appHeight) {
-                            // 将"悬停在最后一个格子"视为插入到末尾，从而推动最后一个向前让位
+                            // "hoverinmostafter一格child"视asinserttoend，from而推动mostafter一backwardlet位
                             let count = visualApps.count
                             if count > 0,
                                hoveringIndex == count - 1,
                                let dragging = draggingApp,
                                dragging != visualApps[hoveringIndex] {
-                                pendingDropIndex = count // 末尾插槽
+                                pendingDropIndex = count // end插slot
                             } else {
-                                // 若命中的是"末尾插槽"（== count），保持为 count；其余为格子索引
+                                // 若命是"end插slot"（== count)，maintainas count；its余as格childindex
                                 pendingDropIndex = hoveringIndex
                             }
                         } else {
@@ -396,7 +396,7 @@ extension FolderView {
                     }
                     .onEnded { _ in
                         if appStore.isLayoutLocked { return }
-                        // 在编辑状态下不处理拖拽结束
+                        // ineditstateSkipdragend
                         if isEditingName { return }
                         
                         guard let dragging = draggingApp else { return }
@@ -404,11 +404,11 @@ extension FolderView {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
                                 draggingApp = nil
                                 pendingDropIndex = nil
-                                // 拖拽结束后不自动恢复键盘导航，保持一致体验
+                                // dragendafternot自动resumeKeyboard navigation，maintainconsistent体验
                             }
                         }
 
-                        // 若已接力到外层，则不在此处处理落点
+                        // 若already接力tooutsidelayer，thennotin此处Processdrop point
                         if hasHandedOffDrag {
                             hasHandedOffDrag = false
                             outOfBoundsBeganAt = nil
@@ -416,7 +416,7 @@ extension FolderView {
                         }
 
                         if let finalIndex = pendingDropIndex {
-                            // 视觉吸附位置：直接使用finalIndex，确保准确吸附到目标位置
+                            // visualsnapposition：directlyusefinalIndex，ensure准确snaptoitem 标position
                             let dropDisplayIndex = finalIndex
                             let targetCenter = cellCenter(for: dropDisplayIndex,
                                                           containerSize: containerSize,
@@ -429,14 +429,14 @@ extension FolderView {
                             if let from = folder.apps.firstIndex(of: dragging) {
                                 var apps = folder.apps
                                 apps.remove(at: from)
-                                // 与视觉预览完全一致：直接使用悬停索引
+                                // andvisualpreviewfully consistent：directlyusehoverindex
                                 let insertIndex = finalIndex
                                 let clamped = min(max(0, insertIndex), apps.count)
                                 apps.insert(dragging, at: clamped)
                                 folder.apps = apps
                                 appStore.notifyFolderContentChanged(folder)
                                 
-                                // 文件夹内拖拽结束后也触发压缩，确保主界面的empty项目移动到页面末尾
+                                // folderinsidedragendafteralsotrigger压缩，ensure主UIemptyitemitem movetopageend
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                     appStore.compactItemsWithinPages()
                                 }
@@ -496,7 +496,7 @@ extension FolderView {
                                                       scrollOffsetY: scrollOffsetY) else { return nil }
         
         let count = visualApps.count
-        // 允许返回 count 作为"末尾插槽"，实现拖到最后一个之后的让位
+        // 允许return count 作as"end插slot"，implementation拖tomostafter一afterlet位
         if count == 0 { return 0 }
         return min(max(offsetInPage, 0), count)
     }
@@ -575,16 +575,16 @@ extension FolderView {
     }
 
     private func handleKeyEvent(_ event: NSEvent) -> NSEvent? {
-        // 正在编辑文件夹名时，放行输入
+        // 正ineditfoldernamewhen，放rowinput
         if isTextFieldFocused { return event }
 
-        // Esc 关闭文件夹
+        // Esc Close folder
         if event.keyCode == 53 {
             onClose()
             return nil
         }
 
-        // 回车：激活或启动选择
+        // 回车：activateorlaunch选择
         if event.keyCode == 36 {
             if !isKeyboardNavigationActive {
                 isKeyboardNavigationActive = true
@@ -605,7 +605,7 @@ extension FolderView {
             return event
         }
 
-        // Tab：与回车一致，先激活键盘导航
+        // Tab：and回车consistent，先activateKeyboard navigation
         if event.keyCode == 48 {
             if !isKeyboardNavigationActive {
                 isKeyboardNavigationActive = true
@@ -617,7 +617,7 @@ extension FolderView {
             return event
         }
 
-        // 向下：先激活导航
+        // 向：先activate导航
         if event.keyCode == 125 {
             if !isKeyboardNavigationActive {
                 isKeyboardNavigationActive = true

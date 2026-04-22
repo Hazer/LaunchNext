@@ -1,13 +1,13 @@
 import SwiftUI
 
 enum LNAnimations {
-    // MARK: - Springs - 优化性能的动画配置
+    // MARK: - Springs - Performance-optimized animation configuration
     static var springFast: Animation {
         guard AnimationPreferences.isEnabled else { return .linear(duration: 0.0001) }
         return .spring(response: AnimationPreferences.springResponse, dampingFraction: 0.8)
     }
     
-    // MARK: - 性能优化的动画
+    // MARK: - Performance-optimized animations
     static var dragPreview: Animation {
         guard AnimationPreferences.isEnabled else { return .linear(duration: 0.0001) }
         return .easeOut(duration: AnimationPreferences.baseDuration)

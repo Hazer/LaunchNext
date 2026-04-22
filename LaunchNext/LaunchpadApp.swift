@@ -1372,12 +1372,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         window?.contentView?.alphaValue = 0
         windowIsVisible = false
 
-        // 初始化完成后执行首个淡入
+        // Execute first fade-in after initialization
         if showImmediately {
             showWindow()
         }
 
-        // 背景点击关闭逻辑改为 SwiftUI 内部实现，避免与输入控件冲突
+        // Background click-to-close logic changed to SwiftUI internal implementation, avoiding conflicts with input controls
     }
 
     private func bindAppearancePreference() {

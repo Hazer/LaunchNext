@@ -1140,7 +1140,7 @@ private struct DefaultsCache {
         setScopedPageIndicatorOverride(override, for: screenID, mode: mode)
     }
 
-    // 图标标题显示
+    // Icon title display
     @Published var showLabels: Bool = {
         if UserDefaults.standard.object(forKey: "showLabels") == nil { return true }
         return UserDefaults.standard.bool(forKey: "showLabels")
@@ -1478,7 +1478,7 @@ private struct DefaultsCache {
         }
     }
 
-    // 更新检查相关属性
+    // Update check related properties
     @Published var updateState: UpdateState = .idle
 
     @Published var autoCheckForUpdates: Bool = {
@@ -1927,10 +1927,10 @@ private struct DefaultsCache {
         didSet { persistCustomTitles() }
     }
 
-    // 缓存管理器
+    // Cache manager
     private let cacheManager = AppCacheManager.shared
     
-    // 文件夹相关状态
+    // Folder related state
     @Published var openFolder: FolderInfo? = nil
     @Published var isDragCreatingFolder = false
     @Published var folderCreationTarget: AppInfo? = nil
@@ -1939,7 +1939,7 @@ private struct DefaultsCache {
     @Published var handoffDraggingApp: AppInfo? = nil
     @Published var handoffDragScreenLocation: CGPoint? = nil
     
-    // 触发器
+    // Triggers
     @Published var folderUpdateTrigger: UUID = UUID()
     @Published var gridRefreshTrigger: UUID = UUID()
     @Published var iconCacheRefreshTrigger: UUID = UUID()
@@ -1961,12 +1961,12 @@ private struct DefaultsCache {
     private let fullRescanThreshold: Int = 50
     private var fallbackScanTimer: DispatchSourceTimer?
 
-    // 状态标记
+    // State flags
     private var hasPerformedInitialScan: Bool = false
     private var cancellables: Set<AnyCancellable> = []
     private var hasAppliedOrderFromStore: Bool = false
     
-    // 后台刷新队列与节流
+    // Background refresh queue and throttle
     private let refreshQueue = DispatchQueue(label: "app.store.refresh", qos: .userInitiated)
     private var gridRefreshWorkItem: DispatchWorkItem?
     private var iconScaleWorkItem: DispatchWorkItem?
@@ -1980,7 +1980,7 @@ private struct DefaultsCache {
     private var loginItemUpdateInProgress = false
     private var volumeObservers: [NSObjectProtocol] = []
     
-    // 计算属性
+    // Computed properties
     private var itemsPerPage: Int { gridColumnsPerPage * gridRowsPerPage }
 
     var builtinAppSourcePaths: [String] { systemApplicationSearchPaths }
@@ -2206,7 +2206,7 @@ private struct DefaultsCache {
             }
         }
 
-        // 主动添加所有来自已移除源的现存应用路径（无论是否缺失）
+        // Actively add all existing app paths from removed sources (regardless of missing status)
         if !sourceSet.isEmpty {
             let prefixes: [String] = sourceSet.map { $0.hasSuffix("/") ? $0 : $0 + "/" }
 
@@ -2354,7 +2354,7 @@ private struct DefaultsCache {
         let cache = DefaultsCache()
 
         if !cache.containsKey("isFullscreenMode") {
-            self.isFullscreenMode = true // 新用户默认 Classic (Fullscreen)
+            self.isFullscreenMode = true // New user default Classic (Fullscreen)
             UserDefaults.standard.set(true, forKey: "isFullscreenMode")
         } else {
             self.isFullscreenMode = cache.bool(forKey: "isFullscreenMode")
@@ -2411,7 +2411,7 @@ private struct DefaultsCache {
         let clampedTopPadding = Self.clampPageIndicatorTopPadding(storedTopPadding)
         self.pageIndicatorTopPadding = clampedTopPadding
         defaults.set(clampedTopPadding, forKey: Self.pageIndicatorTopPaddingKey)
-        // 读取图标缩放默认值
+        // Read icon scale default
         if let v = cache.object(forKey: "iconScale") as Double? {
             self.iconScale = v
         }
@@ -2830,7 +2830,7 @@ private struct DefaultsCache {
     }
 
 
-    // 图标缩放（相对于格子）：默认 0.95，范围建议 0.8~1.1
+    // Icon scale (relative to cell): default 0.95, recommended range 0.8~1.1
     @Published var iconScale: Double = 0.95 {
         didSet {
             UserDefaults.standard.set(iconScale, forKey: "iconScale")
@@ -2847,7 +2847,7 @@ private struct DefaultsCache {
         self.modelContext = modelContext
         evaluateOnboardingGate()
         
-        // 立即尝试加载持久化数据（如果已有数据）——不要过早设置标记，等待加载完成时设置
+        // Try loading persistence data immediately (if available) — do not set flag too early, wait until loading completes
         if !hasAppliedOrderFromStore {
             loadAllOrder()
         }
@@ -2864,12 +2864,12 @@ private struct DefaultsCache {
             }
             .store(in: &cancellables)
         
-        // 监听items变化，自动保存排序
+        // Monitor items changes, auto-save sort order
         $items
             .debounce(for: .seconds(0.5), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self = self, !self.items.isEmpty else { return }
-                // 延迟保存，避免频繁保存
+                // Debounced save to avoid frequent writes
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     self.saveAllOrder()
                 }
@@ -3056,24 +3056,24 @@ private struct DefaultsCache {
                 }
                 self.refreshMissingPlaceholders()
                 
-                // 扫描完成后生成缓存
+                // Generate cache after scan completes
                 self.generateCacheAfterScan()
             }
         }
     }
     
-    /// 智能扫描应用：保持现有排序，新增应用放到最后，缺失应用移除，自动页面内补位
+    /// Smart scan: maintain existing order, append new apps at the end，Missing apps removed, auto-fill within pages
     func scanApplicationsWithOrderPreservation() {
         DispatchQueue.global(qos: .userInitiated).async {
             var found: [AppInfo] = []
             var seenPaths = Set<String>()
 
-            // 使用并发队列加速扫描
+            // Use concurrent queue to accelerate scanning
             let scanQueue = DispatchQueue(label: "app.scan", attributes: .concurrent)
             let group = DispatchGroup()
             let lock = NSLock()
             
-            // 扫描所有应用
+            // Scan all apps
             for path in self.applicationSearchPaths {
                 group.enter()
                 scanQueue.async {
@@ -3098,7 +3098,7 @@ private struct DefaultsCache {
                             }
                         }
                         
-                        // 线程安全地合并结果
+                        // Thread-safe merge of results
                         lock.lock()
                         found.append(contentsOf: localFound)
                         seenPaths.formUnion(localSeenPaths)
@@ -3110,7 +3110,7 @@ private struct DefaultsCache {
             
             group.wait()
             
-            // 去重和排序 - 使用更安全的方法
+            // Deduplicate and sort - using safer method
             var uniqueApps: [AppInfo] = []
             var uniqueSeenPaths = Set<String>()
             
@@ -3121,7 +3121,7 @@ private struct DefaultsCache {
                 }
             }
             
-            // 保持现有应用的顺序，只对新增应用按名称排序
+            // Preserve existing app order, sort only new apps by name
             var newApps: [AppInfo] = []
             var existingAppPaths = Set<String>()
             let refreshedMap = Dictionary(uniqueKeysWithValues: uniqueApps.map { ($0.url.path, $0) })
@@ -3139,27 +3139,27 @@ private struct DefaultsCache {
             DispatchQueue.main.async {
                 self.processScannedApplications(newApps)
                 
-                // 扫描完成后生成缓存
+                // Generate cache after scan completes
                 self.generateCacheAfterScan()
             }
         }
     }
     
-    /// 手动触发完全重新扫描（用于设置中的手动刷新）
+    /// Manually trigger full rescan (for manual refresh in settings)
     func forceFullRescan() {
-        // 清除缓存
+        // Clear cache
         cacheManager.clearAllCaches()
         
         hasPerformedInitialScan = false
         scanApplicationsWithOrderPreservation()
     }
     
-    /// 处理扫描到的应用，智能匹配现有排序
+    /// Processscanned apps, smart-match with existing order
     private func processScannedApplications(_ newApps: [AppInfo]) {
-        // 保存当前 items 的顺序和结构
+        // Save current items order and structure
         let currentItems = self.items
         
-        // 创建新应用列表，但保持现有顺序
+        // Create new app list, but preserve existing order
         var updatedApps: [AppInfo] = []
         var newAppsToAdd: [AppInfo] = []
         var freshMap: [String: AppInfo] = [:]
@@ -3167,84 +3167,84 @@ private struct DefaultsCache {
             freshMap[app.url.path] = app
         }
 
-        // 第一步：保持现有顺序，同时用最新扫描结果刷新应用信息
+        // Step 1: Preserve existing order, refresh app info with latest scan results
         for app in self.apps {
             updatedApps.append(freshMap[app.url.path] ?? app)
         }
 
-        // 同步更新文件夹中的应用对象，确保名称/图标及时刷新
+        // Sync update folderapp objects, ensure name/icontimelyrefresh
         for folderIndex in folders.indices {
             let refreshedApps = folders[folderIndex].apps.map { freshMap[$0.url.path] ?? $0 }
             folders[folderIndex].apps = refreshedApps
         }
         
-        // 第二步：找出新增的应用（顺序保持与扫描结果一致）
+        // Step 2: Find newly added apps (preserve order matching scan results)
         let existingPaths = Set(updatedApps.map { $0.url.path })
         for newApp in newApps where !existingPaths.contains(newApp.url.path) {
             newAppsToAdd.append(newApp)
         }
 
-        // 第三步：将新增应用添加到末尾，保持现有应用顺序不变
+        // Step 3: Append new apps to the end, keep existing app order unchanged
         updatedApps.append(contentsOf: newAppsToAdd)
 
-        // 更新应用列表
+        // updateapplist
         self.apps = updatedApps
         pruneHiddenAppsFromAppList()
         
-        // 第四步：智能重建项目列表，保持用户排序
+        // Step 4: Smart-rebuild items list, preserve user order
         self.smartRebuildItemsWithOrderPreservation(currentItems: currentItems, newApps: newAppsToAdd)
         
-        // 第五步：自动页面内补位
+        // Step 5: Auto-fill within pages
         self.compactItemsWithinPages()
 
-        // 第五步半：根据最新磁盘状态同步缺失占位符
+        // Step 5.5: Sync missing placeholders based on latest disk state
         self.refreshMissingPlaceholders()
 
-        // 第六步：保存新的顺序
+        // Step 6: Save new order
         self.saveAllOrder()
 
-        // 触发界面更新
+        // Trigger UI update
         self.triggerFolderUpdate()
         self.triggerGridRefresh()
     }
     
-    /// 严格保持现有顺序的重建方法
+    /// Strict order-preserving rebuild method
     private func rebuildItemsWithStrictOrderPreservation(currentItems: [LaunchpadItem]) {
         
         var newItems: [LaunchpadItem] = []
         let appsInFolders = Set(self.folders.flatMap { $0.apps })
         
-        // 严格保持现有项目的顺序和位置
+        // Strictly maintain existing items order and positions
         for (_, item) in currentItems.enumerated() {
             switch item {
             case .folder(let folder):
-                // 检查文件夹是否仍然存在
+                // Check if folder still exists in
                 if self.folders.contains(where: { $0.id == folder.id }) {
-                    // 更新文件夹引用，保持原有位置
+                    // Update folderreference，maintainoriginal position
                     if let updatedFolder = self.folders.first(where: { $0.id == folder.id }) {
                         newItems.append(.folder(updatedFolder))
                     } else {
-                        // 文件夹被删除，保持空槽位
+                        // folderdeleted，maintainempty slot
                         newItems.append(.empty(UUID().uuidString))
                     }
                 } else {
-                    // 文件夹被删除，保持空槽位
+                    // folderdeleted，maintainempty slot
                     newItems.append(.empty(UUID().uuidString))
                 }
                 
             case .app(let app):
                 let standardizedPath = standardizedFilePath(app.url.path)
-                // 检查应用是否仍然存在
+                // Check if app still exists in
                 if self.apps.contains(where: { standardizedFilePath($0.url.path) == standardizedPath }) {
                     if !appsInFolders.contains(app) {
-                        // 应用仍然存在且不在文件夹中，保持原有位置
+                        // appStill exists and not in a folder，maintainoriginal position
                         newItems.append(.app(app))
                     } else {
-                        // 应用现在在文件夹中，保持空槽位
+                        // appNow in a folder，maintainempty slot
                         newItems.append(.empty(UUID().uuidString))
                     }
                 } else {
-                    // 应用缺失：转换为占位符
+                    // appmissing：Convert to placeholder
                     if let placeholder = updateMissingPlaceholder(path: standardizedPath, displayName: app.name) {
                         newItems.append(.missingApp(placeholder))
                     } else {
@@ -3258,12 +3258,12 @@ private struct DefaultsCache {
                     newItems.append(.empty(UUID().uuidString))
                 }
             case .empty(let token):
-                // 保持空槽位，维持页面布局
+                // Maintain empty slots, preserve page layout
                 newItems.append(.empty(token))
             }
         }
 
-        // 添加新增的自由应用（不在任何文件夹中）到最后一页的最后面
+        // Append free apps (not in any folder) to the end of last page
         let existingAppPaths = Set(newItems.compactMap { item -> String? in
             switch item {
             case .app(let app):
@@ -3320,25 +3320,25 @@ private struct DefaultsCache {
         self.items = filteredItemsRemovingHidden(from: newItems)
     }
     
-    /// 智能重建项目列表，保持用户排序
+    /// Smart rebuild items list, maintain user order
     private func smartRebuildItemsWithOrderPreservation(currentItems: [LaunchpadItem], newApps: [AppInfo]) {
         
-        // 保存当前的持久化数据，但不立即加载（避免覆盖现有顺序）
+        // Save current persistence data, but do not load immediately (avoid overwriting existing order)
         let hasPersistedData = self.hasPersistedOrderData()
         
         if hasPersistedData {
             
-            // 智能合并现有顺序和持久化数据
+            // Smart merge existing order with persistence data
             self.mergeCurrentOrderWithPersistedData(currentItems: currentItems, newApps: newApps, loadPersistedFolders: true)
         } else {
             
-            // 没有持久化数据时，直接基于当前顺序合并
+            // When no persistence data, merge directly based on current order
             self.mergeCurrentOrderWithPersistedData(currentItems: currentItems, newApps: newApps, loadPersistedFolders: false)
         }
         
     }
     
-    /// 检查是否有持久化数据
+    /// Check if persistence data exists
     private func hasPersistedOrderData() -> Bool {
         guard let modelContext = self.modelContext else { return false }
         
@@ -3351,54 +3351,54 @@ private struct DefaultsCache {
         }
     }
     
-    /// 智能合并现有顺序和持久化数据
+    /// Smart merge existing order with persistence data
     private func mergeCurrentOrderWithPersistedData(currentItems: [LaunchpadItem], newApps: [AppInfo], loadPersistedFolders: Bool = true) {
         
-        // 保存当前的项目顺序
+        // Save current item order
         let currentOrder = currentItems
         
-        // 加载持久化数据，但只更新文件夹信息
+        // Load persistence data, but only update folder info
         if loadPersistedFolders {
             self.loadFoldersFromPersistedData()
         }
         
-        // 重建项目列表，严格保持现有顺序
+        // Rebuild items list, strictly maintain existing order
         var newItems: [LaunchpadItem] = []
         let appsInFolders = Set(self.folders.flatMap { $0.apps })
         let refreshedAppsByPath = Dictionary(uniqueKeysWithValues: self.apps.map { ($0.url.path, $0) })
 
-        // 第一步：处理现有项目，保持顺序
+        // Step 1: Process existing items, maintain order
         for (_, item) in currentOrder.enumerated() {
             switch item {
             case .folder(let folder):
-                // 检查文件夹是否仍然存在
+                // Check if folder still exists in
                 if self.folders.contains(where: { $0.id == folder.id }) {
-                    // 更新文件夹引用，保持原有位置
+                    // Update folderreference，maintainoriginal position
                     if let updatedFolder = self.folders.first(where: { $0.id == folder.id }) {
                         newItems.append(.folder(updatedFolder))
                     } else {
-                        // 文件夹被删除，保持空槽位
+                        // folderdeleted，maintainempty slot
                         newItems.append(.empty(UUID().uuidString))
                     }
                 } else {
-                    // 文件夹被删除，保持空槽位
+                    // folderdeleted，maintainempty slot
                     newItems.append(.empty(UUID().uuidString))
                 }
                 
             case .app(let app):
                 let standardizedPath = standardizedFilePath(app.url.path)
-                // 检查应用是否仍然存在
+                // Check if app still exists in
                 if self.apps.contains(where: { standardizedFilePath($0.url.path) == standardizedPath }) {
                     if !appsInFolders.contains(app) {
-                        // 应用仍然存在且不在文件夹中，更新为最新信息
+                        // appStill exists and not in a folder，updateaslatestinfo
                         let updatedApp = refreshedAppsByPath[app.url.path] ?? app
                         newItems.append(.app(updatedApp))
                     } else {
-                        // 应用现在在文件夹中，保持空槽位
+                        // appNow in a folder，maintainempty slot
                         newItems.append(.empty(UUID().uuidString))
                     }
                 } else {
-                    // 应用缺失：转换为占位符
+                    // appmissing：Convert to placeholder
                     if let placeholder = updateMissingPlaceholder(path: standardizedPath, displayName: app.name) {
                         newItems.append(.missingApp(placeholder))
                     } else {
@@ -3412,12 +3412,12 @@ private struct DefaultsCache {
                     newItems.append(.empty(UUID().uuidString))
                 }
             case .empty(let token):
-                // 保持空槽位，维持页面布局
+                // Maintain empty slots, preserve page layout
                 newItems.append(.empty(token))
             }
         }
 
-        // 第二步：添加新增的自由应用（不在任何文件夹中）到最后一页的最后面
+        // Step 2: Append free apps (not in any folder) to the end of last page
         let existingAppPaths = Set(newItems.compactMap { item -> String? in
             switch item {
             case .app(let app):
@@ -3475,18 +3475,18 @@ private struct DefaultsCache {
 
     }
     
-    /// 只加载文件夹信息，不重建项目顺序
+    /// Only load folder info, do not rebuild item order
     private func loadFoldersFromPersistedData() {
         guard let modelContext = self.modelContext else { return }
         
         do {
-            // 尝试从新的"页-槽位"模型读取文件夹信息
+            // Try reading folder info from new page-slot model
             let saved = try modelContext.fetch(FetchDescriptor<PageEntryData>(
                 sortBy: [SortDescriptor(\.pageIndex, order: .forward), SortDescriptor(\.position, order: .forward)]
             ))
             
             if !saved.isEmpty {
-                // 构建文件夹
+                // buildfolder
                 var folderMap: [String: FolderInfo] = [:]
                 var foldersInOrder: [FolderInfo] = []
                 
@@ -3818,7 +3818,7 @@ private struct DefaultsCache {
     private func applyIncrementalChanges(for changedPaths: Set<String>) {
         guard !changedPaths.isEmpty else { return }
         
-        // 将磁盘与图标解析放到后台，主线程仅应用结果，减少卡顿
+        // Move disk I/O and icon parsing to background; main thread only applies results to reduce jank
         let snapshotApps = self.apps
         refreshQueue.async { [weak self] in
             guard let self else { return }
@@ -3851,9 +3851,9 @@ private struct DefaultsCache {
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 
-                // 应用删除事件：保留现有图标，等待卷重新挂载
+                // App delete event: preserve existing icon, etc. pending volume remount
                 
-                // 应用更新
+                // appupdate
                 let updates: [AppInfo] = changes.compactMap { if case .update(let info) = $0 { return info } else { return nil } }
                 if !updates.isEmpty {
                     var map: [String: Int] = [:]
@@ -3886,7 +3886,7 @@ private struct DefaultsCache {
                     self.rebuildItems()
                 }
                 
-                // 新增应用
+                // Add new apps
                 let inserts: [AppInfo] = changes.compactMap { if case .insert(let info) = $0 { return info } else { return nil } }
                 if !inserts.isEmpty {
                     self.apps.append(contentsOf: inserts)
@@ -3894,7 +3894,7 @@ private struct DefaultsCache {
                     self.rebuildItems()
                 }
                 
-                // 刷新与持久化
+                // refreshandPersistence
                 self.triggerFolderUpdate()
                 self.triggerGridRefresh()
                 self.refreshMissingPlaceholders()
@@ -3929,7 +3929,7 @@ private struct DefaultsCache {
                      loadIcon: shouldLoad)
     }
     
-    // MARK: - 文件夹管理
+    // MARK: - Folder management
     func createFolder(with apps: [AppInfo], name: String = "Untitled") -> FolderInfo {
         return createFolder(with: apps, name: name, insertAt: nil)
     }
@@ -3938,16 +3938,16 @@ private struct DefaultsCache {
         let folder = FolderInfo(name: name, apps: apps)
         folders.append(folder)
 
-        // 从应用列表中移除已添加到文件夹的应用（顶层 apps）
+        // Remove apps already added to folder from app list (top-layer apps)
         for app in apps {
             if let index = self.apps.firstIndex(of: app) {
                 self.apps.remove(at: index)
             }
         }
 
-        // 在当前 items 中：将这些 app 的顶层条目替换为空槽，并在目标位置放置文件夹，保持总长度不变
+        // In current items: replace these top-layer apps with nil/empty slots, place folder at target position, maintain total length
         var newItems = self.items
-        // 找出这些 app 的位置
+        // Find these app positions
         var placeholders: [(Int, AppInfo)] = []
         var remainingApps = apps
         for (idx, item) in newItems.enumerated() {
@@ -3957,11 +3957,11 @@ private struct DefaultsCache {
                 placeholders.append((idx, match))
             }
         }
-        // 将涉及的 app 槽位先置空
+        // Set involved app slots to nil/empty first
         for (idx, _) in placeholders {
             newItems[idx] = .empty(UUID().uuidString)
         }
-        // 选择放置文件夹的位置：优先 insertIndex，否则用最小索引；夹紧范围并用替换而非插入
+        // Choose folder position: prefer insertIndex, otherwise use smallest index; clamp range and use replace not insert
         let baseIndex = placeholders.map { $0.0 }.min() ?? min(newItems.count - 1, max(0, insertIndex ?? (newItems.count - 1)))
         let desiredIndex = insertIndex ?? baseIndex
         let safeIndex = min(max(0, desiredIndex), max(0, newItems.count - 1))
@@ -3971,19 +3971,19 @@ private struct DefaultsCache {
             newItems[safeIndex] = .folder(folder)
         }
         self.items = filteredItemsRemovingHidden(from: newItems)
-        // 单页内自动补位：将该页内的空槽移到页尾
+        // Auto-fill within single page: move nil/empty slots to page end
         compactItemsWithinPages()
         removeEmptyPages()
 
-        // 触发文件夹更新，通知所有相关视图刷新图标
+        // triggerfolderupdate，notificationallrelatedviewrefreshicon
         DispatchQueue.main.async { [weak self] in
             self?.triggerFolderUpdate()
         }
         
-        // 触发网格视图刷新，确保界面立即更新
+        // Trigger grid view refresh, ensure UI updates immediately
         triggerGridRefresh()
         
-        // 刷新缓存，确保搜索时能找到新创建文件夹内的应用
+        // Refresh cache, ensure search can find newly created folder's apps
         refreshCacheAfterFolderOperation()
 
         saveAllOrder()
@@ -3994,42 +3994,42 @@ private struct DefaultsCache {
         guard let folderIndex = folders.firstIndex(of: folder) else { return }
         
         
-        // 创建新的FolderInfo实例，确保SwiftUI能够检测到变化
+        // Create new FolderInfo instance, ensure SwiftUI can detect changes
         var updatedFolder = folders[folderIndex]
         updatedFolder.apps.append(app)
         folders[folderIndex] = updatedFolder
         
         
-        // 从应用列表中移除
+        // fromapplistinremove
         if let appIndex = apps.firstIndex(of: app) {
             apps.remove(at: appIndex)
         }
         
-        // 顶层将该 app 槽位置为 empty（保持页独立）
+        // Set top-layer app slot positions as empty (maintain page independence)
         if let pos = items.firstIndex(of: .app(app)) {
             items[pos] = .empty(UUID().uuidString)
-            // 单页内自动补位
+            // Auto-fill within single page
             compactItemsWithinPages()
             removeEmptyPages()
         } else {
-            // 若未找到则回退到重建
+            // If not found, fall back to rebuild
             rebuildItems()
         }
         
-        // 确保 items 中对应的文件夹条目也更新为最新内容，便于搜索立即可见
+        // Ensure items for corresponding folder also update to latest contents, for search visibility
         for idx in items.indices {
             if case .folder(let f) = items[idx], f.id == updatedFolder.id {
                 items[idx] = .folder(updatedFolder)
             }
         }
         
-        // 立即触发文件夹更新，通知所有相关视图刷新图标和名称
+        // Immediately trigger folder update, notify all related views to refresh icon and name
         triggerFolderUpdate()
         
-        // 触发网格视图刷新，确保界面立即更新
+        // Trigger grid view refresh, ensure UI updates immediately
         triggerGridRefresh()
         
-        // 刷新缓存，确保搜索时能找到新添加的应用
+        // refreshcache，ensuresearchwhencan findnewaddapp
         refreshCacheAfterFolderOperation()
         
         saveAllOrder()
@@ -4039,25 +4039,25 @@ private struct DefaultsCache {
         guard let folderIndex = folders.firstIndex(of: folder) else { return }
         
         
-        // 创建新的FolderInfo实例，确保SwiftUI能够检测到变化
+        // Create new FolderInfo instance, ensure SwiftUI can detect changes
         var updatedFolder = folders[folderIndex]
         updatedFolder.apps.removeAll { $0 == app }
         
         
-        // 如果文件夹空了，删除文件夹
+        // iffoldernil/empty，Delete folder
         if updatedFolder.apps.isEmpty {
             folders.remove(at: folderIndex)
         } else {
-            // 更新文件夹
+            // Update folder
             folders[folderIndex] = updatedFolder
         }
         
-        // 同步更新 items 中的该文件夹条目，避免界面继续引用旧的文件夹内容
+        // Sync update items thefolder item，avoidUIcontinuereferenceoldfolderContents
         var emptiedSlots: [Int] = []
         for idx in items.indices {
             if case .folder(let f) = items[idx], f.id == folder.id {
                 if updatedFolder.apps.isEmpty {
-                    // 文件夹已空并被删除，则将该位置标记为空槽，等待后续补位
+                    // folder already nil/empty, then deleted, thenthe position flagged as nil/empty slot，etc.pending subsequentfill
                     items[idx] = .empty(UUID().uuidString)
                     emptiedSlots.append(idx)
                 } else {
@@ -4066,7 +4066,7 @@ private struct DefaultsCache {
             }
         }
         
-        // 将应用重新添加到应用列表（若已存在则更新，避免重复）
+        // appre-addedtoapplist（若already存inthenupdate，avoid重复)
         if let existingIndex = apps.firstIndex(where: { $0.url == app.url }) {
             apps[existingIndex] = app
         } else {
@@ -4074,7 +4074,7 @@ private struct DefaultsCache {
         }
         apps.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
-        // 优先使用记录的空槽，其次寻找其它空槽，最后追加新槽
+        // 优先userecordnil/emptyslot，itstime(s)寻找its它nil/emptyslot，mostafter追加newslot
         var targetSlot: Int? = nil
         if let firstEmptied = emptiedSlots.first, firstEmptied < items.count {
             targetSlot = firstEmptied
@@ -4090,17 +4090,17 @@ private struct DefaultsCache {
             items.append(.app(app))
         }
 
-        // 立即触发文件夹更新，通知所有相关视图刷新图标和名称
+        // Immediately trigger folder update, notify all related views to refresh icon and name
         triggerFolderUpdate()
 
-        // 仅在页内压缩空槽
+        // onlyin页inside压缩nil/emptyslot
         compactItemsWithinPages()
         removeEmptyPages()
 
-        // 触发网格视图刷新，确保界面立即更新
+        // Trigger grid view refresh, ensure UI updates immediately
         triggerGridRefresh()
 
-        // 刷新缓存，确保搜索时能找到从文件夹移除的应用（在重建之后刷新）
+        // refreshcache，ensuresearchwhencan findfromfolderremoveapp（inrebuildafterrefresh)
         refreshCacheAfterFolderOperation()
 
         saveAllOrder()
@@ -4110,12 +4110,12 @@ private struct DefaultsCache {
         guard let index = folders.firstIndex(of: folder) else { return }
         
         
-        // 创建新的FolderInfo实例，确保SwiftUI能够检测到变化
+        // Create new FolderInfo instance, ensure SwiftUI can detect changes
         var updatedFolder = folders[index]
         updatedFolder.name = newName
         folders[index] = updatedFolder
         
-        // 同步更新 items 中的该文件夹条目，避免主网格继续显示旧名称
+        // Sync update items thefolder item，avoid主gridcontinueshowoldname
         for idx in items.indices {
             if case .folder(let f) = items[idx], f.id == updatedFolder.id {
                 items[idx] = .folder(updatedFolder)
@@ -4123,13 +4123,13 @@ private struct DefaultsCache {
         }
         
         
-        // 立即触发文件夹更新，通知所有相关视图刷新
+        // Immediately triggerfolderupdate，notificationallrelatedviewrefresh
         triggerFolderUpdate()
         
-        // 触发网格视图刷新，确保界面立即更新
+        // Trigger grid view refresh, ensure UI updates immediately
         triggerGridRefresh()
         
-        // 刷新缓存，确保搜索功能正常工作
+        // refreshcache，ensuresearchfunctionality works工作
         refreshCacheAfterFolderOperation()
         
         rebuildItems()
@@ -4206,46 +4206,46 @@ private struct DefaultsCache {
         return true
     }
     
-    // 一键重置布局：完全重新扫描应用，删除所有文件夹、排序和empty填充
+    // 一keyresetlayout：完全重newscanapp，deleteallfolder、order/sortandemptypadding
     func resetLayout() {
-        // 关闭打开的文件夹
+        // closeOpen folder
         openFolder = nil
         
-        // 清空所有文件夹和排序数据
+        // clearallfolderandorder/sortdata
         folders.removeAll()
         
-        // 清除所有持久化的排序数据
+        // 清除allPersistenceorder/sortdata
         clearAllPersistedData()
         
-        // 清除缓存
+        // Clear cache
         cacheManager.clearAllCaches()
         
-        // 重置扫描标记，强制重新扫描
+        // resetscanflag，强制重newscan
         hasPerformedInitialScan = false
         
-        // 清空当前项目列表
+        // clearcurrentitems list
         items.removeAll()
         missingPlaceholders.removeAll()
 
-        // 重新扫描应用，不加载持久化数据
+        // 重newscanapp，notloadPersistencedata
         scanApplications(loadPersistedOrder: false)
         
-        // 重置到第一页
+        // resettoFirst page
         currentPage = 0
         
-        // 触发文件夹更新，通知所有相关视图刷新
+        // triggerfolderupdate，notificationallrelatedviewrefresh
         triggerFolderUpdate()
         
-        // 触发网格视图刷新，确保界面立即更新
+        // Trigger grid view refresh, ensure UI updates immediately
         triggerGridRefresh()
         
-        // 扫描完成后刷新缓存
+        // scanCompleteafterrefreshcache
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.refreshCacheAfterFolderOperation()
         }
     }
     
-    /// 单页内自动补位：将每页的 .empty 槽位移动到该页尾部，保持非空项的相对顺序
+    /// Auto-fill within single page：each页 .empty slotmovetothe页尾部，maintainnon-nil/non-emptyitem相fororder
     func compactItemsWithinPages() {
         guard !items.isEmpty else { return }
         items = filteredItemsRemovingHidden(from: compactedItemsWithinPages(items))
@@ -4253,7 +4253,7 @@ private struct DefaultsCache {
 
     private func compactedItemsWithinPages(_ source: [LaunchpadItem]) -> [LaunchpadItem] {
         guard !source.isEmpty else { return source }
-        let itemsPerPage = self.itemsPerPage // 使用计算属性
+        let itemsPerPage = self.itemsPerPage // useComputed properties
         var result: [LaunchpadItem] = []
         result.reserveCapacity(source.count)
         var index = 0
@@ -4274,10 +4274,10 @@ private struct DefaultsCache {
                 }
             }
 
-            // 先添加非空项目，保持原有顺序
+            // 先addnon-nil/non-emptyitemitem ，maintain原有order
             result.append(contentsOf: nonEmpty)
 
-            // 再添加empty项目到页面末尾
+            // re-addemptyitemitem topageend
             if !emptyTokens.isEmpty {
                 result.append(contentsOf: emptyTokens.map { .empty($0) })
             }
@@ -4287,7 +4287,7 @@ private struct DefaultsCache {
         return result
     }
 
-    // MARK: - 跨页拖拽：级联插入（满页则将最后一个推入下一页）
+    // MARK: - Cross-page drag：级联insert（满页thenmostafter一推入Next page)
     func moveSelectedAppsAcrossPagesWithCascade(appPathsOrdered: [String], to targetIndex: Int) {
         guard !appPathsOrdered.isEmpty else { return }
 
@@ -4344,30 +4344,30 @@ private struct DefaultsCache {
         }
         guard let source = items.firstIndex(of: item) else { return }
         var result = items
-        // 源位置置空，保持长度
+        // 源position置nil/empty，maintain长度
         result[source] = .empty(UUID().uuidString)
-        // 执行级联插入
+        // execute级联insert
         result = cascadeInsert(into: result, item: item, at: targetIndex)
         items = filteredItemsRemovingHidden(from: result)
         
-        // 每次拖拽结束后都进行压缩，确保每页的empty项目移动到页面末尾
+        // eachtime(s)dragendafterall进row压缩，ensureeach页emptyitemitem movetopageend
         let targetPage = targetIndex / itemsPerPage
         let currentPages = (items.count + itemsPerPage - 1) / itemsPerPage
         
         if targetPage == currentPages - 1 {
-            // 拖拽到新页面，延迟压缩以确保应用位置稳定
+            // dragtonewpage，delay压缩以ensureappposition稳定
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 self.compactItemsWithinPages()
                 self.removeEmptyPages()
                 self.triggerGridRefresh()
             }
         } else {
-            // 拖拽到现有页面，立即压缩
+            // dragtoexistingpage，Immediately 压缩
             compactItemsWithinPages()
             removeEmptyPages()
         }
         
-        // 触发网格视图刷新，确保界面立即更新
+        // Trigger grid view refresh, ensure UI updates immediately
         triggerGridRefresh()
         
         saveAllOrder()
@@ -4375,9 +4375,9 @@ private struct DefaultsCache {
 
     private func cascadeInsert(into array: [LaunchpadItem], item: LaunchpadItem, at targetIndex: Int) -> [LaunchpadItem] {
         var result = array
-        let p = self.itemsPerPage // 使用计算属性
+        let p = self.itemsPerPage // useComputed properties
 
-        // 确保长度填充为整页，便于处理
+        // ensure长度paddingas整页，forProcess
         if result.count % p != 0 {
             let remain = p - (result.count % p)
             for _ in 0..<remain { result.append(.empty(UUID().uuidString)) }
@@ -4396,7 +4396,7 @@ private struct DefaultsCache {
             }
             var slice = Array(result[pageStart..<pageEnd])
             
-            // 确保插入位置在有效范围内
+            // ensureinsertpositioninvalidrangeinside
             let safeLocalIndex = max(0, min(localIndex, slice.count))
             slice.insert(moving, at: safeLocalIndex)
             
@@ -4406,14 +4406,14 @@ private struct DefaultsCache {
             }
             result.replaceSubrange(pageStart..<pageEnd, with: slice)
             if let s = spilled, case .empty = s {
-                // 溢出为空：结束
+                // 溢出asnil/empty：end
                 carry = nil
             } else if let s = spilled {
-                // 溢出非空：推到下一页页首
+                // 溢出non-nil/non-empty：推toNext page页首
                 carry = s
                 currentPage += 1
                 localIndex = 0
-                // 若到最后超过长度，填充下一页
+                // 若tomostafter超过长度，paddingNext page
                 let nextEnd = (currentPage + 1) * p
                 if result.count < nextEnd {
                     let need = nextEnd - result.count
@@ -4427,13 +4427,13 @@ private struct DefaultsCache {
     }
     
     func rebuildItems() {
-        // 增加防抖和优化检查
+        // 增加防抖andoptimizationcheck
         let currentItemsCount = items.count
         let appsInFolders: Set<AppInfo> = Set(folders.flatMap { $0.apps })
         let folderById: [String: FolderInfo] = Dictionary(uniqueKeysWithValues: folders.map { ($0.id, $0) })
 
         var newItems: [LaunchpadItem] = []
-        newItems.reserveCapacity(currentItemsCount + 10) // 预分配容量
+        newItems.reserveCapacity(currentItemsCount + 10) // 预allocate容量
         var seenAppPaths = Set<String>()
         var seenFolderIds = Set<String>()
         seenAppPaths.reserveCapacity(apps.count)
@@ -4446,9 +4446,9 @@ private struct DefaultsCache {
                     newItems.append(.folder(updated))
                     seenFolderIds.insert(updated.id)
                 }
-                // 若该文件夹已被删除，则跳过（不再保留）
+                // 若thefolderalreadydeleted，thenSkip（notre-保留)
             case .app(let app):
-                // 如果 app 已进入某个文件夹，则从顶层移除；否则保留其原有位置
+                // if app already进入某folder，thenfromtop-layerremove；otherwise保留itsoriginal position
                 if !appsInFolders.contains(app) {
                     newItems.append(.app(app))
                     seenAppPaths.insert(standardizedFilePath(app.url.path))
@@ -4463,28 +4463,28 @@ private struct DefaultsCache {
                     newItems.append(.empty(UUID().uuidString))
                 }
             case .empty(let token):
-                // 保留 empty 作为占位，维持每页独立
+                // 保留 empty 作asplaceholder，维持eachpage independence
                 newItems.append(.empty(token))
             }
         }
 
-        // 追加遗漏的自由应用（未在顶层出现，但也不在任何文件夹中）
+        // 追加遗漏freeapp（not yetintop-layer出现，但alsonotin任何folderin)
         let missingFreeApps = apps.filter {
             guard !appsInFolders.contains($0) else { return false }
             return !seenAppPaths.contains(standardizedFilePath($0.url.path))
         }
         newItems.append(contentsOf: missingFreeApps.map { .app($0) })
 
-        // 注意：不要自动把缺失的文件夹追加到末尾，
-        // 以免在加载持久化顺序后，因增量更新触发重建时把文件夹推到最后一页。
+        // Note：not要自动missingfolder追加toend，
+        // 以免inloadPersistenceorderafter，因Incremental updatetriggerrebuildwhenfolder推toLast page。
 
-        // 只有在实际变化时才更新items
+        // only有in实际changewhen才updateitems
         if newItems.count != items.count || !newItems.elementsEqual(items, by: { $0.id == $1.id }) {
             items = filteredItemsRemovingHidden(from: newItems)
         }
     }
     
-    // MARK: - 持久化：每页独立排序（新）+ 兼容旧版
+    // MARK: - Persistence：eachpage independenceorder/sort（new)+ compatibleold版
     func loadAllOrder() {
         guard let modelContext else {
             print("LaunchNext: ModelContext is nil, cannot load persisted order")
@@ -4493,14 +4493,14 @@ private struct DefaultsCache {
         
         print("LaunchNext: Attempting to load persisted order data...")
         
-        // 优先尝试从新的"页-槽位"模型读取
+        // 优先尝试fromnew page-slot modelread
         if loadOrderFromPageEntries(using: modelContext) {
             print("LaunchNext: Successfully loaded order from PageEntryData")
             return
         }
         
         print("LaunchNext: PageEntryData not found, trying legacy TopItemData...")
-        // 回退：旧版全局顺序模型
+        // fallback：old版globalordermodel
         loadOrderFromLegacyTopItems(using: modelContext)
         print("LaunchNext: Finished loading order from legacy data")
     }
@@ -4513,11 +4513,11 @@ private struct DefaultsCache {
             let saved = try modelContext.fetch(descriptor)
             guard !saved.isEmpty else { return false }
 
-            // 构建文件夹：按首次出现顺序
+            // buildfolder：by首time(s)出现order
             var folderMap: [String: FolderInfo] = [:]
             var foldersInOrder: [FolderInfo] = []
 
-            // 先收集所有 folder 的 appPaths，避免重复构建
+            // 先收集all folder  appPaths，avoid重复build
             for row in saved where row.kind == "folder" {
                 guard let fid = row.folderId else { continue }
                 if folderMap[fid] != nil { continue }
@@ -4539,7 +4539,7 @@ private struct DefaultsCache {
 
             let folderAppPathSet: Set<String> = Set(foldersInOrder.flatMap { $0.apps.map { $0.url.path } })
 
-            // 合成顶层 items（按页与位置的顺序；保留 empty 以维持每页独立槽位）
+            // 合成top-layer items（by页andpositionorder；保留 empty 以维持eachpage independenceslot)
             var combined: [LaunchpadItem] = []
             combined.reserveCapacity(saved.count)
             for row in saved {
@@ -4595,7 +4595,7 @@ private struct DefaultsCache {
                 self.folders = self.sanitizedFolders(foldersInOrder)
                 if !combined.isEmpty {
                     self.items = self.filteredItemsRemovingHidden(from: combined)
-                    // 如果应用列表为空，从持久化数据中恢复应用列表
+                    // ifapplistasnil/empty，fromPersistencedatainresumeapplist
                     if self.apps.isEmpty {
                         let freeApps: [AppInfo] = combined.compactMap { if case let .app(a) = $0 { return a } else { return nil } }
                         self.apps = freeApps
@@ -4676,7 +4676,7 @@ private struct DefaultsCache {
                 self.folders = self.sanitizedFolders(foldersInOrder)
                 if !combined.isEmpty {
                     self.items = self.filteredItemsRemovingHidden(from: combined)
-                    // 如果应用列表为空，从持久化数据中恢复应用列表
+                    // ifapplistasnil/empty，fromPersistencedatainresumeapplist
                     if self.apps.isEmpty {
                         let freeAppsAfterLoad: [AppInfo] = combined.compactMap { if case let .app(a) = $0 { return a } else { return nil } }
                         self.apps = freeAppsAfterLoad
@@ -4703,15 +4703,15 @@ private struct DefaultsCache {
 
         print("LaunchNext: Saving order data for \(items.count) items...")
         
-        // 写入新模型：按页-槽位
+        // writenewmodel：by页-slot
         do {
             let existing = try modelContext.fetch(FetchDescriptor<PageEntryData>())
             print("LaunchNext: Found \(existing.count) existing entries, clearing...")
             for row in existing { modelContext.delete(row) }
 
-            // 构建 folders 查找表
+            // build folders findtable
             let folderById: [String: FolderInfo] = Dictionary(uniqueKeysWithValues: folders.map { ($0.id, $0) })
-            let itemsPerPage = self.itemsPerPage // 使用计算属性
+            let itemsPerPage = self.itemsPerPage // useComputed properties
 
             for (idx, item) in items.enumerated() {
                 let pageIndex = idx / itemsPerPage
@@ -4765,7 +4765,7 @@ private struct DefaultsCache {
             try modelContext.save()
             print("LaunchNext: Successfully saved order data")
             
-            // 清理旧版表，避免占用空间（忽略错误）
+            // 清理old版table，avoid占usenil/empty间（ignoreerror)
             do {
                 let legacy = try modelContext.fetch(FetchDescriptor<TopItemData>())
                 for row in legacy { modelContext.delete(row) }
@@ -4776,7 +4776,7 @@ private struct DefaultsCache {
         }
     }
 
-    // 触发文件夹更新，通知所有相关视图刷新图标
+    // triggerfolderupdate，notificationallrelatedviewrefreshicon
     private func triggerFolderUpdate() {
         folderUpdateTrigger = UUID()
         FolderPreviewCache.shared.clear()
@@ -4889,35 +4889,35 @@ private struct DefaultsCache {
         }
     }
     
-    // 触发网格视图刷新，用于拖拽操作后的界面更新
+    // triggergridviewrefresh，used fordrag操作afterUIupdate
     func triggerGridRefresh() {
         clampCurrentPageWithinBounds()
         gridRefreshTrigger = UUID()
     }
     
     
-    // 清除所有持久化的排序和文件夹数据
+    // 清除allPersistenceorder/sortandfolderdata
     private func clearAllPersistedData() {
         guard let modelContext else { return }
         
         do {
-            // 清除新的页-槽位数据
+            // 清除new页-slotdata
             let pageEntries = try modelContext.fetch(FetchDescriptor<PageEntryData>())
             for entry in pageEntries {
                 modelContext.delete(entry)
             }
             
-            // 清除旧版的全局顺序数据
+            // 清除old版globalorderdata
             let legacyEntries = try modelContext.fetch(FetchDescriptor<TopItemData>())
             for entry in legacyEntries {
                 modelContext.delete(entry)
             }
             
-            // 保存更改
+            // savemore改
             try modelContext.save()
             missingPlaceholders.removeAll()
         } catch {
-            // 忽略错误，确保重置流程继续进行
+            // ignoreerror，ensurereset流程continue进row
         }
     }
 
@@ -4929,7 +4929,7 @@ private struct DefaultsCache {
         }
     }
 
-    // MARK: - 拖拽时自动创建新页
+    // MARK: - dragwhen自动Createnew页
     private var pendingNewPage: (pageIndex: Int, itemCount: Int)? = nil
     
     func createNewPageForDrag() -> Bool {
@@ -4937,15 +4937,15 @@ private struct DefaultsCache {
         let currentPages = (items.count + itemsPerPage - 1) / itemsPerPage
         let newPageIndex = currentPages
         
-        // 为新页添加empty占位符
+        // asnew页addemptyplaceholder
         for _ in 0..<itemsPerPage {
             items.append(.empty(UUID().uuidString))
         }
         
-        // 记录待处理的新页信息
+        // record待Processnew页info
         pendingNewPage = (pageIndex: newPageIndex, itemCount: itemsPerPage)
         
-        // 触发网格视图刷新
+        // triggergridviewrefresh
         triggerGridRefresh()
         
         return true
@@ -4954,7 +4954,7 @@ private struct DefaultsCache {
     func cleanupUnusedNewPage() {
         guard let pending = pendingNewPage else { return }
         
-        // 检查新页是否被使用（是否有非empty项目）
+        // checknew页是否use（是否有notemptyitemitem )
         let pageStart = pending.pageIndex * pending.itemCount
         let pageEnd = min(pageStart + pending.itemCount, items.count)
         
@@ -4965,20 +4965,20 @@ private struct DefaultsCache {
             }
             
             if !hasNonEmptyItems {
-                // 新页没有被使用，删除它
+                // new页没有use，delete它
                 items.removeSubrange(pageStart..<pageEnd)
                 
-                // 触发网格视图刷新
+                // triggergridviewrefresh
                 triggerGridRefresh()
             }
         }
         
-        // 清除待处理信息
+        // 清除待Processinfo
         pendingNewPage = nil
     }
 
-    // MARK: - 自动删除空白页面
-    /// 自动删除空白页面：删除全部都是empty填充的页面
+    // MARK: - 自动deletenil/emptyemptypage
+    /// 自动deletenil/emptyemptypage：delete全部all是emptypaddingpage
     func removeEmptyPages() {
         guard !items.isEmpty else { return }
         let itemsPerPage = self.itemsPerPage
@@ -4990,31 +4990,31 @@ private struct DefaultsCache {
             let end = min(index + itemsPerPage, items.count)
             let pageSlice = Array(items[index..<end])
             
-            // 检查当前页是否全部都是empty
+            // checkcurrent页是否全部all是empty
             let isEmptyPage = pageSlice.allSatisfy { item in
                 if case .empty = item { return true } else { return false }
             }
             
-            // 如果不是空白页面，保留该页内容
+            // ifnot是nil/emptyemptypage，保留the页Contents
             if !isEmptyPage {
                 newItems.append(contentsOf: pageSlice)
             }
-            // 如果是空白页面，跳过不添加
+            // if是nil/emptyemptypage，Skipnotadd
             
             index = end
         }
         
-        // 只有在实际删除了空白页面时才更新items
+        // only有in实际deletenil/emptyemptypagewhen才updateitems
         if newItems.count != items.count {
             items = filteredItemsRemovingHidden(from: newItems)
             
-            // 删除空白页面后，确保当前页索引在有效范围内
+            // deletenil/emptyemptypageafter，ensurecurrent页indexinvalidrangeinside
             let maxPageIndex = max(0, (items.count - 1) / itemsPerPage)
             if currentPage > maxPageIndex {
                 currentPage = maxPageIndex
             }
             
-            // 触发网格视图刷新
+            // triggergridviewrefresh
             triggerGridRefresh()
         }
     }
@@ -5042,8 +5042,8 @@ private struct DefaultsCache {
         }
     }
     
-    // MARK: - 导出应用排序功能
-    /// 导出应用排序为JSON格式
+    // MARK: - exportapporder/sort功能
+    /// exportapporder/sortasJSONformat
     func exportAppOrderAsJSON() -> String? {
         let exportData = buildExportData()
         
@@ -5055,7 +5055,7 @@ private struct DefaultsCache {
         }
     }
     
-    /// 构建导出数据
+    /// buildexportdata
     private func buildExportData() -> [String: Any] {
         var pages: [[String: Any]] = []
         let itemsPerPage = self.itemsPerPage
@@ -5073,7 +5073,7 @@ private struct DefaultsCache {
                 "folderApps": []
             ]
             
-            // 如果是文件夹，添加文件夹内的应用信息
+            // if是folder，addfolderinsideappinfo
             if case let .folder(folder) = item {
                 itemData["folderApps"] = folder.apps.map { $0.name }
                 itemData["folderAppPaths"] = folder.apps.map { $0.url.path }
@@ -5091,44 +5091,44 @@ private struct DefaultsCache {
         ]
     }
     
-    /// 获取项目类型描述
+    /// Getitemitem typedescription
     private func itemKind(for item: LaunchpadItem) -> String {
         switch item {
         case .app:
-            return "应用"
+            return "app"
         case .folder:
-            return "文件夹"
+            return "folder"
         case .empty:
-            return "空槽位"
+            return "empty slot"
         case .missingApp:
-            return "缺失应用"
+            return "missingapp"
         }
     }
     
-    /// 获取项目路径
+    /// Getitemitem path
     private func itemPath(for item: LaunchpadItem) -> String {
         switch item {
         case let .app(app):
             return app.url.path
         case let .folder(folder):
-            return "文件夹: \(folder.name)"
+            return "folder: \(folder.name)"
         case .empty:
-            return "空槽位"
+            return "empty slot"
         case let .missingApp(placeholder):
-            return "缺失应用: \(placeholder.bundlePath)"
+            return "missingapp: \(placeholder.bundlePath)"
         }
     }
     
-    /// 使用系统文件保存对话框保存导出文件
+    /// usesystemfilesavefor话框saveexportfile
     func saveExportFileWithDialog(content: String, filename: String, fileExtension: String, fileType: String) -> Bool {
         let savePanel = NSSavePanel()
-        savePanel.title = "保存导出文件"
+        savePanel.title = "saveexportfile"
         savePanel.nameFieldStringValue = filename
         savePanel.allowedContentTypes = [UTType(filenameExtension: fileExtension) ?? .plainText]
         savePanel.canCreateDirectories = true
         savePanel.isExtensionHidden = false
         
-        // 设置默认保存位置为桌面
+        // setdefaultsavepositionas桌side
         if let desktopURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first {
             savePanel.directoryURL = desktopURL
         }
@@ -5145,21 +5145,21 @@ private struct DefaultsCache {
         return false
     }
     
-    // MARK: - 缓存管理
+    // MARK: - cache管理
     
-    /// 扫描完成后生成缓存
+    /// Generate cache after scan completes
     private func generateCacheAfterScan() {
         
-        // 检查缓存是否有效
+        // checkcache是否valid
         if !cacheManager.isCacheValid {
-            // 生成新的缓存
+            // Generatenewcache
             cacheManager.generateCache(from: apps,
                                       items: items,
                                       itemsPerPage: itemsPerPage,
                                       columns: gridColumnsPerPage,
                                       rows: gridRowsPerPage)
         } else {
-            // 缓存有效，但可以预加载图标
+            // cachevalid，但canPreloadicon
             let appPaths = apps.map { $0.url.path }
             cacheManager.preloadIcons(for: appPaths)
         }
@@ -5171,57 +5171,57 @@ private struct DefaultsCache {
         }
     }
     
-    /// 手动刷新（模拟全新启动的完整流程）
+    /// Manualrefresh（模拟全newlaunchcomplete流程)
     func refresh() {
         print("LaunchNext: Manual refresh triggered")
         
-        // 清除缓存，确保图标与搜索索引重新生成
+        // Clear cache，ensureiconandsearchindex重newGenerate
         cacheManager.clearAllCaches()
 
-        // 重置界面与状态，使之接近"首次启动"
+        // resetUIandstate，使之接近"首time(s)launch"
         openFolder = nil
         currentPage = 0
         if !searchText.isEmpty { searchText = "" }
 
-        // 不要重置 hasAppliedOrderFromStore，保持布局数据
+        // not要reset hasAppliedOrderFromStore，maintainlayoutdata
         hasPerformedInitialScan = true
 
-        // 执行与首次启动相同的扫描路径（保持现有顺序，新增在末尾）
+        // executeand首time(s)launchsameScan path（Maintain existingorder，addinend)
         scanApplicationsWithOrderPreservation()
 
-        // 扫描完成后生成缓存
+        // Generate cache after scan completes
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             guard let self else { return }
             self.generateCacheAfterScan()
         }
 
-        // 强制界面刷新
+        // 强制UIrefresh
         triggerFolderUpdate()
         triggerGridRefresh()
     }
     
-    /// 清除缓存
+    /// Clear cache
     func clearCache() {
         cacheManager.clearAllCaches()
     }
     
-    /// 获取缓存统计信息
+    /// GetCache stats
     var cacheStatistics: CacheStatistics {
         return cacheManager.cacheStatistics
     }
     
-    /// 增量更新后更新缓存
+    /// Incremental updateafterupdatecache
     private func updateCacheAfterChanges() {
-        // 检查缓存是否需要更新
+        // checkcache是否needupdate
         if !cacheManager.isCacheValid {
-            // 缓存无效，重新生成
+            // cacheinvalid，重newGenerate
             cacheManager.generateCache(from: apps,
                                       items: items,
                                       itemsPerPage: itemsPerPage,
                                       columns: gridColumnsPerPage,
                                       rows: gridRowsPerPage)
         } else {
-            // 缓存有效，只更新变化的部分
+            // cachevalid，onlyupdatechangepartial
             let changedAppPaths = apps.map { $0.url.path }
             cacheManager.preloadIcons(for: changedAppPaths)
         }
@@ -5769,17 +5769,17 @@ private struct DefaultsCache {
         ensureAppSupportDirectory().appendingPathComponent("CustomAppIcon.png", isDirectory: false)
     }
 
-    /// 文件夹操作后刷新缓存，确保搜索功能正常工作
+    /// folder操作afterrefreshcache，ensuresearchfunctionality works工作
     private func refreshCacheAfterFolderOperation() {
-        // 直接刷新缓存，确保包含所有应用（包括文件夹内的应用）
+        // directlyrefreshcache，ensureincludeallapp（includingfolderinsideapp)
         cacheManager.refreshCache(from: apps,
                                   items: items,
                                   itemsPerPage: itemsPerPage,
                                   columns: gridColumnsPerPage,
                                   rows: gridRowsPerPage)
         
-        // 清空搜索文本，确保搜索状态重置
-        // 这样可以避免搜索时显示过时的结果
+        // Clear searchinfo本，ensuresearchstatereset
+        // 这样canavoidsearchwhenshow过whenresults
         if !searchText.isEmpty {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                 self?.searchText = ""
@@ -5846,8 +5846,8 @@ private struct DefaultsCache {
     //     // AppDelegate.shared?.updateAIOverlayHotKey(configuration: isAIEnabled ? aiOverlayHotKey : nil)
     // }
     
-    // MARK: - 导入应用排序功能
-    /// 从JSON数据导入应用排序
+    // MARK: - importapporder/sort功能
+    /// fromJSONdataimportapporder/sort
     func importAppOrderFromJSON(_ jsonData: Data) -> Bool {
         do {
             let importData = try JSONSerialization.jsonObject(with: jsonData, options: [])
@@ -6047,41 +6047,41 @@ private struct DefaultsCache {
         return false
     }
 
-    /// 从原生 macOS Launchpad 导入布局
+    /// fromnative macOS Launchpad importlayout
     func importFromNativeLaunchpad() async -> (success: Bool, message: String) {
         guard let modelContext = self.modelContext else {
-            return (false, "数据存储未初始化")
+            return (false, "datastorenot yetinitial化")
         }
 
         do {
             let importer = NativeLaunchpadImporter(modelContext: modelContext)
             let result = try importer.importFromNativeLaunchpad()
 
-            // 导入成功后刷新应用数据
+            // Import successfulafterrefreshappdata
             DispatchQueue.main.async { [weak self] in
                 self?.performInitialScanIfNeeded()
-                // 新版使用 SwiftData 的统一加载入口
+                // new版use SwiftData unifiedload入口
                 self?.loadAllOrder()
                 self?.triggerGridRefresh()
             }
 
             return (true, result.summary)
         } catch {
-            return (false, "导入失败: \(error.localizedDescription)")
+            return (false, "Import failed: \(error.localizedDescription)")
         }
     }
 
-    /// 从旧版归档（.lmy/.zip 或直接 db）导入
+    /// fromLegacy archive (.lmy/.zip ordirectly db)import
     func importFromLegacyLaunchpadArchive(url: URL) async -> (success: Bool, message: String) {
         guard let modelContext = self.modelContext else {
-            return (false, "数据存储未初始化")
+            return (false, "datastorenot yetinitial化")
         }
 
         do {
             let importer = NativeLaunchpadImporter(modelContext: modelContext)
             let result = try importer.importFromLegacyArchive(at: url)
 
-            // 导入成功后刷新应用数据
+            // Import successfulafterrefreshappdata
             DispatchQueue.main.async { [weak self] in
                 self?.performInitialScanIfNeeded()
                 self?.loadAllOrder()
@@ -6090,50 +6090,50 @@ private struct DefaultsCache {
 
             return (true, result.summary)
         } catch {
-            return (false, "导入失败: \(error.localizedDescription)")
+            return (false, "Import failed: \(error.localizedDescription)")
         }
     }
 
-    /// 处理导入的数据并重建应用布局
+    /// Process import dataand rebuild app layout
     private func processImportedData(_ importData: Any) -> Bool {
         guard let data = importData as? [String: Any],
               let pagesData = data["pages"] as? [[String: Any]] else {
             return false
         }
         
-        // 构建应用路径到应用对象的映射
+        // buildapppathtoappobjects映射
         let appPathMap = Dictionary(uniqueKeysWithValues: apps.map { ($0.url.path, $0) })
         
-        // 重建items数组
+        // rebuilditemsarray
         var newItems: [LaunchpadItem] = []
         var importedFolders: [FolderInfo] = []
         
-        // 处理每一页的数据
+        // Processeach一页data
         for pageData in pagesData {
             guard let kind = pageData["kind"] as? String,
                   let name = pageData["name"] as? String else { continue }
             
             switch kind {
-            case "应用":
+            case "app":
                 if let path = pageData["path"] as? String,
                    let app = appPathMap[path] {
                     newItems.append(.app(app))
                 } else {
-                    // 应用缺失，添加空槽位
+                    // appmissing，addempty slot
                     newItems.append(.empty(UUID().uuidString))
                 }
                 
-            case "文件夹":
+            case "folder":
                 if let folderApps = pageData["folderApps"] as? [String],
                    let folderAppPaths = pageData["folderAppPaths"] as? [String] {
-                    // 重建文件夹 - 优先使用应用路径来匹配，确保准确性
+                    // rebuildfolder - 优先useapppath来match，ensure准确性
                     let folderAppsList = folderAppPaths.compactMap { appPath in
-                        // 通过应用路径匹配，这是最准确的方式
+                        // viaapppathmatch，这是most准确方式
                         if let app = apps.first(where: { $0.url.path == appPath }) {
                             return app
                         }
-                        // 如果路径匹配失败，尝试通过名称匹配（备用方案）
-                        if let appName = folderApps.first(where: { _ in true }), // 获取对应的应用名称
+                        // ifpathmatchfailure，尝试vianamematch（备use方案)
+                        if let appName = folderApps.first(where: { _ in true }), // Getcorrespondingappname
                            let app = apps.first(where: { $0.name == appName }) {
                             return app
                         }
@@ -6141,7 +6141,7 @@ private struct DefaultsCache {
                     }
                     
                     if !folderAppsList.isEmpty {
-                        // 尝试从现有文件夹中查找匹配的，保持ID一致
+                        // 尝试fromexistingfolderinfindmatch，maintainIDconsistent
                         let existingFolder = self.folders.first { existingFolder in
                             existingFolder.name == name &&
                             existingFolder.apps.count == folderAppsList.count &&
@@ -6151,27 +6151,27 @@ private struct DefaultsCache {
                         }
                         
                         if let existing = existingFolder {
-                            // 使用现有文件夹，保持ID一致
+                            // useexistingfolder，maintainIDconsistent
                             importedFolders.append(existing)
                             newItems.append(.folder(existing))
                         } else {
-                            // 创建新文件夹
+                            // Createnewfolder
                             let folder = FolderInfo(name: name, apps: folderAppsList)
                             importedFolders.append(folder)
                             newItems.append(.folder(folder))
                         }
                     } else {
-                        // 文件夹为空，添加空槽位
+                        // folderasnil/empty，addempty slot
                         newItems.append(.empty(UUID().uuidString))
                     }
                 } else if let folderApps = pageData["folderApps"] as? [String] {
-                    // 兼容旧版本：只有应用名称，没有路径信息
+                    // compatibleoldversion：only有appname，没有pathinfo
                     let folderAppsList = folderApps.compactMap { appName in
                         apps.first { $0.name == appName }
                     }
                     
                     if !folderAppsList.isEmpty {
-                        // 尝试从现有文件夹中查找匹配的，保持ID一致
+                        // 尝试fromexistingfolderinfindmatch，maintainIDconsistent
                         let existingFolder = self.folders.first { existingFolder in
                             existingFolder.name == name &&
                             existingFolder.apps.count == folderAppsList.count &&
@@ -6181,34 +6181,34 @@ private struct DefaultsCache {
                         }
                         
                         if let existing = existingFolder {
-                            // 使用现有文件夹，保持ID一致
+                            // useexistingfolder，maintainIDconsistent
                             importedFolders.append(existing)
                             newItems.append(.folder(existing))
                         } else {
-                            // 创建新文件夹
+                            // Createnewfolder
                             let folder = FolderInfo(name: name, apps: folderAppsList)
                             importedFolders.append(folder)
                             newItems.append(.folder(folder))
                         }
                     } else {
-                        // 文件夹为空，添加空槽位
+                        // folderasnil/empty，addempty slot
                         newItems.append(.empty(UUID().uuidString))
                     }
                 } else {
-                    // 文件夹数据无效，添加空槽位
+                    // folderdatainvalid，addempty slot
                     newItems.append(.empty(UUID().uuidString))
                 }
                 
-            case "空槽位":
+            case "empty slot":
                 newItems.append(.empty(UUID().uuidString))
                 
             default:
-                // 未知类型，添加空槽位
+                // not yet知type，addempty slot
                 newItems.append(.empty(UUID().uuidString))
             }
         }
         
-        // 处理多出来的应用（放到最后一页）
+        // Process多出来app（放toLast page)
         let usedApps = Set(newItems.compactMap { item in
             if case let .app(app) = item { return app }
             return nil
@@ -6220,18 +6220,18 @@ private struct DefaultsCache {
         let unusedApps = apps.filter { !allUsedApps.contains($0) }
         
         if !unusedApps.isEmpty {
-            // 计算需要添加的空槽位数量
+            // calculateneedaddempty slot数量
             let itemsPerPage = self.itemsPerPage
             let currentPages = (newItems.count + itemsPerPage - 1) / itemsPerPage
             let lastPageStart = currentPages * itemsPerPage
             let lastPageEnd = lastPageStart + itemsPerPage
             
-            // 确保最后一页有足够的空间
+            // ensureLast page有足够nil/empty间
             while newItems.count < lastPageEnd {
                 newItems.append(.empty(UUID().uuidString))
             }
             
-            // 将未使用的应用添加到最后一页
+            // not yetuseappaddtoLast page
             for (index, app) in unusedApps.enumerated() {
                 let insertIndex = lastPageStart + index
                 if insertIndex < newItems.count {
@@ -6241,69 +6241,69 @@ private struct DefaultsCache {
                 }
             }
             
-            // 确保最后一页也是完整的
+            // ensureLast pagealso是complete
             let finalPageCount = newItems.count
             let finalPages = (finalPageCount + itemsPerPage - 1) / itemsPerPage
             let finalLastPageStart = (finalPages - 1) * itemsPerPage
             let finalLastPageEnd = finalLastPageStart + itemsPerPage
             
-            // 如果最后一页不完整，添加空槽位
+            // ifLast pagenotcomplete，addempty slot
             while newItems.count < finalLastPageEnd {
                 newItems.append(.empty(UUID().uuidString))
             }
         }
         
-        // 验证导入的数据结构
+        // verificationimportdatastructure
         
-        // 更新应用状态
+        // updateappstate
         DispatchQueue.main.async {
             
-            // 设置新的数据
+            // setnewdata
             self.folders = self.sanitizedFolders(importedFolders)
             self.items = self.filteredItemsRemovingHidden(from: newItems)
             
             
-            // 强制触发界面更新
+            // 强制Trigger UI update
             self.triggerFolderUpdate()
             self.triggerGridRefresh()
             
-            // 保存新的布局
+            // savenewlayout
             self.saveAllOrder()
             
             
-            // 暂时不调用页面补齐，保持导入的原始顺序
-            // 如果需要补齐，可以在用户手动操作后触发
+            // 暂whennot调usepage补齐，maintainimportoriginalorder
+            // ifneed补齐，caninuse户Manual操作aftertrigger
         }
         
         return true
     }
     
-    /// 验证导入数据的完整性
+    /// verificationimportdatacomplete性
     func validateImportData(_ jsonData: Data) -> (isValid: Bool, message: String) {
         do {
             let importData = try JSONSerialization.jsonObject(with: jsonData, options: [])
             guard let data = importData as? [String: Any] else {
-                return (false, "数据格式无效")
+                return (false, "dataformatinvalid")
             }
             
             guard let pagesData = data["pages"] as? [[String: Any]] else {
-                return (false, "缺少页面数据")
+                return (false, "缺少pagedata")
             }
             
             let totalPages = data["totalPages"] as? Int ?? 0
             let totalItems = data["totalItems"] as? Int ?? 0
             
             if pagesData.isEmpty {
-                return (false, "没有找到应用数据")
+                return (false, "没有foundappdata")
             }
             
-            return (true, "数据验证通过，共\(totalPages)页，\(totalItems)个项目")
+            return (true, "dataverificationvia，共\(totalPages)页，\(totalItems)itemitem ")
         } catch {
-            return (false, "JSON解析失败: \(error.localizedDescription)")
+            return (false, "JSONParse failed: \(error.localizedDescription)")
         }
     }
 
-    // MARK: - 更新检查功能
+    // MARK: - Update check功能
 
     private func scheduleAutomaticUpdateCheck() {
         autoCheckTimer?.cancel()
