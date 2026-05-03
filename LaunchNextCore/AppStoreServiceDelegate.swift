@@ -32,6 +32,10 @@ public protocol AppStoreServiceDelegate: AnyObject {
     var currentItemsPerPage: Int { get }
     var currentApplicationSearchPaths: [String] { get }
     var currentCustomAppSourcePaths: [String] { get }
+    var currentIsFullscreenMode: Bool { get }
+    var currentGridColumnsPerPage: Int { get }
+    var currentGridRowsPerPage: Int { get }
+    var currentRememberLastPage: Bool { get }
 
     // MARK: - Layout Helpers
     func compactItemsWithinPagesReturning() -> [LaunchpadItem]
@@ -40,11 +44,26 @@ public protocol AppStoreServiceDelegate: AnyObject {
     func sanitizedFolders(_ folders: [FolderInfo]) -> [FolderInfo]
     func compactItemsWithinPages()
 
+    // MARK: - App List Writes
+    /// FolderManager writes updated app list (after folder add/remove/dissolve)
+    func applyAppListChanges(_ apps: [AppInfo])
+    /// FolderManager clears folder list (resetLayout)
+    func applyClearFolders()
+    /// FolderManager sets open folder (dissolveFolder, resetLayout)
+    func applyOpenFolder(_ folder: FolderInfo?)
+    /// FolderManager sets current page (resetLayout)
+    func applyCurrentPage(_ page: Int)
+    /// FolderManager resets scan flag (resetLayout)
+    func applyHasPerformedInitialScan(_ value: Bool)
+
     // MARK: - Cross-Manager Routing
     func persistenceSaveAllOrder()
     func persistenceLoadAllOrder()
     func persistenceRebuildItems()
     func persistenceSmartRebuildItemsWithOrderPreservation(currentItems: [LaunchpadItem], newApps: [AppInfo])
+    func persistenceClearAllPersistedData()
+    func triggerFullRescan(loadPersistedOrder: Bool)
+    func clearAllCaches()
 
     // MARK: - Cache Refresh
     func refreshCacheAfterScan()
