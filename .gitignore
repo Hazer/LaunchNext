@@ -28,3 +28,6 @@ parallel_version/
 # Local AI notes
 LaunchNext/AI/TODO.md
 .worktrees/
+
+Derived/
+DerivedDataTuist/
