@@ -28,33 +28,35 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         let view = CAGridView(frame: .zero)
 
         // Initialize configuration
-        view.columns = appStore.gridColumnsPerPage
-        view.rows = appStore.gridRowsPerPage
+        view.columns = appStore.settingsStore.gridColumnsPerPage
+        view.rows = appStore.settingsStore.gridRowsPerPage
         view.iconSize = iconSize
         view.columnSpacing = columnSpacing
         view.rowSpacing = rowSpacing
         view.contentInsets = contentInsets
         view.pageSpacing = pageSpacing
-        view.labelFontSize = CGFloat(appStore.iconLabelFontSize)
-        view.labelFontWeight = nsFontWeight(for: appStore.iconLabelFontWeight)
-        view.showLabels = appStore.showLabels
-        view.isLayoutLocked = appStore.isLayoutLocked
-        view.folderDropZoneScale = CGFloat(appStore.folderDropZoneScale)
+        view.labelFontSize = CGFloat(appStore.settingsStore.iconLabelFontSize)
+        view.labelFontWeight = nsFontWeight(for: appStore.settingsStore.iconLabelFontWeight)
+        view.showLabels = appStore.settingsStore.showLabels
+        view.isLayoutLocked = appStore.settingsStore.isLayoutLocked
+        view.folderDropZoneScale = CGFloat(appStore.settingsStore.folderDropZoneScale)
         let preferredScale = nsViewScale(for: view)
-        view.folderPreviewScale = appStore.enableHighResFolderPreviews ? preferredScale : 1
+        view.folderPreviewScale = appStore.settingsStore.enableHighResFolderPreviews ? preferredScale : 1
         view.enableIconPreload = false
-        view.scrollSensitivity = appStore.scrollSensitivity
-        view.reverseWheelPagingDirection = appStore.reverseWheelPagingDirection
-        view.hoverMagnificationEnabled = appStore.enableHoverMagnification
-        view.hoverMagnificationScale = CGFloat(appStore.hoverMagnificationScale)
-        view.activePressEffectEnabled = appStore.enableActivePressEffect
-        view.activePressScale = CGFloat(appStore.activePressScale)
-        view.animationsEnabled = appStore.enableAnimations
-        view.animationDuration = appStore.animationDuration
-        view.layoutMode = appStore.layoutMode
-        view.dockDragEnabled = appStore.dockDragEnabled
-        view.dockDragSide = appStore.dockDragSide
-        view.externalAppDragTriggerDistance = CGFloat(appStore.dockDragTriggerDistance)
+        view.scrollSensitivity = appStore.settingsStore.scrollSensitivity
+        view.reverseWheelPagingDirection = appStore.settingsStore.reverseWheelPagingDirection
+        view.hoverMagnificationEnabled = appStore.settingsStore.enableHoverMagnification
+        view.hoverMagnificationScale = CGFloat(appStore.settingsStore.hoverMagnificationScale)
+        view.activePressEffectEnabled = appStore.settingsStore.enableActivePressEffect
+        view.activePressScale = CGFloat(appStore.settingsStore.activePressScale)
+        view.animationsEnabled = appStore.settingsStore.enableAnimations
+        view.animationDuration = appStore.settingsStore.animationDuration
+        view.layoutMode = appStore.settingsStore.layoutMode
+        view.dockDragEnabled = appStore.settingsStore.dockDragEnabled
+        view.dockDragSide = appStore.settingsStore.dockDragSide
+        view.externalAppDragTriggerDistance = CGFloat(appStore.settingsStore.dockDragTriggerDistance)
+        view.showInFinderMenuTitle = appStore.localized(.contextMenuShowInFinder)
+        view.copyAppPathMenuTitle = appStore.localized(.contextMenuCopyAppPath) (refactor: migrate CAGridViewRepresentable to use settingsStore)
         view.hideAppMenuTitle = appStore.localized(.hiddenAppsAddButton)
         view.dissolveFolderMenuTitle = appStore.localized(.contextMenuDissolveFolder)
         view.uninstallWithToolMenuTitle = appStore.localized(.contextMenuUninstallWithConfiguredTool)
@@ -143,44 +145,15 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         }
 
         // Drag reorder
-        view.onReorderItems = { fromIndex, toIndex in
+        view.onReorderItems = { [weak appStore] fromIndex, toIndex in
+            guard let appStore else { return }
             DispatchQueue.main.async {
-                guard fromIndex < appStore.items.count else { return }
-                let itemsPerPage = appStore.gridColumnsPerPage * appStore.gridRowsPerPage
-                let sourcePage = fromIndex / itemsPerPage
-                let targetPage = toIndex / itemsPerPage
-                
-                if sourcePage == targetPage {
-                    // Same page: use simple swap logic
-                    let pageStart = sourcePage * itemsPerPage
-                    let pageEnd = min(pageStart + itemsPerPage, appStore.items.count)
-                    var newItems = appStore.items
-                    var pageSlice = Array(newItems[pageStart..<pageEnd])
-                    let localFrom = fromIndex - pageStart
-                    let localTo = min(toIndex - pageStart, pageSlice.count - 1)
-                    
-                    if localFrom != localTo && localFrom < pageSlice.count && localTo < pageSlice.count {
-                        let moving = pageSlice.remove(at: localFrom)
-                        pageSlice.insert(moving, at: localTo)
-                        newItems.replaceSubrange(pageStart..<pageEnd, with: pageSlice)
-                        appStore.items = newItems
-                    }
-                    appStore.triggerGridRefresh()
-                    appStore.saveAllOrder()
-                    
-                    // Compact after same-page drag
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        appStore.compactItemsWithinPages()
-                    }
-                } else {
-                    // Cross-page: use cascade insert logic
-                let item = appStore.items[fromIndex]
-                appStore.moveItemAcrossPagesWithCascade(item: item, to: toIndex)
-                }
+                Self.handleReorder(appStore: appStore, fromIndex: fromIndex, toIndex: toIndex)
             }
         }
 
-        view.onReorderAppBatch = { appPathsOrdered, toIndex in
+        view.onReorderAppBatch = { [weak appStore] appPathsOrdered, toIndex in
+            guard let appStore else { return }
             DispatchQueue.main.async {
                 appStore.moveSelectedAppsAcrossPagesWithCascade(appPathsOrdered: appPathsOrdered, to: toIndex)
             }
@@ -189,7 +162,7 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         // Request new page creation (when dragged to right edge)
         view.onRequestNewPage = {
             DispatchQueue.main.async {
-                let itemsPerPage = appStore.gridColumnsPerPage * appStore.gridRowsPerPage
+                let itemsPerPage = appStore.settingsStore.gridColumnsPerPage * appStore.settingsStore.gridRowsPerPage
                 let currentPageCount = (appStore.items.count + itemsPerPage - 1) / itemsPerPage
                 let neededItems = (currentPageCount + 1) * itemsPerPage - appStore.items.count
                 for _ in 0..<neededItems {
@@ -206,8 +179,8 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         nsView.ensureScrollMonitorInstalled()
 
         // updateconfig
-        let configChanged = nsView.columns != appStore.gridColumnsPerPage ||
-                            nsView.rows != appStore.gridRowsPerPage ||
+        let configChanged = nsView.columns != appStore.settingsStore.gridColumnsPerPage ||
+                            nsView.rows != appStore.settingsStore.gridRowsPerPage || (refactor: migrate CAGridViewRepresentable to use settingsStore)
                             nsView.iconSize != iconSize ||
                             nsView.columnSpacing != columnSpacing ||
                             nsView.rowSpacing != rowSpacing ||
@@ -216,40 +189,40 @@ struct CAGridViewRepresentable: NSViewRepresentable {
                             nsView.contentInsets.bottom != contentInsets.bottom ||
                             nsView.contentInsets.right != contentInsets.right ||
                             nsView.pageSpacing != pageSpacing ||
-                            nsView.labelFontSize != CGFloat(appStore.iconLabelFontSize) ||
-                            nsView.labelFontWeight != nsFontWeight(for: appStore.iconLabelFontWeight) ||
-                            nsView.showLabels != appStore.showLabels ||
-                            nsView.isLayoutLocked != appStore.isLayoutLocked ||
-                            nsView.folderDropZoneScale != CGFloat(appStore.folderDropZoneScale) ||
-                            nsView.folderPreviewScale != (appStore.enableHighResFolderPreviews ? nsViewScale(for: nsView) : 1)
+                            nsView.labelFontSize != CGFloat(appStore.settingsStore.iconLabelFontSize) ||
+                            nsView.labelFontWeight != nsFontWeight(for: appStore.settingsStore.iconLabelFontWeight) ||
+                            nsView.showLabels != appStore.settingsStore.showLabels ||
+                            nsView.isLayoutLocked != appStore.settingsStore.isLayoutLocked ||
+                            nsView.folderDropZoneScale != CGFloat(appStore.settingsStore.folderDropZoneScale) ||
+                            nsView.folderPreviewScale != (appStore.settingsStore.enableHighResFolderPreviews ? nsViewScale(for: nsView) : 1)
 
         if configChanged {
-            nsView.columns = appStore.gridColumnsPerPage
-            nsView.rows = appStore.gridRowsPerPage
+            nsView.columns = appStore.settingsStore.gridColumnsPerPage
+            nsView.rows = appStore.settingsStore.gridRowsPerPage
             nsView.iconSize = iconSize
             nsView.columnSpacing = columnSpacing
             nsView.rowSpacing = rowSpacing
             nsView.contentInsets = contentInsets
             nsView.pageSpacing = pageSpacing
-            nsView.labelFontSize = CGFloat(appStore.iconLabelFontSize)
-            nsView.labelFontWeight = nsFontWeight(for: appStore.iconLabelFontWeight)
-            nsView.showLabels = appStore.showLabels
-            nsView.isLayoutLocked = appStore.isLayoutLocked
-            nsView.folderDropZoneScale = CGFloat(appStore.folderDropZoneScale)
+            nsView.labelFontSize = CGFloat(appStore.settingsStore.iconLabelFontSize)
+            nsView.labelFontWeight = nsFontWeight(for: appStore.settingsStore.iconLabelFontWeight)
+            nsView.showLabels = appStore.settingsStore.showLabels
+            nsView.isLayoutLocked = appStore.settingsStore.isLayoutLocked
+            nsView.folderDropZoneScale = CGFloat(appStore.settingsStore.folderDropZoneScale)
             let preferredScale = nsViewScale(for: nsView)
-            nsView.folderPreviewScale = appStore.enableHighResFolderPreviews ? preferredScale : 1
+            nsView.folderPreviewScale = appStore.settingsStore.enableHighResFolderPreviews ? preferredScale : 1
         }
-        nsView.scrollSensitivity = appStore.scrollSensitivity
+        nsView.scrollSensitivity = appStore.settingsStore.scrollSensitivity
         nsView.enableIconPreload = false
-        nsView.scrollSensitivity = appStore.scrollSensitivity
-        nsView.reverseWheelPagingDirection = appStore.reverseWheelPagingDirection
-        nsView.hoverMagnificationEnabled = appStore.enableHoverMagnification
-        nsView.hoverMagnificationScale = CGFloat(appStore.hoverMagnificationScale)
-        nsView.activePressEffectEnabled = appStore.enableActivePressEffect
-        nsView.activePressScale = CGFloat(appStore.activePressScale)
-        nsView.animationsEnabled = appStore.enableAnimations
-        nsView.animationDuration = appStore.animationDuration
-        nsView.layoutMode = appStore.layoutMode
+        nsView.scrollSensitivity = appStore.settingsStore.scrollSensitivity
+        nsView.reverseWheelPagingDirection = appStore.settingsStore.reverseWheelPagingDirection
+        nsView.hoverMagnificationEnabled = appStore.settingsStore.enableHoverMagnification
+        nsView.hoverMagnificationScale = CGFloat(appStore.settingsStore.hoverMagnificationScale)
+        nsView.activePressEffectEnabled = appStore.settingsStore.enableActivePressEffect
+        nsView.activePressScale = CGFloat(appStore.settingsStore.activePressScale)
+        nsView.animationsEnabled = appStore.settingsStore.enableAnimations
+        nsView.animationDuration = appStore.settingsStore.animationDuration
+        nsView.layoutMode = appStore.settingsStore.layoutMode (refactor: migrate CAGridViewRepresentable to use settingsStore)
         nsView.isScrollEnabled = appStore.openFolder == nil && !appStore.isSetting
         nsView.hideAppMenuTitle = appStore.localized(.hiddenAppsAddButton)
         nsView.dissolveFolderMenuTitle = appStore.localized(.contextMenuDissolveFolder)
@@ -296,7 +269,7 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         // Syncpage
         if nsView.currentPage != appStore.currentPage {
             // print("📄 [CAGrid] Page sync: \(nsView.currentPage) -> \(appStore.currentPage)")
-            nsView.navigateToPage(appStore.currentPage, animated: appStore.enableAnimations)
+            nsView.navigateToPage(appStore.currentPage, animated: appStore.settingsStore.enableAnimations)
         }
 
         if didUpdateItems {
@@ -309,9 +282,9 @@ struct CAGridViewRepresentable: NSViewRepresentable {
             guard let selectedIndex else { return nil }
             return items.indices.contains(selectedIndex) ? selectedIndex : nil
         }()
-        nsView.dockDragEnabled = appStore.dockDragEnabled
-        nsView.dockDragSide = appStore.dockDragSide
-        nsView.externalAppDragTriggerDistance = CGFloat(appStore.dockDragTriggerDistance)
+        nsView.dockDragEnabled = appStore.settingsStore.dockDragEnabled
+        nsView.dockDragSide = appStore.settingsStore.dockDragSide
+        nsView.externalAppDragTriggerDistance = CGFloat(appStore.settingsStore.dockDragTriggerDistance)
         nsView.updateSelection(safeSelectedIndex, animated: true)
         nsView.updateExternalDragState(sourceIndex: externalDragSourceIndex,
                                        hoverIndex: externalDragHoverIndex)
@@ -343,6 +316,39 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         var lastGridRefreshTrigger: UUID = UUID()
         var lastFolderUpdateTrigger: UUID = UUID()
         var lastIconCacheRefreshTrigger: UUID = UUID()
+    }
+
+
+    static func handleReorder(appStore: AppStore, fromIndex: Int, toIndex: Int) {
+        guard fromIndex < appStore.items.count else { return }
+        let itemsPerPage = appStore.settingsStore.gridColumnsPerPage * appStore.settingsStore.gridRowsPerPage
+        let sourcePage = fromIndex / itemsPerPage
+        let targetPage = toIndex / itemsPerPage
+
+        if sourcePage == targetPage {
+            let pageStart = sourcePage * itemsPerPage
+            let pageEnd = min(pageStart + itemsPerPage, appStore.items.count)
+            var newItems = appStore.items
+            var pageSlice = Array(newItems[pageStart..<pageEnd])
+            let localFrom = fromIndex - pageStart
+            let localTo = min(toIndex - pageStart, pageSlice.count - 1)
+
+            if localFrom != localTo && localFrom < pageSlice.count && localTo < pageSlice.count {
+                let moving = pageSlice.remove(at: localFrom)
+                pageSlice.insert(moving, at: localTo)
+                newItems.replaceSubrange(pageStart..<pageEnd, with: pageSlice)
+                appStore.items = newItems
+            }
+            appStore.triggerGridRefresh()
+            appStore.persistence.saveAllOrder()
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                appStore.compactItemsWithinPages()
+            }
+        } else {
+            let item = appStore.items[fromIndex]
+            appStore.moveItemAcrossPagesWithCascade(item: item, to: toIndex)
+        }
     }
 
     // Check if items changed (full comparison of all item IDs and names)
