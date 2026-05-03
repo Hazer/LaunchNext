@@ -30,17 +30,25 @@ public protocol AppStoreServiceDelegate: AnyObject {
     var currentMissingPlaceholders: [String: MissingAppPlaceholder] { get }
     var currentModelContext: ModelContext? { get }
     var currentItemsPerPage: Int { get }
+    var currentApplicationSearchPaths: [String] { get }
+    var currentCustomAppSourcePaths: [String] { get }
 
     // MARK: - Layout Helpers
     func compactItemsWithinPagesReturning() -> [LaunchpadItem]
     func removeEmptyPagesReturning() -> [LaunchpadItem]
     func filteredItemsRemovingHidden(from items: [LaunchpadItem]) -> [LaunchpadItem]
     func sanitizedFolders(_ folders: [FolderInfo]) -> [FolderInfo]
+    func compactItemsWithinPages()
 
     // MARK: - Cross-Manager Routing
     func persistenceSaveAllOrder()
     func persistenceLoadAllOrder()
     func persistenceRebuildItems()
+    func persistenceSmartRebuildItemsWithOrderPreservation(currentItems: [LaunchpadItem], newApps: [AppInfo])
+
+    // MARK: - Cache Refresh
+    func refreshCacheAfterScan()
+    func updateCacheAfterChanges()
 
     // MARK: - Persistence Helpers
     func removableSourcePath(forAppPath path: String) -> String?

@@ -1877,25 +1877,13 @@ private struct DefaultsCache {
     var modelContext: ModelContext?
 
     // MARK: - Auto rescan (FSEvents)
-    private var fsEventStream: FSEventStreamRef?
-    private var fsEventContextPointer: UnsafeMutableRawPointer?
 
-    /// Wrapper for FSEventStream context that holds a weak reference to AppStore,
-    /// avoiding the retain cycle that passRetained(self) would create.
-    private final class FSEventContextBox {
-        weak var store: AppStore?
-        init(store: AppStore) { self.store = store }
-    }
-    private var pendingChangedAppPaths: Set<String> = []
-    private var pendingForceFullScan: Bool = false
-    private let fullRescanThreshold: Int = 50
-    private var fallbackScanTimer: DispatchSourceTimer?
-
-    // State flags
+    // MARK: - Volume observers
     private var hasPerformedInitialScan: Bool = false
     private var cancellables: Set<AnyCancellable> = []
     var hasAppliedOrderFromStore: Bool = false
     private(set) lazy var persistence = OrderPersistence(delegate: self)
+    private(set) lazy var scanner = AppScanner(delegate: self)
     
     // Background refresh queue and throttle
     private let refreshQueue = DispatchQueue(label: "app.store.refresh", qos: .userInitiated)
