@@ -43,20 +43,6 @@ enum AppearancePreference: String, CaseIterable, Identifiable {
     }
 }
 
-
-/// Batch-reads all UserDefaults keys into memory in one IPC call,
-/// eliminating per-key round-trips to cfprefsd during init().
-private struct DefaultsCache {
-    let store: [String: Any]
-    init() { self.store = UserDefaults.standard.dictionaryRepresentation() }
-    func containsKey(_ key: String) -> Bool { store[key] != nil }
-    func bool(forKey key: String) -> Bool { store[key] as? Bool ?? false }
-    func double(forKey key: String) -> Double { store[key] as? Double ?? 0.0 }
-    func string(forKey key: String) -> String? { store[key] as? String }
-    func integer(forKey key: String) -> Int { store[key] as? Int ?? 0 }
-    func object<T>(forKey key: String) -> T? { store[key] as? T }
-}
-
 @MainActor final class AppStore: ObservableObject {
     struct PageIndicatorOverride: Codable, Equatable {
         var offset: Double
@@ -265,77 +251,15 @@ private struct DefaultsCache {
 
     static let customTitlesKey = "customAppTitles"
     static let hiddenAppsKey = "hiddenAppBundlePaths"
-    static let gridColumnsKey = "gridColumnsPerPage"
-    static let gridRowsKey = "gridRowsPerPage"
-    static let columnSpacingKey = "gridColumnSpacing"
-    static let rowSpacingKey = "gridRowSpacing"
-    static let iconLabelFontWeightKey = "iconLabelFontWeight"
-    static let showQuickRefreshButtonKey = "showQuickRefreshButton"
-    static let lockLayoutKey = "lockLayoutEnabled"
-    static let rememberPageKey = "rememberLastPage"
     static let rememberedPageIndexKey = "rememberedPageIndex"
-    static let globalHotKeyKey = "globalHotKeyConfiguration"
-    static let hoverMagnificationKey = "enableHoverMagnification"
-    static let hoverMagnificationScaleKey = "hoverMagnificationScale"
-    static let activePressEffectKey = "enableActivePressEffect"
-    static let activePressScaleKey = "activePressScale"
-    static let followScrollPagingKey = "followScrollPagingEnabled"
-    static let reverseWheelPagingKey = "reverseWheelPagingDirection"
-    static let useCAGridRendererKey = "useCAGridRenderer"
-    static let windowOpenAnimationKey = "windowOpenAnimationEnabled"
-    static let developmentEnableCLICodeKey = "developmentEnableCLICode"
-    static let dockDragEnabledKey = "dockDragEnabled"
-    static let dockDragSideKey = "dockDragSide"
-    static let dockDragTriggerDistanceKey = "dockDragTriggerDistance"
-    static let hotCornerEnabledKey = "hotCornerEnabled"
-    static let hotCornerPositionKey = "hotCornerPosition"
-    static let hotCornerTriggerDelayKey = "hotCornerTriggerDelay"
-    static let hotCornerHitboxSizeKey = "hotCornerHitboxSize"
-    static let hotCornerToggleWhenOpenKey = "hotCornerToggleWhenOpen"
     // Experimental gesture persistence keys.
     // Safe to remove together with LaunchNext/Gesture/ and gesture UI wiring
     // if the private multitouch feature is dropped later.
-    static let gestureEnabledKey = "gestureEnabled"
-    static let gestureCloseOnPinchOutKey = "gestureCloseOnPinchOut"
-    static let gestureTapActionKey = "gestureTapAction"
     private static let cliShimMarker = "# LaunchNext CLI shim"
     private static let cliPathSnippetHeader = "# >>> LaunchNext CLI >>>"
     private static let cliPathSnippetFooter = "# <<< LaunchNext CLI <<<"
-    static let backgroundStyleKey = "launchpadBackgroundStyle"
-    static let backgroundMaskEnabledKey = "launchpadBackgroundMaskEnabled"
-    static let backgroundMaskLightKey = "launchpadBackgroundMaskLight"
-    static let backgroundMaskDarkKey = "launchpadBackgroundMaskDark"
-    static let folderPreviewHighResKey = "folderPreviewHighRes"
-    static let sidebarIconPresetKey = "sidebarIconPreset"
-    static let uninstallToolAppPathKey = "uninstallToolAppPath"
-    static let pageIndicatorPerDisplayEnabledKey = "pageIndicatorPerDisplayEnabled"
-    static let pageIndicatorPerDisplayOverridesKey = "pageIndicatorPerDisplayOverrides"
-    static let dualModeAppearanceSettingsKey = "dualModeAppearanceSettings"
-    private static let gameControllerEnabledKey = "gameControllerEnabled"
-    static let gameControllerMenuToggleKey = "gameControllerMenuToggleLaunchpad"
-    private static let soundEffectsEnabledKey = "soundEffectsEnabled"
-    private static let soundLaunchpadOpenKey = "soundLaunchpadOpenSound"
-    private static let soundLaunchpadCloseKey = "soundLaunchpadCloseSound"
-    private static let soundNavigationKey = "soundNavigationSound"
-    private static let voiceFeedbackEnabledKey = "voiceFeedbackEnabled"
-    static let folderDropZoneScaleKey = "folderDropZoneScale"
-    static let pageIndicatorTopPaddingKey = "pageIndicatorTopPadding"
-    static let searchStrategyTypeKey = "searchStrategyType"
-    static let searchDebounceMsKey = "searchDebounceMs"
-    static let searchThrottleMsKey = "searchThrottleMs"
-    static let searchThrottleLatestKey = "searchThrottleLatest"
-    static let layoutModeKey = "layoutMode"
-    static let showInDockKey = "showInDock"
-    static let showInMenuBarKey = "showInMenuBar"
-    static let hideMenuBarKey = "hideMenuBar"
     static let onboardingVersionKey = "onboardingVersionShown"
     static let currentOnboardingVersion = 1
-    static let dockDragTriggerDistanceRange: ClosedRange<Double> = 8...72
-    static let defaultDockDragTriggerDistance: Double = 50
-    static let hotCornerTriggerDelayRange: ClosedRange<Double> = 0...1.2
-    static let hotCornerHitboxSizeRange: ClosedRange<Double> = 20...120
-    static let defaultHotCornerTriggerDelay: Double = 0.25
-    static let defaultHotCornerHitboxSize: Double = 50
     // private static let aiFeatureEnabledKey = "aiFeatureEnabled"
     // private static let aiOverlayHotKeyKey = "aiOverlayHotKeyConfiguration"
 
@@ -346,39 +270,6 @@ private struct DefaultsCache {
         return []
     }
 
-    private static func loadBackgroundStyle() -> BackgroundStyle {
-        if let raw = UserDefaults.standard.string(forKey: backgroundStyleKey),
-           let style = BackgroundStyle(rawValue: raw) {
-            return style
-        }
-        return .glass
-    }
-
-    private static let defaultBackgroundMaskOpacity: Double = 0.1
-    private static let defaultBackgroundMaskColor = RGBAColor(red: 0, green: 0, blue: 0, alpha: defaultBackgroundMaskOpacity)
-
-    private static func loadBackgroundMaskEnabled() -> Bool {
-        if UserDefaults.standard.object(forKey: backgroundMaskEnabledKey) == nil { return false }
-        return UserDefaults.standard.bool(forKey: backgroundMaskEnabledKey)
-    }
-
-    private static func loadBackgroundMaskColor(forKey key: String) -> RGBAColor {
-        guard let data = UserDefaults.standard.data(forKey: key) else {
-            return defaultBackgroundMaskColor
-        }
-        if let decoded = try? JSONDecoder().decode(RGBAColor.self, from: data) {
-            return decoded
-        }
-        UserDefaults.standard.removeObject(forKey: key)
-        return defaultBackgroundMaskColor
-    }
-
-    private static func persistBackgroundMaskColor(_ color: RGBAColor, forKey key: String) {
-        if let data = try? JSONEncoder().encode(color) {
-            UserDefaults.standard.set(data, forKey: key)
-        }
-    }
-
     private static let minColumnsPerPage = 4
     private static let maxColumnsPerPage = 10
     private static let minRowsPerPage = 3
@@ -387,32 +278,6 @@ private struct DefaultsCache {
     private static let maxColumnSpacing: Double = 50
     private static let minRowSpacing: Double = 6
     private static let maxRowSpacing: Double = 40
-    static let defaultScrollSensitivity: Double = 0.2
-    static var gridColumnRange: ClosedRange<Int> { minColumnsPerPage...maxColumnsPerPage }
-    static var gridRowRange: ClosedRange<Int> { minRowsPerPage...maxRowsPerPage }
-    static var columnSpacingRange: ClosedRange<Double> { minColumnSpacing...maxColumnSpacing }
-    static var rowSpacingRange: ClosedRange<Double> { minRowSpacing...maxRowSpacing }
-    static let hoverMagnificationRange: ClosedRange<Double> = 1.0...1.4
-    private static let defaultHoverMagnificationScale: Double = 1.1
-    static let activePressScaleRange: ClosedRange<Double> = 0.85...1.0
-    private static let defaultActivePressScale: Double = 0.92
-    static let folderPopoverWidthRange: ClosedRange<Double> = 0.6...0.95
-    static let folderPopoverHeightRange: ClosedRange<Double> = 0.6...0.95
-    private static let defaultFolderPopoverWidth: Double = 0.9
-    private static let defaultFolderPopoverHeight: Double = 0.85
-    static let folderDropZoneScaleRange: ClosedRange<Double> = 0.6...2.0
-    static let defaultFolderDropZoneScale: Double = 1.6
-    static let pageIndicatorTopPaddingRange: ClosedRange<Double> = 0...60
-    static let defaultPageIndicatorTopPadding: Double = 12
-    private static let defaultLaunchpadOpenSound = "Submarine"
-    private static let defaultLaunchpadCloseSound = "Glass"
-    private static let defaultNavigationSound = "Tink"
-    private static func normalizedSoundName(_ raw: String?, defaultValue: String) -> String {
-        guard let raw else { return defaultValue }
-        if raw.isEmpty { return "" }
-        return SoundManager.isValidSystemSoundName(raw) ? raw : defaultValue
-    }
-
     struct HotKeyConfiguration: Equatable {
         let keyCode: UInt16
         let modifiersRawValue: NSEvent.ModifierFlags.RawValue
@@ -521,117 +386,18 @@ private struct DefaultsCache {
         persistHiddenApps(updated)
     }
 
-    @Published var launchpadBackgroundStyle: BackgroundStyle = AppStore.loadBackgroundStyle() {
-        didSet {
-            guard launchpadBackgroundStyle != oldValue else { return }
-            UserDefaults.standard.set(launchpadBackgroundStyle.rawValue, forKey: Self.backgroundStyleKey)
-        }
-    }
-
     // Development-only override to capture flat screenshots quickly.
-    @Published var developmentBackgroundOverride: DevelopmentBackgroundOverride = .none
-
-    @Published var developmentEnableCLICode: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.developmentEnableCLICodeKey) == nil { return false }
-        return UserDefaults.standard.bool(forKey: AppStore.developmentEnableCLICodeKey)
-    }() {
-        didSet {
-            UserDefaults.standard.set(developmentEnableCLICode, forKey: Self.developmentEnableCLICodeKey)
-            if developmentEnableCLICode && !oldValue {
-                installCLICommandIfNeeded()
-            } else if !developmentEnableCLICode && oldValue {
-                uninstallCLICommandIfNeeded()
-            }
-        }
-    }
-
-    @Published var backgroundMaskEnabled: Bool = AppStore.loadBackgroundMaskEnabled() {
-        didSet {
-            UserDefaults.standard.set(backgroundMaskEnabled, forKey: Self.backgroundMaskEnabledKey)
-        }
-    }
-
-    @Published var backgroundMaskLightColor: RGBAColor = AppStore.loadBackgroundMaskColor(forKey: AppStore.backgroundMaskLightKey) {
-        didSet {
-            AppStore.persistBackgroundMaskColor(backgroundMaskLightColor, forKey: Self.backgroundMaskLightKey)
-        }
-    }
-
-    @Published var backgroundMaskDarkColor: RGBAColor = AppStore.loadBackgroundMaskColor(forKey: AppStore.backgroundMaskDarkKey) {
-        didSet {
-            AppStore.persistBackgroundMaskColor(backgroundMaskDarkColor, forKey: Self.backgroundMaskDarkKey)
-        }
-    }
-
-    @Published var sidebarIconPreset: SidebarIconPreset = {
-        if let raw = UserDefaults.standard.string(forKey: AppStore.sidebarIconPresetKey),
-           let preset = SidebarIconPreset(rawValue: raw) {
-            return preset
-        }
-        return .large
-    }() {
-        didSet {
-            guard sidebarIconPreset != oldValue else { return }
-            UserDefaults.standard.set(sidebarIconPreset.rawValue, forKey: Self.sidebarIconPresetKey)
-        }
-    }
-
     // Reload selected preferences from UserDefaults after an import
     func reloadPreferencesFromDefaults() {
         hiddenAppPaths = AppStore.loadHiddenApps()
 
-        if let savedSources = UserDefaults.standard.array(forKey: AppStore.customAppSourcesKey) as? [String] {
-            customAppSourcePaths = savedSources
+        // SettingsStore reads directly from UserDefaults, so we recreate it
+        // to pick up the imported values
+        let newStore = SettingsStore()
+
+        if let savedSources = UserDefaults.standard.array(forKey: SettingsStore.customAppSourcesKey) as? [String] {
+            newStore.customAppSourcePaths = savedSources
         }
-
-        if let raw = UserDefaults.standard.string(forKey: AppStore.sidebarIconPresetKey),
-           let preset = SidebarIconPreset(rawValue: raw) {
-            sidebarIconPreset = preset
-        }
-        uninstallToolAppPath = UserDefaults.standard.string(forKey: AppStore.uninstallToolAppPathKey) ?? ""
-
-        launchpadBackgroundStyle = AppStore.loadBackgroundStyle()
-        backgroundMaskEnabled = AppStore.loadBackgroundMaskEnabled()
-        backgroundMaskLightColor = AppStore.loadBackgroundMaskColor(forKey: Self.backgroundMaskLightKey)
-        backgroundMaskDarkColor = AppStore.loadBackgroundMaskColor(forKey: Self.backgroundMaskDarkKey)
-
-        isFullscreenMode = UserDefaults.standard.bool(forKey: "isFullscreenMode")
-        showLabels = UserDefaults.standard.object(forKey: "showLabels") as? Bool ?? true
-        hideDock = UserDefaults.standard.object(forKey: "hideDock") as? Bool ?? false
-        useLocalizedThirdPartyTitles = UserDefaults.standard.object(forKey: "useLocalizedThirdPartyTitles") as? Bool ?? true
-        enableAnimations = UserDefaults.standard.object(forKey: "enableAnimations") as? Bool ?? true
-        scrollSensitivity = UserDefaults.standard.object(forKey: "scrollSensitivity") as? Double ?? scrollSensitivity
-        reverseWheelPagingDirection = UserDefaults.standard.object(forKey: Self.reverseWheelPagingKey) as? Bool ?? false
-        useCAGridRenderer = UserDefaults.standard.object(forKey: Self.useCAGridRendererKey) as? Bool ?? useCAGridRenderer
-        developmentEnableCLICode = UserDefaults.standard.object(forKey: Self.developmentEnableCLICodeKey) as? Bool ?? false
-
-        // Keep imported appearance/input settings in sync without requiring relaunch.
-        iconScale = UserDefaults.standard.object(forKey: "iconScale") as? Double ?? iconScale
-        iconLabelFontSize = UserDefaults.standard.object(forKey: "iconLabelFontSize") as? Double ?? iconLabelFontSize
-        if let rawFontWeight = UserDefaults.standard.string(forKey: Self.iconLabelFontWeightKey),
-           let fontWeight = IconLabelFontWeightOption(rawValue: rawFontWeight) {
-            iconLabelFontWeight = fontWeight
-        }
-
-        pageIndicatorOffset = UserDefaults.standard.object(forKey: "pageIndicatorOffset") as? Double ?? pageIndicatorOffset
-        let importedTopPadding = UserDefaults.standard.object(forKey: Self.pageIndicatorTopPaddingKey) as? Double ?? pageIndicatorTopPadding
-        pageIndicatorTopPadding = Self.clampPageIndicatorTopPadding(importedTopPadding)
-        if let importedPerDisplayEnabled = UserDefaults.standard.object(forKey: Self.pageIndicatorPerDisplayEnabledKey) as? Bool {
-            pageIndicatorPerDisplayEnabled = importedPerDisplayEnabled
-        }
-        pageIndicatorOverrides = Self.loadPageIndicatorOverrides()
-
-        if let storedDualModeAppearance = Self.loadDualModeAppearanceSettings(from: UserDefaults.standard) {
-            dualModeAppearanceSettings = storedDualModeAppearance
-        } else {
-            let legacy = Self.legacyAppearanceSettings(from: UserDefaults.standard)
-            dualModeAppearanceSettings = DualModeAppearanceSettings(fullscreen: legacy, compact: legacy)
-            persistDualModeAppearanceSettings()
-        }
-        syncActiveAppearanceProxies(from: currentAppearanceLayoutMode)
-        persistLegacyAppearanceProxyValues()
-
-        globalHotKey = Self.loadHotKeyConfiguration()
 
         // Apply hidden filtering immediately
         pruneHiddenAppsFromAppList()
@@ -647,7 +413,7 @@ private struct DefaultsCache {
     @Published var currentPage = 0 {
         didSet {
             if currentPage < 0 { currentPage = 0; return }
-            if rememberLastPage {
+            if settingsStore.rememberLastPage {
                 UserDefaults.standard.set(currentPage, forKey: Self.rememberedPageIndexKey)
             }
         }
@@ -665,194 +431,22 @@ private struct DefaultsCache {
 
     // MARK: - Search Strategy
 
-    @Published var searchStrategyType: SearchStrategyType = {
-        if let raw = UserDefaults.standard.string(forKey: searchStrategyTypeKey),
-           let type = SearchStrategyType(rawValue: raw) {
-            return type
-        }
-        return .debounce
-    }() {
-        didSet {
-            guard searchStrategyType != oldValue else { return }
-            UserDefaults.standard.set(searchStrategyType.rawValue, forKey: Self.searchStrategyTypeKey)
-            setupSearchPipeline()
-        }
-    }
-
-    @Published var searchDebounceMs: Int = {
-        let stored = UserDefaults.standard.integer(forKey: searchDebounceMsKey)
-        return stored > 0 ? stored : 500
-    }() {
-        didSet {
-            guard searchDebounceMs != oldValue else { return }
-            UserDefaults.standard.set(searchDebounceMs, forKey: Self.searchDebounceMsKey)
-            if searchStrategyType == .debounce { setupSearchPipeline() }
-        }
-    }
-
-    @Published var searchThrottleMs: Int = {
-        let stored = UserDefaults.standard.integer(forKey: searchThrottleMsKey)
-        return stored > 0 ? stored : 50
-    }() {
-        didSet {
-            guard searchThrottleMs != oldValue else { return }
-            UserDefaults.standard.set(searchThrottleMs, forKey: Self.searchThrottleMsKey)
-            if searchStrategyType == .throttle { setupSearchPipeline() }
-        }
-    }
-
-    @Published var searchThrottleLatest: Bool = {
-        if UserDefaults.standard.object(forKey: searchThrottleLatestKey) == nil { return true }
-        return UserDefaults.standard.bool(forKey: searchThrottleLatestKey)
-    }() {
-        didSet {
-            guard searchThrottleLatest != oldValue else { return }
-            UserDefaults.standard.set(searchThrottleLatest, forKey: Self.searchThrottleLatestKey)
-            if searchStrategyType == .throttle { setupSearchPipeline() }
-        }
-    }
-
-    static let searchDebounceMsRange: ClosedRange<Int> = 100...1000
-    static let searchThrottleMsRange: ClosedRange<Int> = 16...500
-
-    var currentSearchStrategy: SearchStrategy {
-        switch searchStrategyType {
-        case .debounce:
-            return DebounceStrategy(milliseconds: searchDebounceMs)
-        case .throttle:
-            return ThrottleStrategy(milliseconds: searchThrottleMs, emitLatest: searchThrottleLatest)
-        case .instant:
-            return InstantStrategy()
-        }
-    }
-
     private var searchCancellable: AnyCancellable?
 
     func setupSearchPipeline() {
         searchCancellable?.cancel()
 
-        searchCancellable = currentSearchStrategy
+        searchCancellable = settingsStore.currentSearchStrategy
             .apply(to: $searchText.removeDuplicates())
             .sink { [weak self] value in
                 self?.searchQuery = value
             }
     }
 
-    @Published var isStartOnLogin: Bool = {
-        if #available(macOS 13.0, *) {
-            return SMAppService.mainApp.status == .enabled
-        }
-        return false
-    }() {
-        didSet {
-            guard !loginItemUpdateInProgress else { return }
-            guard isStartOnLogin != oldValue else { return }
-            guard #available(macOS 13.0, *) else {
-                loginItemUpdateInProgress = true
-                isStartOnLogin = false
-                loginItemUpdateInProgress = false
-                return
-            }
-
-            loginItemUpdateInProgress = true
-            defer { loginItemUpdateInProgress = false }
-
-            do {
-                if isStartOnLogin {
-                    try SMAppService.mainApp.register()
-                } else {
-                    try SMAppService.mainApp.unregister()
-                }
-            } catch {
-                NSLog("LaunchNext: Failed to update login item setting - %@", error.localizedDescription)
-                isStartOnLogin = oldValue
-            }
-        }
-    }
     var canConfigureStartOnLogin: Bool {
         if #available(macOS 13.0, *) { return true }
         return false
     }
-    @Published var isFullscreenMode: Bool = false {
-        didSet {
-            UserDefaults.standard.set(isFullscreenMode, forKey: "isFullscreenMode")
-            syncActiveAppearanceProxies(from: currentAppearanceLayoutMode)
-            persistLegacyAppearanceProxyValues()
-            DispatchQueue.main.async { [weak self] in
-                if let appDelegate = AppDelegate.shared {
-                    appDelegate.updateWindowMode(isFullscreen: self?.isFullscreenMode ?? false)
-                }
-            }
-            
-            DispatchQueue.main.async { [weak self] in
-                self?.clearIconCachesForLayoutChange()
-                self?.triggerGridRefresh()
-            }
-        }
-    }
-    private static func clampColumns(_ value: Int) -> Int {
-        min(max(value, minColumnsPerPage), maxColumnsPerPage)
-    }
-
-    private static func clampRows(_ value: Int) -> Int {
-        min(max(value, minRowsPerPage), maxRowsPerPage)
-    }
-
-    private static func clampColumnSpacing(_ value: Double) -> Double {
-        min(max(value, minColumnSpacing), maxColumnSpacing)
-    }
-
-    private static func clampRowSpacing(_ value: Double) -> Double {
-        min(max(value, minRowSpacing), maxRowSpacing)
-    }
-
-    private static func clampFolderWidth(_ value: Double) -> Double {
-        min(max(value, folderPopoverWidthRange.lowerBound), folderPopoverWidthRange.upperBound)
-    }
-
-    private static func clampFolderHeight(_ value: Double) -> Double {
-        min(max(value, folderPopoverHeightRange.lowerBound), folderPopoverHeightRange.upperBound)
-    }
-
-    private static func clampFolderDropZoneScale(_ value: Double) -> Double {
-        min(max(value, folderDropZoneScaleRange.lowerBound), folderDropZoneScaleRange.upperBound)
-    }
-
-    private static func clampPageIndicatorTopPadding(_ value: Double) -> Double {
-        min(max(value, pageIndicatorTopPaddingRange.lowerBound), pageIndicatorTopPaddingRange.upperBound)
-    }
-
-    private static func clampDockDragTriggerDistance(_ value: Double) -> Double {
-        min(max(value, dockDragTriggerDistanceRange.lowerBound), dockDragTriggerDistanceRange.upperBound)
-    }
-
-    private static func clampHotCornerTriggerDelay(_ value: Double) -> Double {
-        min(max(value, hotCornerTriggerDelayRange.lowerBound), hotCornerTriggerDelayRange.upperBound)
-    }
-
-    private static func clampHotCornerHitboxSize(_ value: Double) -> Double {
-        min(max(value, hotCornerHitboxSizeRange.lowerBound), hotCornerHitboxSizeRange.upperBound)
-    }
-
-    private var appearanceRefreshWorkItem: DispatchWorkItem?
-    private var lastAppearanceEventAt: TimeInterval = 0
-    private var isApplyingScopedAppearanceState = false
-    @Published private var dualModeAppearanceSettings: DualModeAppearanceSettings = DualModeAppearanceSettings(
-        fullscreen: ModeScopedAppearanceSettings(iconScale: 0.95,
-                                                 iconLabelFontSize: 11.0,
-                                                 folderDropZoneScale: AppStore.defaultFolderDropZoneScale,
-                                                 pageIndicatorOffset: 27.0,
-                                                 pageIndicatorTopPadding: AppStore.defaultPageIndicatorTopPadding,
-                                                 pageIndicatorPerDisplayEnabled: false,
-                                                 pageIndicatorOverrides: [:]),
-        compact: ModeScopedAppearanceSettings(iconScale: 0.95,
-                                              iconLabelFontSize: 11.0,
-                                              folderDropZoneScale: AppStore.defaultFolderDropZoneScale,
-                                              pageIndicatorOffset: 27.0,
-                                              pageIndicatorTopPadding: AppStore.defaultPageIndicatorTopPadding,
-                                              pageIndicatorPerDisplayEnabled: false,
-                                              pageIndicatorOverrides: [:])
-    )
 
     static func screenIdentifier(for screen: NSScreen) -> String {
         if let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber {
@@ -861,196 +455,70 @@ private struct DefaultsCache {
         return screen.localizedName
     }
 
-    private static func loadPageIndicatorOverrides() -> [String: PageIndicatorOverride] {
-        guard let data = UserDefaults.standard.data(forKey: pageIndicatorPerDisplayOverridesKey) else { return [:] }
-        return (try? JSONDecoder().decode([String: PageIndicatorOverride].self, from: data)) ?? [:]
-    }
-
-    private func persistPageIndicatorOverrides(_ overrides: [String: PageIndicatorOverride]) {
-        if overrides.isEmpty {
-            UserDefaults.standard.removeObject(forKey: Self.pageIndicatorPerDisplayOverridesKey)
-            return
-        }
-        if let data = try? JSONEncoder().encode(overrides) {
-            UserDefaults.standard.set(data, forKey: Self.pageIndicatorPerDisplayOverridesKey)
-        }
-    }
-
-    private static func legacyAppearanceSettings(from defaults: UserDefaults) -> ModeScopedAppearanceSettings {
-        let iconScale = defaults.object(forKey: "iconScale") as? Double ?? 0.95
-        let iconLabelFontSize = defaults.object(forKey: "iconLabelFontSize") as? Double ?? 11.0
-        let dropZoneScale = clampFolderDropZoneScale(defaults.object(forKey: Self.folderDropZoneScaleKey) as? Double ?? Self.defaultFolderDropZoneScale)
-        let indicatorOffset = defaults.object(forKey: "pageIndicatorOffset") as? Double ?? 27.0
-        let indicatorTopPadding = clampPageIndicatorTopPadding(defaults.object(forKey: Self.pageIndicatorTopPaddingKey) as? Double ?? Self.defaultPageIndicatorTopPadding)
-        let perDisplayEnabled = defaults.object(forKey: Self.pageIndicatorPerDisplayEnabledKey) as? Bool ?? false
-        let overrides = (try? JSONDecoder().decode([String: PageIndicatorOverride].self,
-                                                   from: defaults.data(forKey: Self.pageIndicatorPerDisplayOverridesKey) ?? Data())) ?? [:]
-        return ModeScopedAppearanceSettings(iconScale: iconScale,
-                                            iconLabelFontSize: iconLabelFontSize,
-                                            folderDropZoneScale: dropZoneScale,
-                                            pageIndicatorOffset: indicatorOffset,
-                                            pageIndicatorTopPadding: indicatorTopPadding,
-                                            pageIndicatorPerDisplayEnabled: perDisplayEnabled,
-                                            pageIndicatorOverrides: overrides)
-    }
-
-    private static func normalizedAppearanceSettings(_ settings: ModeScopedAppearanceSettings) -> ModeScopedAppearanceSettings {
-        ModeScopedAppearanceSettings(iconScale: settings.iconScale,
-                                     iconLabelFontSize: settings.iconLabelFontSize,
-                                     folderDropZoneScale: clampFolderDropZoneScale(settings.folderDropZoneScale),
-                                     pageIndicatorOffset: settings.pageIndicatorOffset,
-                                     pageIndicatorTopPadding: clampPageIndicatorTopPadding(settings.pageIndicatorTopPadding),
-                                     pageIndicatorPerDisplayEnabled: settings.pageIndicatorPerDisplayEnabled,
-                                     pageIndicatorOverrides: settings.pageIndicatorOverrides)
-    }
-
-    private static func normalizedDualModeAppearanceSettings(_ settings: DualModeAppearanceSettings) -> DualModeAppearanceSettings {
-        DualModeAppearanceSettings(fullscreen: normalizedAppearanceSettings(settings.fullscreen),
-                                   compact: normalizedAppearanceSettings(settings.compact))
-    }
-
-    private static func loadDualModeAppearanceSettings(from defaults: UserDefaults) -> DualModeAppearanceSettings? {
-        guard let data = defaults.data(forKey: dualModeAppearanceSettingsKey),
-              let decoded = try? JSONDecoder().decode(DualModeAppearanceSettings.self, from: data) else {
-            return nil
-        }
-        return normalizedDualModeAppearanceSettings(decoded)
-    }
-
-    private func persistDualModeAppearanceSettings() {
-        let normalized = Self.normalizedDualModeAppearanceSettings(dualModeAppearanceSettings)
-        dualModeAppearanceSettings = normalized
-        if let data = try? JSONEncoder().encode(normalized) {
-            UserDefaults.standard.set(data, forKey: Self.dualModeAppearanceSettingsKey)
-        }
-    }
-
-    private var currentAppearanceLayoutMode: AppearanceLayoutMode {
-        isFullscreenMode ? .fullscreen : .compact
-    }
-
-    private func updateScopedAppearanceSettings(for mode: AppearanceLayoutMode,
-                                                _ update: (inout ModeScopedAppearanceSettings) -> Void) {
-        var settings = dualModeAppearanceSettings
-        var scoped = settings[mode]
-        update(&scoped)
-        settings[mode] = Self.normalizedAppearanceSettings(scoped)
-        dualModeAppearanceSettings = settings
-        persistDualModeAppearanceSettings()
-    }
-
-    private func syncActiveAppearanceProxies(from mode: AppearanceLayoutMode) {
-        let settings = dualModeAppearanceSettings[mode]
-        isApplyingScopedAppearanceState = true
-        defer { isApplyingScopedAppearanceState = false }
-        iconScale = settings.iconScale
-        iconLabelFontSize = settings.iconLabelFontSize
-        folderDropZoneScale = settings.folderDropZoneScale
-        pageIndicatorOffset = settings.pageIndicatorOffset
-        pageIndicatorTopPadding = settings.pageIndicatorTopPadding
-        pageIndicatorPerDisplayEnabled = settings.pageIndicatorPerDisplayEnabled
-        pageIndicatorOverrides = settings.pageIndicatorOverrides
-    }
-
-    private func persistLegacyAppearanceProxyValues() {
-        let defaults = UserDefaults.standard
-        defaults.set(iconScale, forKey: "iconScale")
-        defaults.set(iconLabelFontSize, forKey: "iconLabelFontSize")
-        defaults.set(folderDropZoneScale, forKey: Self.folderDropZoneScaleKey)
-        defaults.set(pageIndicatorOffset, forKey: "pageIndicatorOffset")
-        defaults.set(pageIndicatorTopPadding, forKey: Self.pageIndicatorTopPaddingKey)
-        defaults.set(pageIndicatorPerDisplayEnabled, forKey: Self.pageIndicatorPerDisplayEnabledKey)
-        persistPageIndicatorOverrides(pageIndicatorOverrides)
-    }
+    // MARK: - Scoped Appearance (forwarded to SettingsStore)
 
     func scopedIconScale(for mode: AppearanceLayoutMode) -> Double {
-        dualModeAppearanceSettings[mode].iconScale
+        settingsStore.scopedIconScale(for: mode)
     }
 
     func setScopedIconScale(_ value: Double, for mode: AppearanceLayoutMode) {
-        if mode == currentAppearanceLayoutMode {
-            iconScale = value
-        } else {
-            updateScopedAppearanceSettings(for: mode) { $0.iconScale = value }
-        }
+        settingsStore.setScopedIconScale(value, for: mode)
     }
 
     func scopedIconLabelFontSize(for mode: AppearanceLayoutMode) -> Double {
-        dualModeAppearanceSettings[mode].iconLabelFontSize
+        settingsStore.scopedIconLabelFontSize(for: mode)
     }
 
     func setScopedIconLabelFontSize(_ value: Double, for mode: AppearanceLayoutMode) {
-        if mode == currentAppearanceLayoutMode {
-            iconLabelFontSize = value
-        } else {
-            updateScopedAppearanceSettings(for: mode) { $0.iconLabelFontSize = value }
-        }
+        settingsStore.setScopedIconLabelFontSize(value, for: mode)
     }
 
     func scopedFolderDropZoneScale(for mode: AppearanceLayoutMode) -> Double {
-        dualModeAppearanceSettings[mode].folderDropZoneScale
+        settingsStore.scopedFolderDropZoneScale(for: mode)
     }
 
     func setScopedFolderDropZoneScale(_ value: Double, for mode: AppearanceLayoutMode) {
-        let clamped = Self.clampFolderDropZoneScale(value)
-        if mode == currentAppearanceLayoutMode {
-            folderDropZoneScale = clamped
-        } else {
-            updateScopedAppearanceSettings(for: mode) { $0.folderDropZoneScale = clamped }
-        }
+        settingsStore.setScopedFolderDropZoneScale(value, for: mode)
     }
 
     func scopedPageIndicatorOffset(for mode: AppearanceLayoutMode) -> Double {
-        dualModeAppearanceSettings[mode].pageIndicatorOffset
+        settingsStore.scopedPageIndicatorOffset(for: mode)
     }
 
     func setScopedPageIndicatorOffset(_ value: Double, for mode: AppearanceLayoutMode) {
-        if mode == currentAppearanceLayoutMode {
-            pageIndicatorOffset = value
-        } else {
-            updateScopedAppearanceSettings(for: mode) { $0.pageIndicatorOffset = value }
-        }
+        settingsStore.setScopedPageIndicatorOffset(value, for: mode)
     }
 
     func scopedPageIndicatorTopPadding(for mode: AppearanceLayoutMode) -> Double {
-        dualModeAppearanceSettings[mode].pageIndicatorTopPadding
+        settingsStore.scopedPageIndicatorTopPadding(for: mode)
     }
 
     func setScopedPageIndicatorTopPadding(_ value: Double, for mode: AppearanceLayoutMode) {
-        let clamped = Self.clampPageIndicatorTopPadding(value)
-        if mode == currentAppearanceLayoutMode {
-            pageIndicatorTopPadding = clamped
-        } else {
-            updateScopedAppearanceSettings(for: mode) { $0.pageIndicatorTopPadding = clamped }
-        }
+        settingsStore.setScopedPageIndicatorTopPadding(value, for: mode)
     }
 
     func scopedPageIndicatorPerDisplayEnabled(for mode: AppearanceLayoutMode) -> Bool {
-        dualModeAppearanceSettings[mode].pageIndicatorPerDisplayEnabled
+        settingsStore.scopedPageIndicatorPerDisplayEnabled(for: mode)
     }
 
     func setScopedPageIndicatorPerDisplayEnabled(_ enabled: Bool, for mode: AppearanceLayoutMode) {
-        if mode == currentAppearanceLayoutMode {
-            pageIndicatorPerDisplayEnabled = enabled
-        } else {
-            updateScopedAppearanceSettings(for: mode) { $0.pageIndicatorPerDisplayEnabled = enabled }
-        }
+        settingsStore.setScopedPageIndicatorPerDisplayEnabled(enabled, for: mode)
     }
 
     func scopedPageIndicatorOverrides(for mode: AppearanceLayoutMode) -> [String: PageIndicatorOverride] {
-        dualModeAppearanceSettings[mode].pageIndicatorOverrides
+        settingsStore.scopedPageIndicatorOverrides(for: mode)
     }
 
     func scopedPageIndicatorOverride(for screenID: String, mode: AppearanceLayoutMode) -> PageIndicatorOverride? {
-        dualModeAppearanceSettings[mode].pageIndicatorOverrides[screenID]
+        settingsStore.scopedPageIndicatorOverrides(for: mode)[screenID]
     }
 
     func setScopedPageIndicatorOverride(_ override: PageIndicatorOverride?, for screenID: String, mode: AppearanceLayoutMode) {
-        if mode == currentAppearanceLayoutMode {
-            setPageIndicatorOverride(override, for: screenID)
+        if mode == settingsStore.currentAppearanceLayoutMode {
+            settingsStore.setPageIndicatorOverride(override, for: screenID)
             return
         }
-        updateScopedAppearanceSettings(for: mode) { settings in
+        settingsStore.updateScopedAppearanceSettings(for: mode) { settings in
             if let override {
                 settings.pageIndicatorOverrides[screenID] = override
             } else {
@@ -1060,230 +528,17 @@ private struct DefaultsCache {
     }
 
     func applyIndicatorDefaults(to screenID: String, mode: AppearanceLayoutMode) {
-        let settings = dualModeAppearanceSettings[mode]
+        let settings = settingsStore.dualModeAppearanceSettings[mode]
         let override = PageIndicatorOverride(offset: settings.pageIndicatorOffset,
                                              topPadding: settings.pageIndicatorTopPadding)
         setScopedPageIndicatorOverride(override, for: screenID, mode: mode)
     }
 
     // Icon title display
-    @Published var showLabels: Bool = {
-        if UserDefaults.standard.object(forKey: "showLabels") == nil { return true }
-        return UserDefaults.standard.bool(forKey: "showLabels")
-    }() {
-        didSet { UserDefaults.standard.set(showLabels, forKey: "showLabels") }
-    }
-
-    @Published var enableHighResFolderPreviews: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.folderPreviewHighResKey) == nil { return true }
-        return UserDefaults.standard.bool(forKey: AppStore.folderPreviewHighResKey)
-    }() {
-        didSet {
-            guard enableHighResFolderPreviews != oldValue else { return }
-            UserDefaults.standard.set(enableHighResFolderPreviews, forKey: AppStore.folderPreviewHighResKey)
-            clearIconCachesForLayoutChange()
-            triggerFolderUpdate()
-            triggerGridRefresh()
-        }
-    }
-
-    @Published var hideDock: Bool = {
-        if UserDefaults.standard.object(forKey: "hideDock") == nil { return false }
-        return UserDefaults.standard.bool(forKey: "hideDock")
-    }() {
-        didSet {
-            guard hideDock != oldValue else { return }
-            UserDefaults.standard.set(hideDock, forKey: "hideDock")
-        }
-    }
-
-    @Published var hideMenuBar: Bool = {
-        if UserDefaults.standard.object(forKey: hideMenuBarKey) == nil { return true }
-        return UserDefaults.standard.bool(forKey: hideMenuBarKey)
-    }() {
-        didSet {
-            guard hideMenuBar != oldValue else { return }
-            UserDefaults.standard.set(hideMenuBar, forKey: Self.hideMenuBarKey)
-        }
-    }
-    
-    @Published var scrollSensitivity: Double {
-        didSet {
-            UserDefaults.standard.set(scrollSensitivity, forKey: "scrollSensitivity")
-        }
-    }
-
-    @Published var gridColumnsPerPage: Int {
-        didSet {
-            let clamped = Self.clampColumns(gridColumnsPerPage)
-            if gridColumnsPerPage != clamped {
-                gridColumnsPerPage = clamped
-                return
-            }
-            guard gridColumnsPerPage != oldValue else { return }
-            UserDefaults.standard.set(gridColumnsPerPage, forKey: Self.gridColumnsKey)
-            handleGridConfigurationChange()
-        }
-    }
-
-    @Published var gridRowsPerPage: Int {
-        didSet {
-            let clamped = Self.clampRows(gridRowsPerPage)
-            if gridRowsPerPage != clamped {
-                gridRowsPerPage = clamped
-                return
-            }
-            guard gridRowsPerPage != oldValue else { return }
-            UserDefaults.standard.set(gridRowsPerPage, forKey: Self.gridRowsKey)
-            handleGridConfigurationChange()
-        }
-    }
-
-    @Published var iconColumnSpacing: Double {
-        didSet {
-            let clamped = Self.clampColumnSpacing(iconColumnSpacing)
-            if iconColumnSpacing != clamped {
-                iconColumnSpacing = clamped
-                return
-            }
-            guard iconColumnSpacing != oldValue else { return }
-            UserDefaults.standard.set(iconColumnSpacing, forKey: Self.columnSpacingKey)
-            triggerGridRefresh()
-        }
-    }
-
-    @Published var iconRowSpacing: Double {
-        didSet {
-            let clamped = Self.clampRowSpacing(iconRowSpacing)
-            if iconRowSpacing != clamped {
-                iconRowSpacing = clamped
-                return
-            }
-            guard iconRowSpacing != oldValue else { return }
-            UserDefaults.standard.set(iconRowSpacing, forKey: Self.rowSpacingKey)
-            triggerGridRefresh()
-        }
-    }
-
-    @Published var enableDropPrediction: Bool = {
-        if UserDefaults.standard.object(forKey: "enableDropPrediction") == nil { return true }
-        return UserDefaults.standard.bool(forKey: "enableDropPrediction")
-    }() {
-        didSet { UserDefaults.standard.set(enableDropPrediction, forKey: "enableDropPrediction") }
-    }
-
-    @Published var folderDropZoneScale: Double = AppStore.defaultFolderDropZoneScale {
-        didSet {
-            let clamped = Self.clampFolderDropZoneScale(folderDropZoneScale)
-            if folderDropZoneScale != clamped {
-                folderDropZoneScale = clamped
-                return
-            }
-            UserDefaults.standard.set(folderDropZoneScale, forKey: Self.folderDropZoneScaleKey)
-            guard !isApplyingScopedAppearanceState else { return }
-            updateScopedAppearanceSettings(for: currentAppearanceLayoutMode) { $0.folderDropZoneScale = folderDropZoneScale }
-        }
-    }
-
-    @Published var pageIndicatorTopPadding: Double = AppStore.defaultPageIndicatorTopPadding {
-        didSet {
-            let clamped = Self.clampPageIndicatorTopPadding(pageIndicatorTopPadding)
-            if pageIndicatorTopPadding != clamped {
-                pageIndicatorTopPadding = clamped
-                return
-            }
-            UserDefaults.standard.set(pageIndicatorTopPadding, forKey: Self.pageIndicatorTopPaddingKey)
-            guard !isApplyingScopedAppearanceState else { return }
-            updateScopedAppearanceSettings(for: currentAppearanceLayoutMode) { $0.pageIndicatorTopPadding = pageIndicatorTopPadding }
-        }
-    }
-
-    @Published var enableAnimations: Bool = {
-        if UserDefaults.standard.object(forKey: "enableAnimations") == nil { return true }
-        return UserDefaults.standard.bool(forKey: "enableAnimations")
-    }() {
-        didSet { UserDefaults.standard.set(enableAnimations, forKey: "enableAnimations") }
-    }
-
-    @Published var enableHoverMagnification: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.hoverMagnificationKey) == nil { return false }
-        return UserDefaults.standard.bool(forKey: AppStore.hoverMagnificationKey)
-    }() {
-        didSet { UserDefaults.standard.set(enableHoverMagnification, forKey: Self.hoverMagnificationKey) }
-    }
-
-    @Published var hoverMagnificationScale: Double = {
-        let defaults = UserDefaults.standard
-        let stored = defaults.object(forKey: AppStore.hoverMagnificationScaleKey) as? Double
-        let initial = stored ?? AppStore.defaultHoverMagnificationScale
-        let clamped = min(max(initial, AppStore.hoverMagnificationRange.lowerBound), AppStore.hoverMagnificationRange.upperBound)
-        if stored == nil || stored != clamped {
-            defaults.set(clamped, forKey: AppStore.hoverMagnificationScaleKey)
-        }
-        return clamped
-    }() {
-        didSet {
-            let clamped = min(max(hoverMagnificationScale, Self.hoverMagnificationRange.lowerBound), Self.hoverMagnificationRange.upperBound)
-            if hoverMagnificationScale != clamped {
-                hoverMagnificationScale = clamped
-                return
-            }
-            UserDefaults.standard.set(hoverMagnificationScale, forKey: Self.hoverMagnificationScaleKey)
-        }
-    }
-
-    @Published var enableActivePressEffect: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.activePressEffectKey) == nil { return false }
-        return UserDefaults.standard.bool(forKey: AppStore.activePressEffectKey)
-    }() {
-        didSet { UserDefaults.standard.set(enableActivePressEffect, forKey: Self.activePressEffectKey) }
-    }
-
-    @Published var followScrollPagingEnabled: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.followScrollPagingKey) == nil { return false }
-        return UserDefaults.standard.bool(forKey: AppStore.followScrollPagingKey)
-    }() {
-        didSet { UserDefaults.standard.set(followScrollPagingEnabled, forKey: Self.followScrollPagingKey) }
-    }
-
-    @Published var reverseWheelPagingDirection: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.reverseWheelPagingKey) == nil { return false }
-        return UserDefaults.standard.bool(forKey: AppStore.reverseWheelPagingKey)
-    }() {
-        didSet { UserDefaults.standard.set(reverseWheelPagingDirection, forKey: Self.reverseWheelPagingKey) }
-    }
-
-    @Published var useCAGridRenderer: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.useCAGridRendererKey) == nil { return true }
-        let enabled = UserDefaults.standard.bool(forKey: AppStore.useCAGridRendererKey)
-        if PerformanceMode.current == .full { return false }
-        return enabled
-    }() {
-        didSet {
-            if useCAGridRenderer, performanceMode == .full {
-                performanceMode = .lean
-            }
-            UserDefaults.standard.set(useCAGridRenderer, forKey: Self.useCAGridRendererKey)
-        }
-    }
-
     // MARK: - Layout Mode
 
-    @Published var layoutMode: LayoutMode = {
-        if let raw = UserDefaults.standard.string(forKey: layoutModeKey),
-           let mode = LayoutMode(rawValue: raw) {
-            return mode
-        }
-        return .paged
-    }() {
-        didSet {
-            guard layoutMode != oldValue else { return }
-            UserDefaults.standard.set(layoutMode.rawValue, forKey: Self.layoutModeKey)
-        }
-    }
-
     var layoutStrategy: LayoutStrategy {
-        switch layoutMode {
+        switch settingsStore.layoutMode {
         case .paged: return PagedLayoutStrategy()
         case .vertical: return VerticalLayoutStrategy()
         }
@@ -1291,529 +546,30 @@ private struct DefaultsCache {
 
     // MARK: - Dock & Menu Bar
 
-    @Published var showInDock: Bool = {
-        UserDefaults.standard.bool(forKey: showInDockKey)
-    }() {
-        didSet {
-            guard showInDock != oldValue else { return }
-            UserDefaults.standard.set(showInDock, forKey: Self.showInDockKey)
-            updateActivationPolicy()
-        }
-    }
-
     func updateActivationPolicy() {
-        if showInDock {
+        if settingsStore.showInDock {
             NSApp.setActivationPolicy(.regular)
         } else {
             NSApp.setActivationPolicy(.accessory)
         }
     }
 
-    @Published var showInMenuBar: Bool = {
-        UserDefaults.standard.bool(forKey: showInMenuBarKey)
-    }() {
-        didSet {
-            guard showInMenuBar != oldValue else { return }
-            UserDefaults.standard.set(showInMenuBar, forKey: Self.showInMenuBarKey)
-        }
-    }
-
-    @Published var activePressScale: Double = {
-        let defaults = UserDefaults.standard
-        let stored = defaults.object(forKey: AppStore.activePressScaleKey) as? Double
-        let initial = stored ?? AppStore.defaultActivePressScale
-        let clamped = min(max(initial, AppStore.activePressScaleRange.lowerBound), AppStore.activePressScaleRange.upperBound)
-        if stored == nil || stored != clamped {
-            defaults.set(clamped, forKey: AppStore.activePressScaleKey)
-        }
-        return clamped
-    }() {
-        didSet {
-            let clamped = min(max(activePressScale, Self.activePressScaleRange.lowerBound), Self.activePressScaleRange.upperBound)
-            if activePressScale != clamped {
-                activePressScale = clamped
-                return
-            }
-            UserDefaults.standard.set(activePressScale, forKey: Self.activePressScaleKey)
-        }
-    }
-
-    @Published var iconLabelFontSize: Double = {
-        let stored = UserDefaults.standard.double(forKey: "iconLabelFontSize")
-        return stored == 0 ? 11.0 : stored
-    }() {
-        didSet {
-            UserDefaults.standard.set(iconLabelFontSize, forKey: "iconLabelFontSize")
-            guard !isApplyingScopedAppearanceState else { return }
-            updateScopedAppearanceSettings(for: currentAppearanceLayoutMode) { $0.iconLabelFontSize = iconLabelFontSize }
-            triggerGridRefresh()
-        }
-    }
-
-    @Published var iconLabelFontWeight: IconLabelFontWeightOption = {
-        let defaults = UserDefaults.standard
-        if let raw = defaults.string(forKey: AppStore.iconLabelFontWeightKey),
-           let value = IconLabelFontWeightOption(rawValue: raw) {
-            return value
-        }
-        return .medium
-    }() {
-        didSet {
-            guard iconLabelFontWeight != oldValue else { return }
-            UserDefaults.standard.set(iconLabelFontWeight.rawValue, forKey: AppStore.iconLabelFontWeightKey)
-            triggerGridRefresh()
-        }
-    }
-
     var iconLabelFontWeightValue: Font.Weight {
-        iconLabelFontWeight.fontWeight
-    }
-
-    @Published var showQuickRefreshButton: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.showQuickRefreshButtonKey) == nil { return false }
-        return UserDefaults.standard.bool(forKey: AppStore.showQuickRefreshButtonKey)
-    }() {
-        didSet {
-            guard showQuickRefreshButton != oldValue else { return }
-            UserDefaults.standard.set(showQuickRefreshButton, forKey: AppStore.showQuickRefreshButtonKey)
-        }
-    }
-
-    @Published var uninstallToolAppPath: String = {
-        UserDefaults.standard.string(forKey: AppStore.uninstallToolAppPathKey) ?? ""
-    }() {
-        didSet {
-            guard uninstallToolAppPath != oldValue else { return }
-            let trimmed = uninstallToolAppPath.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty {
-                UserDefaults.standard.removeObject(forKey: AppStore.uninstallToolAppPathKey)
-            } else {
-                UserDefaults.standard.set(trimmed, forKey: AppStore.uninstallToolAppPathKey)
-            }
-        }
-    }
-
-    @Published var isLayoutLocked: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.lockLayoutKey) == nil { return false }
-        return UserDefaults.standard.bool(forKey: AppStore.lockLayoutKey)
-    }() {
-        didSet {
-            guard isLayoutLocked != oldValue else { return }
-            UserDefaults.standard.set(isLayoutLocked, forKey: AppStore.lockLayoutKey)
-            triggerGridRefresh()
-        }
+        settingsStore.iconLabelFontWeight.fontWeight
     }
 
     // Update check related properties
     @Published var updateState: UpdateState = .idle
-
-    @Published var autoCheckForUpdates: Bool = {
-        if UserDefaults.standard.object(forKey: "autoCheckForUpdates") == nil { return true }
-        return UserDefaults.standard.bool(forKey: "autoCheckForUpdates")
-    }() {
-        didSet {
-            UserDefaults.standard.set(autoCheckForUpdates, forKey: "autoCheckForUpdates")
-            if autoCheckForUpdates {
-                updateChecker.scheduleAutomaticUpdateCheck()
-            } else {
-                updateChecker.cancelAutoCheck()
-            }
-        }
-    }
 
     private(set) lazy var updateChecker = UpdateChecker(
         delegate: self,
         localized: { [weak self] key in self?.localized(key) ?? "" }
     )
 
-    @Published var animationDuration: Double = {
-        let stored = UserDefaults.standard.double(forKey: "animationDuration")
-        return stored == 0 ? 0.3 : stored
-    }() {
-        didSet { UserDefaults.standard.set(animationDuration, forKey: "animationDuration") }
-    }
-
-    @Published var enableWindowOpenAnimation: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.windowOpenAnimationKey) == nil { return true }
-        return UserDefaults.standard.bool(forKey: AppStore.windowOpenAnimationKey)
-    }() {
-        didSet { UserDefaults.standard.set(enableWindowOpenAnimation, forKey: Self.windowOpenAnimationKey) }
-    }
-
-    @Published var useLocalizedThirdPartyTitles: Bool = {
-        if UserDefaults.standard.object(forKey: "useLocalizedThirdPartyTitles") == nil { return true }
-        return UserDefaults.standard.bool(forKey: "useLocalizedThirdPartyTitles")
-    }() {
-        didSet {
-            guard oldValue != useLocalizedThirdPartyTitles else { return }
-            UserDefaults.standard.set(useLocalizedThirdPartyTitles, forKey: "useLocalizedThirdPartyTitles")
-            DispatchQueue.main.async { [weak self] in
-                self?.refresh()
-            }
-        }
-    }
-
-    @Published var showFPSOverlay: Bool = {
-        if UserDefaults.standard.object(forKey: "showFPSOverlay") == nil { return false }
-        return UserDefaults.standard.bool(forKey: "showFPSOverlay")
-    }() {
-        didSet { UserDefaults.standard.set(showFPSOverlay, forKey: "showFPSOverlay") }
-    }
-
-    @Published var performanceMode: PerformanceMode = PerformanceMode.current {
-        didSet {
-            guard oldValue != performanceMode else { return }
-            PerformanceMode.persist(performanceMode)
-            if performanceMode == .full, useCAGridRenderer {
-                useCAGridRenderer = false
-            }
-        }
-    }
-
-    @Published var gameControllerEnabled: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.gameControllerEnabledKey) == nil { return false }
-        return UserDefaults.standard.bool(forKey: AppStore.gameControllerEnabledKey)
-    }() {
-        didSet {
-            guard oldValue != gameControllerEnabled else { return }
-            UserDefaults.standard.set(gameControllerEnabled, forKey: AppStore.gameControllerEnabledKey)
-        }
-    }
-
-    @Published var gameControllerMenuTogglesLaunchpad: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.gameControllerMenuToggleKey) == nil { return true }
-        return UserDefaults.standard.bool(forKey: AppStore.gameControllerMenuToggleKey)
-    }() {
-        didSet {
-            guard oldValue != gameControllerMenuTogglesLaunchpad else { return }
-            UserDefaults.standard.set(gameControllerMenuTogglesLaunchpad, forKey: AppStore.gameControllerMenuToggleKey)
-        }
-    }
-
-    @Published var soundEffectsEnabled: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.soundEffectsEnabledKey) == nil { return false }
-        return UserDefaults.standard.bool(forKey: AppStore.soundEffectsEnabledKey)
-    }() {
-        didSet {
-            guard oldValue != soundEffectsEnabled else { return }
-            UserDefaults.standard.set(soundEffectsEnabled, forKey: AppStore.soundEffectsEnabledKey)
-        }
-    }
-
-    @Published var soundLaunchpadOpenSound: String = {
-        let stored = UserDefaults.standard.string(forKey: AppStore.soundLaunchpadOpenKey)
-        return AppStore.normalizedSoundName(stored, defaultValue: AppStore.defaultLaunchpadOpenSound)
-    }() {
-        didSet {
-            UserDefaults.standard.set(soundLaunchpadOpenSound, forKey: AppStore.soundLaunchpadOpenKey)
-        }
-    }
-
-    @Published var soundLaunchpadCloseSound: String = {
-        let stored = UserDefaults.standard.string(forKey: AppStore.soundLaunchpadCloseKey)
-        return AppStore.normalizedSoundName(stored, defaultValue: AppStore.defaultLaunchpadCloseSound)
-    }() {
-        didSet {
-            UserDefaults.standard.set(soundLaunchpadCloseSound, forKey: AppStore.soundLaunchpadCloseKey)
-        }
-    }
-
-    @Published var soundNavigationSound: String = {
-        let stored = UserDefaults.standard.string(forKey: AppStore.soundNavigationKey)
-        return AppStore.normalizedSoundName(stored, defaultValue: AppStore.defaultNavigationSound)
-    }() {
-        didSet {
-            UserDefaults.standard.set(soundNavigationSound, forKey: AppStore.soundNavigationKey)
-        }
-    }
-
-    @Published var voiceFeedbackEnabled: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.voiceFeedbackEnabledKey) == nil { return false }
-        return UserDefaults.standard.bool(forKey: AppStore.voiceFeedbackEnabledKey)
-    }() {
-        didSet {
-            guard oldValue != voiceFeedbackEnabled else { return }
-            UserDefaults.standard.set(voiceFeedbackEnabled, forKey: AppStore.voiceFeedbackEnabledKey)
-            if !voiceFeedbackEnabled {
-                VoiceManager.shared.stop()
-            }
-        }
-    }
-
-    @Published var pageIndicatorOffset: Double = {
-        if UserDefaults.standard.object(forKey: "pageIndicatorOffset") == nil { return 27.0 }
-        return UserDefaults.standard.double(forKey: "pageIndicatorOffset")
-    }() {
-        didSet {
-            UserDefaults.standard.set(pageIndicatorOffset, forKey: "pageIndicatorOffset")
-            guard !isApplyingScopedAppearanceState else { return }
-            updateScopedAppearanceSettings(for: currentAppearanceLayoutMode) { $0.pageIndicatorOffset = pageIndicatorOffset }
-        }
-    }
-
-    @Published var pageIndicatorPerDisplayEnabled: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.pageIndicatorPerDisplayEnabledKey) == nil { return false }
-        return UserDefaults.standard.bool(forKey: AppStore.pageIndicatorPerDisplayEnabledKey)
-    }() {
-        didSet {
-            UserDefaults.standard.set(pageIndicatorPerDisplayEnabled, forKey: AppStore.pageIndicatorPerDisplayEnabledKey)
-            guard !isApplyingScopedAppearanceState else { return }
-            updateScopedAppearanceSettings(for: currentAppearanceLayoutMode) { $0.pageIndicatorPerDisplayEnabled = pageIndicatorPerDisplayEnabled }
-        }
-    }
-
-    @Published private(set) var pageIndicatorOverrides: [String: PageIndicatorOverride] = AppStore.loadPageIndicatorOverrides() {
-        didSet {
-            persistPageIndicatorOverrides(pageIndicatorOverrides)
-            guard !isApplyingScopedAppearanceState else { return }
-            updateScopedAppearanceSettings(for: currentAppearanceLayoutMode) { $0.pageIndicatorOverrides = pageIndicatorOverrides }
-        }
-    }
-
-    @Published var rememberLastPage: Bool = AppStore.defaultRememberSetting() {
-        didSet {
-            UserDefaults.standard.set(rememberLastPage, forKey: Self.rememberPageKey)
-            if rememberLastPage {
-                UserDefaults.standard.set(currentPage, forKey: Self.rememberedPageIndexKey)
-            } else {
-                UserDefaults.standard.removeObject(forKey: Self.rememberedPageIndexKey)
-            }
-        }
-    }
-
-    @Published var folderPopoverWidthFactor: Double = {
-        let stored = UserDefaults.standard.double(forKey: "folderPopoverWidthFactor")
-        if stored == 0 { return defaultFolderPopoverWidth }
-        return clampFolderWidth(stored)
-    }() {
-        didSet {
-            let clamped = AppStore.clampFolderWidth(folderPopoverWidthFactor)
-            if folderPopoverWidthFactor != clamped {
-                folderPopoverWidthFactor = clamped
-                return
-            }
-            UserDefaults.standard.set(folderPopoverWidthFactor, forKey: "folderPopoverWidthFactor")
-        }
-    }
-
-    @Published var folderPopoverHeightFactor: Double = {
-        let stored = UserDefaults.standard.double(forKey: "folderPopoverHeightFactor")
-        if stored == 0 { return defaultFolderPopoverHeight }
-        return clampFolderHeight(stored)
-    }() {
-        didSet {
-            let clamped = AppStore.clampFolderHeight(folderPopoverHeightFactor)
-            if folderPopoverHeightFactor != clamped {
-                folderPopoverHeightFactor = clamped
-                return
-            }
-            UserDefaults.standard.set(folderPopoverHeightFactor, forKey: "folderPopoverHeightFactor")
-        }
-    }
-
-    @Published var appearancePreference: AppearancePreference = {
-        if let raw = UserDefaults.standard.string(forKey: "appearancePreference"),
-           let pref = AppearancePreference(rawValue: raw) {
-            return pref
-        }
-        return .system
-    }() {
-        didSet {
-            guard oldValue != appearancePreference else { return }
-            UserDefaults.standard.set(appearancePreference.rawValue, forKey: "appearancePreference")
-        }
-    }
-
-    private static func defaultRememberSetting() -> Bool {
-        if UserDefaults.standard.object(forKey: rememberPageKey) == nil { return true }
-        return UserDefaults.standard.bool(forKey: rememberPageKey)
-    }
-
-    @Published var globalHotKey: HotKeyConfiguration? = AppStore.loadHotKeyConfiguration() {
-        didSet {
-            persistHotKeyConfiguration()
-            AppDelegate.shared?.updateGlobalHotKey(configuration: globalHotKey)
-        }
-    }
-
-    @Published var dockDragEnabled: Bool = {
-        let defaults = UserDefaults.standard
-        if let stored = defaults.object(forKey: AppStore.dockDragEnabledKey) as? Bool {
-            return stored
-        }
-        let legacySideRaw = defaults.string(forKey: AppStore.dockDragSideKey)
-        let enabled = legacySideRaw != DockDragSide.disabled.rawValue
-        defaults.set(enabled, forKey: AppStore.dockDragEnabledKey)
-        return enabled
-    }() {
-        didSet {
-            guard dockDragEnabled != oldValue else { return }
-            UserDefaults.standard.set(dockDragEnabled, forKey: Self.dockDragEnabledKey)
-        }
-    }
-
-    @Published var dockDragSide: DockDragSide = {
-        let defaults = UserDefaults.standard
-        if let raw = defaults.string(forKey: AppStore.dockDragSideKey),
-           let side = DockDragSide(rawValue: raw),
-           side != .disabled {
-            return side
-        }
-        return .bottom
-    }() {
-        didSet {
-            guard dockDragSide != oldValue else { return }
-            UserDefaults.standard.set(dockDragSide.rawValue, forKey: Self.dockDragSideKey)
-        }
-    }
-
-    @Published var dockDragTriggerDistance: Double = {
-        let defaults = UserDefaults.standard
-        let stored = defaults.object(forKey: AppStore.dockDragTriggerDistanceKey) as? Double
-        let initial = stored ?? AppStore.defaultDockDragTriggerDistance
-        let clamped = AppStore.clampDockDragTriggerDistance(initial)
-        if stored == nil || stored != clamped {
-            defaults.set(clamped, forKey: AppStore.dockDragTriggerDistanceKey)
-        }
-        return clamped
-    }() {
-        didSet {
-            let clamped = Self.clampDockDragTriggerDistance(dockDragTriggerDistance)
-            if dockDragTriggerDistance != clamped {
-                dockDragTriggerDistance = clamped
-                return
-            }
-            UserDefaults.standard.set(dockDragTriggerDistance, forKey: Self.dockDragTriggerDistanceKey)
-        }
-    }
-
-    @Published var hotCornerEnabled: Bool = {
-        let defaults = UserDefaults.standard
-        if defaults.object(forKey: AppStore.hotCornerEnabledKey) == nil {
-            defaults.set(false, forKey: AppStore.hotCornerEnabledKey)
-        }
-        return defaults.bool(forKey: AppStore.hotCornerEnabledKey)
-    }() {
-        didSet {
-            guard hotCornerEnabled != oldValue else { return }
-            UserDefaults.standard.set(hotCornerEnabled, forKey: Self.hotCornerEnabledKey)
-        }
-    }
-
-    @Published var hotCornerPosition: HotCornerPosition = {
-        let defaults = UserDefaults.standard
-        if let raw = defaults.string(forKey: AppStore.hotCornerPositionKey),
-           let position = HotCornerPosition(rawValue: raw) {
-            return position
-        }
-        return .topLeft
-    }() {
-        didSet {
-            guard hotCornerPosition != oldValue else { return }
-            UserDefaults.standard.set(hotCornerPosition.rawValue, forKey: Self.hotCornerPositionKey)
-        }
-    }
-
-    @Published var hotCornerTriggerDelay: Double = {
-        let defaults = UserDefaults.standard
-        let stored = defaults.object(forKey: AppStore.hotCornerTriggerDelayKey) as? Double
-        let initial = stored ?? AppStore.defaultHotCornerTriggerDelay
-        let clamped = AppStore.clampHotCornerTriggerDelay(initial)
-        if stored == nil || stored != clamped {
-            defaults.set(clamped, forKey: AppStore.hotCornerTriggerDelayKey)
-        }
-        return clamped
-    }() {
-        didSet {
-            let clamped = Self.clampHotCornerTriggerDelay(hotCornerTriggerDelay)
-            if hotCornerTriggerDelay != clamped {
-                hotCornerTriggerDelay = clamped
-                return
-            }
-            UserDefaults.standard.set(hotCornerTriggerDelay, forKey: Self.hotCornerTriggerDelayKey)
-        }
-    }
-
-    @Published var hotCornerHitboxSize: Double = {
-        let defaults = UserDefaults.standard
-        let stored = defaults.object(forKey: AppStore.hotCornerHitboxSizeKey) as? Double
-        let initial = stored ?? AppStore.defaultHotCornerHitboxSize
-        let clamped = AppStore.clampHotCornerHitboxSize(initial)
-        if stored == nil || stored != clamped {
-            defaults.set(clamped, forKey: AppStore.hotCornerHitboxSizeKey)
-        }
-        return clamped
-    }() {
-        didSet {
-            let clamped = Self.clampHotCornerHitboxSize(hotCornerHitboxSize)
-            if hotCornerHitboxSize != clamped {
-                hotCornerHitboxSize = clamped
-                return
-            }
-            UserDefaults.standard.set(hotCornerHitboxSize, forKey: Self.hotCornerHitboxSizeKey)
-        }
-    }
-
-    @Published var hotCornerToggleWhenOpen: Bool = {
-        let defaults = UserDefaults.standard
-        if defaults.object(forKey: AppStore.hotCornerToggleWhenOpenKey) == nil {
-            defaults.set(false, forKey: AppStore.hotCornerToggleWhenOpenKey)
-        }
-        return defaults.bool(forKey: AppStore.hotCornerToggleWhenOpenKey)
-    }() {
-        didSet {
-            guard hotCornerToggleWhenOpen != oldValue else { return }
-            UserDefaults.standard.set(hotCornerToggleWhenOpen, forKey: Self.hotCornerToggleWhenOpenKey)
-        }
-    }
 
     // Experimental gesture settings consumed by LaunchpadApp gesture wiring.
     // Remove these fields together with the gesture monitor/configuration flow
     // if low-level multitouch support is no longer needed.
-    @Published var gestureEnabled: Bool = {
-        let defaults = UserDefaults.standard
-        if defaults.object(forKey: AppStore.gestureEnabledKey) == nil {
-            defaults.set(false, forKey: AppStore.gestureEnabledKey)
-        }
-        return defaults.bool(forKey: AppStore.gestureEnabledKey)
-    }() {
-        didSet {
-            guard gestureEnabled != oldValue else { return }
-            UserDefaults.standard.set(gestureEnabled, forKey: Self.gestureEnabledKey)
-        }
-    }
-
-    @Published var gestureCloseOnPinchOut: Bool = {
-        let defaults = UserDefaults.standard
-        if defaults.object(forKey: AppStore.gestureCloseOnPinchOutKey) == nil {
-            defaults.set(false, forKey: AppStore.gestureCloseOnPinchOutKey)
-        }
-        return defaults.bool(forKey: AppStore.gestureCloseOnPinchOutKey)
-    }() {
-        didSet {
-            guard gestureCloseOnPinchOut != oldValue else { return }
-            UserDefaults.standard.set(gestureCloseOnPinchOut, forKey: Self.gestureCloseOnPinchOutKey)
-        }
-    }
-
-    @Published var gestureTapAction: GestureTapAction = {
-        let defaults = UserDefaults.standard
-        if let rawValue = defaults.string(forKey: AppStore.gestureTapActionKey),
-           let action = GestureTapAction(rawValue: rawValue) {
-            return action
-        }
-        let legacyEnabled = defaults.object(forKey: "gestureTapEnabled") as? Bool ?? false
-        let legacyToggle = defaults.object(forKey: "gestureTapToggleWhenOpen") as? Bool ?? false
-        let migratedAction: GestureTapAction = legacyEnabled ? (legacyToggle ? .toggle : .open) : .off
-        defaults.set(migratedAction.rawValue, forKey: AppStore.gestureTapActionKey)
-        return migratedAction
-    }() {
-        didSet {
-            guard gestureTapAction != oldValue else { return }
-            UserDefaults.standard.set(gestureTapAction.rawValue, forKey: Self.gestureTapActionKey)
-        }
-    }
-
     // @Published var isAIEnabled: Bool = {
     //     if UserDefaults.standard.object(forKey: AppStore.aiFeatureEnabledKey) == nil { return false }
     //     return UserDefaults.standard.bool(forKey: AppStore.aiFeatureEnabledKey)
@@ -1842,16 +598,6 @@ private struct DefaultsCache {
     }
 
     @Published private(set) var hasCustomAppIcon: Bool
-
-    @Published var preferredLanguage: AppLanguage = {
-        if let raw = UserDefaults.standard.string(forKey: "preferredLanguage"),
-           let lang = AppLanguage(rawValue: raw) {
-            return lang
-        }
-        return .system
-    }() {
-        didSet { UserDefaults.standard.set(preferredLanguage.rawValue, forKey: "preferredLanguage") }
-    }
 
     @Published private(set) var customTitles: [String: String] = AppStore.loadCustomTitles() {
         didSet { persistCustomTitles() }
@@ -1884,28 +630,31 @@ private struct DefaultsCache {
     var hasAppliedOrderFromStore: Bool = false
     private(set) lazy var persistence = OrderPersistence(delegate: self)
     private(set) lazy var scanner = AppScanner(delegate: self)
+    private(set) lazy var folderManager = FolderManager(delegate: self)
+    private(set) lazy var importer = AppImportService(delegate: self, localized: { [weak self] key in self?.localized(key) ?? "" })
+    let settingsStore = SettingsStore()
     
     // Background refresh queue and throttle
     private let refreshQueue = DispatchQueue(label: "app.store.refresh", qos: .userInitiated)
     private var gridRefreshWorkItem: DispatchWorkItem?
-    private var iconScaleWorkItem: DispatchWorkItem?
     private var rescanWorkItem: DispatchWorkItem?
     private var customTitleRefreshWorkItem: DispatchWorkItem?
     private let fsEventsQueue = DispatchQueue(label: "app.store.fsevents")
     private let customIconFileURL: URL
     private let defaultAppIcon: NSImage
-    private var loginItemUpdateInProgress = false
     private var volumeObservers: [NSObjectProtocol] = []
-    
+    private var appearanceRefreshWorkItem: DispatchWorkItem?
+    private var lastAppearanceEventAt: TimeInterval = 0
+
     // Computed properties
-    private var itemsPerPage: Int { gridColumnsPerPage * gridRowsPerPage }
+    private var itemsPerPage: Int { settingsStore.gridColumnsPerPage * settingsStore.gridRowsPerPage }
 
     var builtinAppSourcePaths: [String] { systemApplicationSearchPaths }
 
     private var applicationSearchPaths: [String] {
         var seen = Set<String>()
         var result: [String] = []
-        let candidates = systemApplicationSearchPaths + customAppSourcePaths
+        let candidates = systemApplicationSearchPaths + settingsStore.customAppSourcePaths
         let fileManager = FileManager.default
 
         for raw in candidates {
@@ -1934,7 +683,7 @@ private struct DefaultsCache {
 
     func removableSourcePath(forAppPath path: String) -> String? {
         let standardizedApp = standardizedFilePath(path)
-        for source in customAppSourcePaths {
+        for source in settingsStore.customAppSourcePaths {
             guard let normalizedSource = normalizeApplicationPath(source) else { continue }
             if standardizedApp == normalizedSource { return normalizedSource }
             if standardizedApp.hasPrefix(normalizedSource.hasSuffix("/") ? normalizedSource : normalizedSource + "/") {
@@ -1989,7 +738,7 @@ private struct DefaultsCache {
         guard let removableSource else { return false }
 
         let normalizedSource = normalizeApplicationPath(removableSource) ?? standardizedFilePath(removableSource)
-        let customSources = customAppSourcePaths.map { normalizeApplicationPath($0) ?? standardizedFilePath($0) }
+        let customSources = settingsStore.customAppSourcePaths.map { normalizeApplicationPath($0) ?? standardizedFilePath($0) }
         return customSources.contains(normalizedSource)
     }
 
@@ -2250,206 +999,16 @@ private struct DefaultsCache {
         "/System/Cryptexes/App/System/Applications"
     ]
 
-    static let customAppSourcesKey = "customApplicationSourcePaths"
-
-    @Published var customAppSourcePaths: [String] = {
-        guard let saved = UserDefaults.standard.array(forKey: AppStore.customAppSourcesKey) as? [String] else { return [] }
-        return saved
-    }() {
-        didSet {
-            guard customAppSourcePaths != oldValue else { return }
-            UserDefaults.standard.set(customAppSourcePaths, forKey: AppStore.customAppSourcesKey)
-            restartAutoRescan()
-            scanApplicationsWithOrderPreservation()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
-                self?.removeEmptyPages()
-            }
-        }
-    }
 
     init() {
-        let cache = DefaultsCache()
-
-        if !cache.containsKey("isFullscreenMode") {
-            self.isFullscreenMode = true // New user default Classic (Fullscreen)
-            UserDefaults.standard.set(true, forKey: "isFullscreenMode")
-        } else {
-            self.isFullscreenMode = cache.bool(forKey: "isFullscreenMode")
-        }
-        if !cache.containsKey(PerformanceMode.userDefaultsKey) {
+        // Performance mode default
+        if UserDefaults.standard.object(forKey: PerformanceMode.userDefaultsKey) == nil {
             PerformanceMode.persist(.lean)
         }
-        let defaults = UserDefaults.standard // kept for write-backs only
 
-        let shouldRememberPage = !cache.containsKey(Self.rememberPageKey) ? true : cache.bool(forKey: Self.rememberPageKey)
-        let savedPageIndex = cache.object(forKey: Self.rememberedPageIndexKey) as Int?
+        // SettingsStore handles its own init from UserDefaults
 
-        let initialScrollSensitivity: Double
-        if !cache.containsKey("scrollSensitivity") {
-            initialScrollSensitivity = 0.8
-            defaults.set(initialScrollSensitivity, forKey: "scrollSensitivity")
-        } else {
-            let storedSensitivity = cache.double(forKey: "scrollSensitivity")
-            initialScrollSensitivity = storedSensitivity == 0 ? Self.defaultScrollSensitivity : storedSensitivity
-        }
-        scrollSensitivity = initialScrollSensitivity
-
-        let storedColumns = cache.object(forKey: Self.gridColumnsKey) ?? 7
-        let clampedColumns = Self.clampColumns(storedColumns)
-        self.gridColumnsPerPage = clampedColumns
-
-        defaults.set(clampedColumns, forKey: Self.gridColumnsKey)
-
-        let storedRows = cache.object(forKey: Self.gridRowsKey) ?? 5
-        let clampedRows = Self.clampRows(storedRows)
-        self.gridRowsPerPage = clampedRows
-        defaults.set(clampedRows, forKey: Self.gridRowsKey)
-
-        let storedColumnSpacing = cache.object(forKey: Self.columnSpacingKey) ?? 20.0
-        let clampedColumnSpacing = Self.clampColumnSpacing(storedColumnSpacing)
-        self.iconColumnSpacing = clampedColumnSpacing
-        defaults.set(clampedColumnSpacing, forKey: Self.columnSpacingKey)
-
-        let storedRowSpacing = cache.object(forKey: Self.rowSpacingKey) ?? 14.0
-        let clampedRowSpacing = Self.clampRowSpacing(storedRowSpacing)
-        self.iconRowSpacing = clampedRowSpacing
-        defaults.set(clampedRowSpacing, forKey: Self.rowSpacingKey)
-        let storedDropZoneScale = cache.object(forKey: Self.folderDropZoneScaleKey) ?? Self.defaultFolderDropZoneScale
-        let clampedDropZoneScale = Self.clampFolderDropZoneScale(storedDropZoneScale)
-        self.folderDropZoneScale = clampedDropZoneScale
-        defaults.set(clampedDropZoneScale, forKey: Self.folderDropZoneScaleKey)
-        if !cache.containsKey(Self.pageIndicatorTopPaddingKey) {
-            defaults.set(Self.defaultPageIndicatorTopPadding, forKey: Self.pageIndicatorTopPaddingKey)
-        }
-        if !cache.containsKey(Self.pageIndicatorPerDisplayEnabledKey) {
-            defaults.set(false, forKey: Self.pageIndicatorPerDisplayEnabledKey)
-        }
-        let storedTopPadding = cache.object(forKey: Self.pageIndicatorTopPaddingKey) ?? Self.defaultPageIndicatorTopPadding
-        let clampedTopPadding = Self.clampPageIndicatorTopPadding(storedTopPadding)
-        self.pageIndicatorTopPadding = clampedTopPadding
-        defaults.set(clampedTopPadding, forKey: Self.pageIndicatorTopPaddingKey)
-        // Read icon scale default
-        if let v = cache.object(forKey: "iconScale") as Double? {
-            self.iconScale = v
-        }
-        if !cache.containsKey("enableDropPrediction") {
-            defaults.set(true, forKey: "enableDropPrediction")
-        }
-        if !cache.containsKey("useLocalizedThirdPartyTitles") {
-            defaults.set(true, forKey: "useLocalizedThirdPartyTitles")
-        }
-        if !cache.containsKey("enableAnimations") {
-            defaults.set(true, forKey: "enableAnimations")
-        }
-        if !cache.containsKey(AppStore.followScrollPagingKey) {
-            defaults.set(false, forKey: AppStore.followScrollPagingKey)
-        }
-        if !cache.containsKey(AppStore.reverseWheelPagingKey) {
-            defaults.set(false, forKey: AppStore.reverseWheelPagingKey)
-        }
-        if !cache.containsKey(Self.dockDragEnabledKey) {
-            let legacySideRaw = cache.string(forKey: Self.dockDragSideKey)
-            defaults.set(legacySideRaw != DockDragSide.disabled.rawValue, forKey: Self.dockDragEnabledKey)
-        }
-        if !cache.containsKey(Self.dockDragSideKey) {
-            defaults.set(DockDragSide.bottom.rawValue, forKey: Self.dockDragSideKey)
-        }
-        let storedDockDragDistance = cache.object(forKey: Self.dockDragTriggerDistanceKey) ?? Self.defaultDockDragTriggerDistance
-        let clampedDockDragDistance = Self.clampDockDragTriggerDistance(storedDockDragDistance)
-        defaults.set(clampedDockDragDistance, forKey: Self.dockDragTriggerDistanceKey)
-        if !cache.containsKey(Self.hotCornerEnabledKey) {
-            defaults.set(false, forKey: Self.hotCornerEnabledKey)
-        }
-        if !cache.containsKey(Self.hotCornerPositionKey) {
-            defaults.set(HotCornerPosition.topLeft.rawValue, forKey: Self.hotCornerPositionKey)
-        }
-        let storedHotCornerDelay = cache.object(forKey: Self.hotCornerTriggerDelayKey) ?? Self.defaultHotCornerTriggerDelay
-        let clampedHotCornerDelay = Self.clampHotCornerTriggerDelay(storedHotCornerDelay)
-        defaults.set(clampedHotCornerDelay, forKey: Self.hotCornerTriggerDelayKey)
-        let storedHotCornerHitboxSize = cache.object(forKey: Self.hotCornerHitboxSizeKey) ?? Self.defaultHotCornerHitboxSize
-        let clampedHotCornerHitboxSize = Self.clampHotCornerHitboxSize(storedHotCornerHitboxSize)
-        defaults.set(clampedHotCornerHitboxSize, forKey: Self.hotCornerHitboxSizeKey)
-        if !cache.containsKey(Self.hotCornerToggleWhenOpenKey) {
-            defaults.set(false, forKey: Self.hotCornerToggleWhenOpenKey)
-        }
-        if !cache.containsKey(Self.gestureEnabledKey) {
-            defaults.set(false, forKey: Self.gestureEnabledKey)
-        }
-        if !cache.containsKey(Self.gestureCloseOnPinchOutKey) {
-            defaults.set(false, forKey: Self.gestureCloseOnPinchOutKey)
-        }
-        // Keep a one-time migration path from the older tap booleans so users
-        // do not lose settings if gesture support remains enabled.
-        if !cache.containsKey(Self.gestureTapActionKey) {
-            let legacyEnabled = cache.object(forKey: "gestureTapEnabled") ?? false
-            let legacyToggle = cache.object(forKey: "gestureTapToggleWhenOpen") ?? false
-            let migratedAction: GestureTapAction = legacyEnabled ? (legacyToggle ? .toggle : .open) : .off
-            defaults.set(migratedAction.rawValue, forKey: Self.gestureTapActionKey)
-        }
-        if !cache.containsKey(Self.gameControllerMenuToggleKey) {
-            defaults.set(true, forKey: Self.gameControllerMenuToggleKey)
-        }
-        if !cache.containsKey(Self.useCAGridRendererKey) {
-            defaults.set(true, forKey: Self.useCAGridRendererKey)
-        }
-        if !cache.containsKey(Self.developmentEnableCLICodeKey) {
-            defaults.set(false, forKey: Self.developmentEnableCLICodeKey)
-        }
-        if !cache.containsKey(Self.backgroundMaskEnabledKey) {
-            defaults.set(false, forKey: Self.backgroundMaskEnabledKey)
-        }
-        if !cache.containsKey(Self.backgroundMaskLightKey) {
-            Self.persistBackgroundMaskColor(Self.defaultBackgroundMaskColor, forKey: Self.backgroundMaskLightKey)
-        }
-        if !cache.containsKey(Self.backgroundMaskDarkKey) {
-            Self.persistBackgroundMaskColor(Self.defaultBackgroundMaskColor, forKey: Self.backgroundMaskDarkKey)
-        }
-        if !cache.containsKey("iconLabelFontSize") {
-            defaults.set(11.0, forKey: "iconLabelFontSize")
-        }
-        if !cache.containsKey(AppStore.iconLabelFontWeightKey) {
-            defaults.set(IconLabelFontWeightOption.medium.rawValue, forKey: AppStore.iconLabelFontWeightKey)
-        }
-        if !cache.containsKey("animationDuration") {
-            defaults.set(0.3, forKey: "animationDuration")
-        }
-        if !cache.containsKey(Self.windowOpenAnimationKey) {
-            defaults.set(true, forKey: Self.windowOpenAnimationKey)
-        }
-        if !cache.containsKey("showFPSOverlay") {
-            defaults.set(false, forKey: "showFPSOverlay")
-        }
-        if !cache.containsKey("pageIndicatorOffset") {
-            defaults.set(27.0, forKey: "pageIndicatorOffset")
-        }
-
-        if let storedDualModeAppearance = Self.loadDualModeAppearanceSettings(from: defaults) {
-            self.dualModeAppearanceSettings = storedDualModeAppearance
-        } else {
-            let legacy = Self.legacyAppearanceSettings(from: defaults)
-            let migrated = DualModeAppearanceSettings(fullscreen: legacy, compact: legacy)
-            self.dualModeAppearanceSettings = migrated
-            if let data = try? JSONEncoder().encode(migrated) {
-                defaults.set(data, forKey: Self.dualModeAppearanceSettingsKey)
-            }
-        }
-
-        let storedDuration = cache.double(forKey: "animationDuration")
-        self.animationDuration = storedDuration == 0 ? 0.3 : storedDuration
-        self.enableWindowOpenAnimation = cache.object(forKey: Self.windowOpenAnimationKey) ?? true
-        self.dockDragEnabled = cache.object(forKey: Self.dockDragEnabledKey) ?? true
-        let storedDockDragSide = DockDragSide(rawValue: cache.string(forKey: Self.dockDragSideKey) ?? "")
-        self.dockDragSide = storedDockDragSide == .disabled ? .bottom : (storedDockDragSide ?? .bottom)
-        self.dockDragTriggerDistance = clampedDockDragDistance
-        self.hotCornerEnabled = cache.object(forKey: Self.hotCornerEnabledKey) ?? false
-        self.hotCornerPosition = HotCornerPosition(rawValue: cache.string(forKey: Self.hotCornerPositionKey) ?? "") ?? .topLeft
-        self.hotCornerTriggerDelay = clampedHotCornerDelay
-        self.hotCornerHitboxSize = clampedHotCornerHitboxSize
-        self.hotCornerToggleWhenOpen = cache.object(forKey: Self.hotCornerToggleWhenOpenKey) ?? false
-        self.gestureEnabled = cache.object(forKey: Self.gestureEnabledKey) ?? false
-        self.gestureCloseOnPinchOut = cache.object(forKey: Self.gestureCloseOnPinchOutKey) ?? false
-        self.gestureTapAction = GestureTapAction(rawValue: cache.string(forKey: Self.gestureTapActionKey) ?? "") ?? .off
-        self.enableAnimations = cache.object(forKey: "enableAnimations") ?? true
+        // Custom app icon setup
         self.customIconFileURL = AppStore.customIconFileURL
 
         let fallbackIcon = (NSApplication.shared.applicationIconImage?.copy() as? NSImage) ?? NSImage(size: NSSize(width: 512, height: 512))
@@ -2462,12 +1021,12 @@ private struct DefaultsCache {
             self.currentAppIcon = fallbackIcon
         }
         applyCurrentAppIcon()
-        syncActiveAppearanceProxies(from: currentAppearanceLayoutMode)
-        persistLegacyAppearanceProxyValues()
+        settingsStore.syncActiveAppearanceProxies(from: settingsStore.currentAppearanceLayoutMode)
+        settingsStore.persistLegacyAppearanceProxyValues()
 
-        let sanitizedSources = sanitizedCustomPaths(from: customAppSourcePaths)
-        if sanitizedSources != customAppSourcePaths {
-            customAppSourcePaths = sanitizedSources
+        let sanitizedSources = sanitizedCustomPaths(from: settingsStore.customAppSourcePaths)
+        if sanitizedSources != settingsStore.customAppSourcePaths {
+            settingsStore.customAppSourcePaths = sanitizedSources
         }
 
         setupVolumeObservers()
@@ -2476,7 +1035,7 @@ private struct DefaultsCache {
 
         searchQuery = searchText
 
-        if developmentEnableCLICode {
+        if settingsStore.developmentEnableCLICode {
             installCLICommandIfNeeded()
         } else {
             uninstallCLICommandIfNeeded()
@@ -2484,19 +1043,35 @@ private struct DefaultsCache {
 
         updateChecker.scheduleAutomaticUpdateCheck()
 
-        self.rememberLastPage = shouldRememberPage
-        if shouldRememberPage, let savedPageIndex {
+        if settingsStore.rememberLastPage,
+           let savedPageIndex = UserDefaults.standard.object(forKey: Self.rememberedPageIndexKey) as? Int {
             self.currentPage = max(0, savedPageIndex)
         }
 
+
+        // Wire SettingsStore sideEffects
+        settingsStore.sideEffects = self
+
+        // Forward SettingsStore objectWillChange to AppStore
+        settingsStore.objectWillChange
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
         syncLoginItemStatusFromSystem()
     }
 
     func syncLoginItemStatusFromSystem() {
         guard #available(macOS 13.0, *) else { return }
-        loginItemUpdateInProgress = true
-        isStartOnLogin = SMAppService.mainApp.status == .enabled
-        loginItemUpdateInProgress = false
+        // Access SettingsStore's internal flag via the same pattern
+        // Note: SettingsStore has its own loginItemUpdateInProgress guard
+        // We directly update the published value to reflect system state
+        let systemEnabled = SMAppService.mainApp.status == .enabled
+        if settingsStore.isStartOnLogin != systemEnabled {
+            // Bypass the didSet registration logic by writing to UserDefaults directly
+            // and then updating the @Published var (the didSet will no-op if value matches)
+            UserDefaults.standard.set(systemEnabled, forKey: "isStartOnLogin")
+            settingsStore.isStartOnLogin = systemEnabled
+        }
     }
 
     private func installCLICommandIfNeeded() {
@@ -2703,11 +1278,6 @@ private struct DefaultsCache {
         return result
     }
 
-    private static func loadHotKeyConfiguration() -> HotKeyConfiguration? {
-        guard let dict = UserDefaults.standard.dictionary(forKey: globalHotKeyKey) else { return nil }
-        return HotKeyConfiguration(dictionary: dict)
-    }
-
     // private static func loadAIOverlayHotKeyConfiguration() -> HotKeyConfiguration? {
     //     guard let dict = UserDefaults.standard.dictionary(forKey: aiOverlayHotKeyKey) else { return nil }
     //     return HotKeyConfiguration(dictionary: dict)
@@ -2737,29 +1307,7 @@ private struct DefaultsCache {
     //     }
     // }
 
-    private func persistHotKeyConfiguration() {
-        let defaults = UserDefaults.standard
-        if let config = globalHotKey {
-            defaults.set(config.dictionaryRepresentation, forKey: Self.globalHotKeyKey)
-        } else {
-            defaults.removeObject(forKey: Self.globalHotKeyKey)
-        }
-    }
-
-
     // Icon scale (relative to cell): default 0.95, recommended range 0.8~1.1
-    @Published var iconScale: Double = 0.95 {
-        didSet {
-            UserDefaults.standard.set(iconScale, forKey: "iconScale")
-            guard !isApplyingScopedAppearanceState else { return }
-            updateScopedAppearanceSettings(for: currentAppearanceLayoutMode) { $0.iconScale = iconScale }
-            iconScaleWorkItem?.cancel()
-            let work = DispatchWorkItem { [weak self] in self?.triggerGridRefresh() }
-            iconScaleWorkItem = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: work)
-        }
-    }
-
     func configure(modelContext: ModelContext) {
         self.modelContext = modelContext
         evaluateOnboardingGate()
@@ -2800,7 +1348,7 @@ private struct DefaultsCache {
     }
 
     func forceShowOnboarding() {
-        guard isFullscreenMode else { return }
+        guard settingsStore.isFullscreenMode else { return }
 
         if isSetting {
             isSetting = false
@@ -3297,40 +1845,40 @@ private struct DefaultsCache {
     @discardableResult
     func addCustomAppSource(path: String) -> Bool {
         guard let normalized = normalizeApplicationPath(path) else { return false }
-        if customAppSourcePaths.contains(where: { normalizeApplicationPath($0) == normalized }) { return false }
-        customAppSourcePaths.append(normalized)
+        if settingsStore.customAppSourcePaths.contains(where: { normalizeApplicationPath($0) == normalized }) { return false }
+        settingsStore.customAppSourcePaths.append(normalized)
         return true
     }
 
     func removeCustomAppSource(at index: Int) {
-        guard customAppSourcePaths.indices.contains(index) else { return }
-        let removed = customAppSourcePaths[index]
+        guard settingsStore.customAppSourcePaths.indices.contains(index) else { return }
+        let removed = settingsStore.customAppSourcePaths[index]
         purgeMissingPlaceholders(forRemovedSources: [removed])
-        customAppSourcePaths.remove(at: index)
+        settingsStore.customAppSourcePaths.remove(at: index)
     }
 
     func removeCustomAppSources(at offsets: IndexSet) {
         let removed = offsets.compactMap { offset -> String? in
-            guard customAppSourcePaths.indices.contains(offset) else { return nil }
-            return customAppSourcePaths[offset]
+            guard settingsStore.customAppSourcePaths.indices.contains(offset) else { return nil }
+            return settingsStore.customAppSourcePaths[offset]
         }
         purgeMissingPlaceholders(forRemovedSources: removed)
-        customAppSourcePaths.remove(atOffsets: offsets)
+        settingsStore.customAppSourcePaths.remove(atOffsets: offsets)
     }
 
     func resetCustomAppSources() {
-        guard !customAppSourcePaths.isEmpty else { return }
-        let removed = customAppSourcePaths
+        guard !settingsStore.customAppSourcePaths.isEmpty else { return }
+        let removed = settingsStore.customAppSourcePaths
         purgeMissingPlaceholders(forRemovedSources: removed)
-        customAppSourcePaths.removeAll()
+        settingsStore.customAppSourcePaths.removeAll()
     }
 
     func removeCustomAppSource(path: String) {
         guard let normalized = normalizeApplicationPath(path) else { return }
-        if let index = customAppSourcePaths.firstIndex(where: { normalizeApplicationPath($0) == normalized }) {
-            let removed = customAppSourcePaths[index]
+        if let index = settingsStore.customAppSourcePaths.firstIndex(where: { normalizeApplicationPath($0) == normalized }) {
+            let removed = settingsStore.customAppSourcePaths[index]
             purgeMissingPlaceholders(forRemovedSources: [removed])
-            customAppSourcePaths.remove(at: index)
+            settingsStore.customAppSourcePaths.remove(at: index)
         }
     }
 
@@ -3354,7 +1902,7 @@ private struct DefaultsCache {
         let volumePath = url.standardizedFileURL.path
         guard !volumePath.isEmpty else { return }
 
-        let relevant = customAppSourcePaths.contains { source in
+        let relevant = settingsStore.customAppSourcePaths.contains { source in
             guard let normalized = normalizeApplicationPath(source) else { return false }
             return normalized.hasPrefix(volumePath)
         }
@@ -3544,321 +2092,42 @@ private struct DefaultsCache {
     }
 
     func createFolder(with apps: [AppInfo], name: String = "Untitled", insertAt insertIndex: Int?) -> FolderInfo {
-        let folder = FolderInfo(name: name, apps: apps)
-        folders.append(folder)
-
-        // Remove apps already added to folder from app list (top-layer apps)
-        for app in apps {
-            if let index = self.apps.firstIndex(of: app) {
-                self.apps.remove(at: index)
-            }
-        }
-
-        // In current items: replace these top-layer apps with nil/empty slots, place folder at target position, maintain total length
-        var newItems = self.items
-        // Find these app positions
-        var placeholders: [(Int, AppInfo)] = []
-        var remainingApps = apps
-        for (idx, item) in newItems.enumerated() {
-            guard !remainingApps.isEmpty else { break }
-            if case let .app(a) = item, let matchIndex = remainingApps.firstIndex(of: a) {
-                let match = remainingApps.remove(at: matchIndex)
-                placeholders.append((idx, match))
-            }
-        }
-        // Set involved app slots to nil/empty first
-        for (idx, _) in placeholders {
-            newItems[idx] = .empty(UUID().uuidString)
-        }
-        // Choose folder position: prefer insertIndex, otherwise use smallest index; clamp range and use replace not insert
-        let baseIndex = placeholders.map { $0.0 }.min() ?? min(newItems.count - 1, max(0, insertIndex ?? (newItems.count - 1)))
-        let desiredIndex = insertIndex ?? baseIndex
-        let safeIndex = min(max(0, desiredIndex), max(0, newItems.count - 1))
-        if newItems.isEmpty {
-            newItems = [.folder(folder)]
-        } else {
-            newItems[safeIndex] = .folder(folder)
-        }
-        self.items = filteredItemsRemovingHidden(from: newItems)
-        // Auto-fill within single page: move nil/empty slots to page end
-        compactItemsWithinPages()
-        removeEmptyPages()
-
-        // triggerfolderupdate，notificationallrelatedviewrefreshicon
-        DispatchQueue.main.async { [weak self] in
-            self?.triggerFolderUpdate()
-        }
-        
-        // Trigger grid view refresh, ensure UI updates immediately
-        triggerGridRefresh()
-        
-        // Refresh cache, ensure search can find newly created folder's apps
-        refreshCacheAfterFolderOperation()
-
-        persistence.saveAllOrder()
-        return folder
+        return folderManager.createFolder(with: apps, name: name, insertAt: insertIndex)
     }
+
     
     func addAppToFolder(_ app: AppInfo, folder: FolderInfo) {
-        guard let folderIndex = folders.firstIndex(of: folder) else { return }
-        
-        
-        // Create new FolderInfo instance, ensure SwiftUI can detect changes
-        var updatedFolder = folders[folderIndex]
-        updatedFolder.apps.append(app)
-        folders[folderIndex] = updatedFolder
-        
-        
-        // fromapplistinremove
-        if let appIndex = apps.firstIndex(of: app) {
-            apps.remove(at: appIndex)
-        }
-        
-        // Set top-layer app slot positions as empty (maintain page independence)
-        if let pos = items.firstIndex(of: .app(app)) {
-            items[pos] = .empty(UUID().uuidString)
-            // Auto-fill within single page
-            compactItemsWithinPages()
-            removeEmptyPages()
-        } else {
-            // If not found, fall back to rebuild
-            persistence.rebuildItems()
-        }
-        
-        // Ensure items for corresponding folder also update to latest contents, for search visibility
-        for idx in items.indices {
-            if case .folder(let f) = items[idx], f.id == updatedFolder.id {
-                items[idx] = .folder(updatedFolder)
-            }
-        }
-        
-        // Immediately trigger folder update, notify all related views to refresh icon and name
-        triggerFolderUpdate()
-        
-        // Trigger grid view refresh, ensure UI updates immediately
-        triggerGridRefresh()
-        
-        // refreshcache，ensuresearchwhencan findnewaddapp
-        refreshCacheAfterFolderOperation()
-        
-        persistence.saveAllOrder()
+        folderManager.addAppToFolder(app, folder: folder)
     }
+
     
     func removeAppFromFolder(_ app: AppInfo, folder: FolderInfo) {
-        guard let folderIndex = folders.firstIndex(of: folder) else { return }
-        
-        
-        // Create new FolderInfo instance, ensure SwiftUI can detect changes
-        var updatedFolder = folders[folderIndex]
-        updatedFolder.apps.removeAll { $0 == app }
-        
-        
-        // iffoldernil/empty，Delete folder
-        if updatedFolder.apps.isEmpty {
-            folders.remove(at: folderIndex)
-        } else {
-            // Update folder
-            folders[folderIndex] = updatedFolder
-        }
-        
-        // Sync update items thefolder item，avoidUIcontinuereferenceoldfolderContents
-        var emptiedSlots: [Int] = []
-        for idx in items.indices {
-            if case .folder(let f) = items[idx], f.id == folder.id {
-                if updatedFolder.apps.isEmpty {
-                    // folder already nil/empty, then deleted, thenthe position flagged as nil/empty slot，etc.pending subsequentfill
-                    items[idx] = .empty(UUID().uuidString)
-                    emptiedSlots.append(idx)
-                } else {
-                    items[idx] = .folder(updatedFolder)
-                }
-            }
-        }
-        
-        // App re-added to app list (if already exists then update, avoid duplicates)
-        if let existingIndex = apps.firstIndex(where: { $0.url == app.url }) {
-            apps[existingIndex] = app
-        } else {
-            apps.append(app)
-        }
-        apps.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-
-        // Prefer using recorded nil/empty slot, search for other nil/empty slots, then append new slot as last resort
-        var targetSlot: Int? = nil
-        if let firstEmptied = emptiedSlots.first, firstEmptied < items.count {
-            targetSlot = firstEmptied
-        } else {
-            targetSlot = items.firstIndex {
-                if case .empty = $0 { return true }
-                return false
-            }
-        }
-        if let slot = targetSlot {
-            items[slot] = .app(app)
-        } else {
-            items.append(.app(app))
-        }
-
-        // Immediately trigger folder update, notify all related views to refresh icon and name
-        triggerFolderUpdate()
-
-        // Only compact nil/empty slots within the page
-        compactItemsWithinPages()
-        removeEmptyPages()
-
-        // Trigger grid view refresh, ensure UI updates immediately
-        triggerGridRefresh()
-
-        // refreshcache，ensuresearchwhencan findfromfolderremoveapp（inrebuildafterrefresh)
-        refreshCacheAfterFolderOperation()
-
-        persistence.saveAllOrder()
+        folderManager.removeAppFromFolder(app, folder: folder)
     }
+
     
     func renameFolder(_ folder: FolderInfo, newName: String) {
-        guard let index = folders.firstIndex(of: folder) else { return }
-        
-        
-        // Create new FolderInfo instance, ensure SwiftUI can detect changes
-        var updatedFolder = folders[index]
-        updatedFolder.name = newName
-        folders[index] = updatedFolder
-        
-        // Sync update the folder item, avoid main grid continuing to show old name
-        for idx in items.indices {
-            if case .folder(let f) = items[idx], f.id == updatedFolder.id {
-                items[idx] = .folder(updatedFolder)
-            }
-        }
-        
-        
-        // Immediately triggerfolderupdate，notificationallrelatedviewrefresh
-        triggerFolderUpdate()
-        
-        // Trigger grid view refresh, ensure UI updates immediately
-        triggerGridRefresh()
-        
-        // Refresh cache, ensure search functionality works
-        refreshCacheAfterFolderOperation()
-        
-        persistence.rebuildItems()
-        persistence.saveAllOrder()
+        folderManager.renameFolder(folder, newName: newName)
     }
+
 
     @discardableResult
     func dissolveFolder(_ folder: FolderInfo) -> Bool {
-        let folderID = folder.id
-
-        let resolvedFolder: FolderInfo
-        if let index = folders.firstIndex(where: { $0.id == folderID }) {
-            resolvedFolder = folders[index]
-            folders.remove(at: index)
-        } else if let itemIndex = items.firstIndex(where: {
-            if case .folder(let f) = $0 { return f.id == folderID }
-            return false
-        }), case .folder(let fallbackFolder) = items[itemIndex] {
-            resolvedFolder = fallbackFolder
-        } else {
-            return false
-        }
-
-        let folderApps = resolvedFolder.apps
-        let folderAppPaths = Set(folderApps.map { standardizedFilePath($0.url.path) })
-        var newItems = items
-
-        // Remove stale duplicates first; the folder slot will be reused for the first restored app.
-        if !folderAppPaths.isEmpty {
-            for idx in newItems.indices {
-                if case .app(let app) = newItems[idx],
-                   folderAppPaths.contains(standardizedFilePath(app.url.path)) {
-                    newItems[idx] = .empty(UUID().uuidString)
-                }
-            }
-        }
-
-        if let folderItemIndex = newItems.firstIndex(where: {
-            if case .folder(let f) = $0 { return f.id == folderID }
-            return false
-        }) {
-            newItems[folderItemIndex] = .empty(UUID().uuidString)
-            var insertIndex = folderItemIndex
-            for app in folderApps {
-                newItems = cascadeInsert(into: newItems, item: .app(app), at: insertIndex)
-                insertIndex += 1
-            }
-        } else if !folderApps.isEmpty {
-            newItems.append(contentsOf: folderApps.map { .app($0) })
-        }
-
-        var existingTopLevelPaths = Set(apps.map { standardizedFilePath($0.url.path) })
-        for app in folderApps {
-            let normalized = standardizedFilePath(app.url.path)
-            if !existingTopLevelPaths.contains(normalized) {
-                apps.append(app)
-                existingTopLevelPaths.insert(normalized)
-            }
-        }
-        apps.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        pruneHiddenAppsFromAppList()
-
-        items = filteredItemsRemovingHidden(from: newItems)
-        if openFolder?.id == folderID {
-            openFolder = nil
-        }
-
-        compactItemsWithinPages()
-        removeEmptyPages()
-        triggerFolderUpdate()
-        triggerGridRefresh()
-        refreshCacheAfterFolderOperation()
-        persistence.saveAllOrder()
-        return true
+        return folderManager.dissolveFolder(folder)
     }
+
     
     // onekeyresetlayout：full renewscanapp，deleteallfolder、order/sortandemptypadding
     func resetLayout() {
-        // closeOpen folder
-        openFolder = nil
-        
-        // clearallfolderandorder/sortdata
-        folders.removeAll()
-        
-        // clearallPersistenceorder/sortdata
-        persistence.clearAllPersistedData()
-        
-        // Clear cache
-        cacheManager.clearAllCaches()
-        
-        // resetscanflag，force renewscan
-        hasPerformedInitialScan = false
-        
-        // clearcurrentitems list
-        items.removeAll()
-        missingPlaceholders.removeAll()
-
-        // renewscanapp，notloadPersistencedata
-        scanApplications(loadPersistedOrder: false)
-        
-        // resettoFirst page
-        currentPage = 0
-        
-        // triggerfolderupdate，notificationallrelatedviewrefresh
-        triggerFolderUpdate()
-        
-        // Trigger grid view refresh, ensure UI updates immediately
-        triggerGridRefresh()
-        
-        // scanCompleteafterrefreshcache
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.refreshCacheAfterFolderOperation()
-        }
+        folderManager.resetLayout()
     }
+
     
     /// Auto-fill within single page：eachpage .empty slotmovetothepage end，maintainnon-nil/non-emptyitemmutualfororder
     func compactItemsWithinPages() {
-        guard !items.isEmpty else { return }
-        items = filteredItemsRemovingHidden(from: compactedItemsWithinPages(items))
+        folderManager.compactItemsWithinPages()
     }
+
 
     private func compactedItemsWithinPages(_ source: [LaunchpadItem]) -> [LaunchpadItem] {
         guard !source.isEmpty else { return source }
@@ -3898,89 +2167,14 @@ private struct DefaultsCache {
 
     // MARK: - Cross-page drag：cascadeinsert（full pagethenthen once pushed intoNext page)
     func moveSelectedAppsAcrossPagesWithCascade(appPathsOrdered: [String], to targetIndex: Int) {
-        guard !appPathsOrdered.isEmpty else { return }
-
-        var seenPaths = Set<String>()
-        let normalizedOrderedPaths: [String] = appPathsOrdered.compactMap { raw in
-            let normalized = standardizedFilePath(raw)
-            guard seenPaths.insert(normalized).inserted else { return nil }
-            return normalized
-        }
-        guard !normalizedOrderedPaths.isEmpty else { return }
-        let movingPathSet = Set(normalizedOrderedPaths)
-
-        var movingItemsByPath: [String: LaunchpadItem] = [:]
-        for item in items {
-            guard case .app(let app) = item else { continue }
-            let path = standardizedFilePath(app.url.path)
-            if movingPathSet.contains(path), movingItemsByPath[path] == nil {
-                movingItemsByPath[path] = .app(app)
-            }
-        }
-
-        let orderedMovingItems = normalizedOrderedPaths.compactMap { movingItemsByPath[$0] }
-        guard !orderedMovingItems.isEmpty else { return }
-
-        var result = items
-        let sourceIndexes = result.indices.filter { index in
-            guard case .app(let app) = result[index] else { return false }
-            return movingPathSet.contains(standardizedFilePath(app.url.path))
-        }
-        guard !sourceIndexes.isEmpty else { return }
-
-        for index in sourceIndexes {
-            result[index] = .empty(UUID().uuidString)
-        }
-
-        result = compactedItemsWithinPages(result)
-        var insertionIndex = max(0, min(targetIndex, result.count))
-
-        for movingItem in orderedMovingItems {
-            result = cascadeInsert(into: result, item: movingItem, at: insertionIndex)
-            insertionIndex += 1
-        }
-
-        items = filteredItemsRemovingHidden(from: result)
-        compactItemsWithinPages()
-        removeEmptyPages()
-        triggerGridRefresh()
-        persistence.saveAllOrder()
+        folderManager.moveSelectedAppsAcrossPagesWithCascade(appPathsOrdered: appPathsOrdered, to: targetIndex)
     }
+
 
     func moveItemAcrossPagesWithCascade(item: LaunchpadItem, to targetIndex: Int) {
-        guard items.indices.contains(targetIndex) || targetIndex == items.count else {
-            return
-        }
-        guard let source = items.firstIndex(of: item) else { return }
-        var result = items
-        // sourcepositionsetnil/empty，maintainlength
-        result[source] = .empty(UUID().uuidString)
-        // executecascadeinsert
-        result = cascadeInsert(into: result, item: item, at: targetIndex)
-        items = filteredItemsRemovingHidden(from: result)
-        
-        // eachtime(s)dragendafterallenterrowcompact，ensureeachpageemptyitemitem movetopageend
-        let targetPage = targetIndex / itemsPerPage
-        let currentPages = (items.count + itemsPerPage - 1) / itemsPerPage
-        
-        if targetPage == currentPages - 1 {
-            // dragtonewpage，delaycompact toensureapppositionstable
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.compactItemsWithinPages()
-                self.removeEmptyPages()
-                self.triggerGridRefresh()
-            }
-        } else {
-            // dragtoexistingpage，Immediately compact
-            compactItemsWithinPages()
-            removeEmptyPages()
-        }
-        
-        // Trigger grid view refresh, ensure UI updates immediately
-        triggerGridRefresh()
-        
-        persistence.saveAllOrder()
+        folderManager.moveItemAcrossPagesWithCascade(item: item, to: targetIndex)
     }
+
 
     private func cascadeInsert(into array: [LaunchpadItem], item: LaunchpadItem, at targetIndex: Int) -> [LaunchpadItem] {
         var result = array
@@ -4042,7 +2236,7 @@ private struct DefaultsCache {
     }
 
     func scheduleSystemAppearanceRefresh() {
-        guard appearancePreference == .system else { return }
+        guard settingsStore.appearancePreference == .system else { return }
         let now = CFAbsoluteTimeGetCurrent()
         if now - lastAppearanceEventAt < 0.2 { return }
         lastAppearanceEventAt = now
@@ -4060,58 +2254,52 @@ private struct DefaultsCache {
     }
 
     func effectivePageIndicatorOffset(for screenID: String?) -> Double {
-        guard pageIndicatorPerDisplayEnabled, let screenID,
-              let override = pageIndicatorOverrides[screenID] else {
-            return pageIndicatorOffset
+        guard settingsStore.pageIndicatorPerDisplayEnabled, let screenID,
+              let override = settingsStore.pageIndicatorOverrides[screenID] else {
+            return settingsStore.pageIndicatorOffset
         }
         return override.offset
     }
 
     func effectivePageIndicatorTopPadding(for screenID: String?) -> Double {
-        guard pageIndicatorPerDisplayEnabled, let screenID,
-              let override = pageIndicatorOverrides[screenID] else {
-            return pageIndicatorTopPadding
+        guard settingsStore.pageIndicatorPerDisplayEnabled, let screenID,
+              let override = settingsStore.pageIndicatorOverrides[screenID] else {
+            return settingsStore.pageIndicatorTopPadding
         }
         return override.topPadding
     }
 
     func backgroundMaskColor(for colorScheme: ColorScheme) -> Color? {
-        guard backgroundMaskEnabled else { return nil }
-        let rgba = (colorScheme == .dark) ? backgroundMaskDarkColor : backgroundMaskLightColor
+        guard settingsStore.backgroundMaskEnabled else { return nil }
+        let rgba = (colorScheme == .dark) ? settingsStore.backgroundMaskDarkColor : settingsStore.backgroundMaskLightColor
         return rgba.color
     }
 
     func pageIndicatorOverride(for screenID: String) -> PageIndicatorOverride? {
-        pageIndicatorOverrides[screenID]
+        settingsStore.pageIndicatorOverrides[screenID]
     }
 
     func setPageIndicatorOverride(_ override: PageIndicatorOverride?, for screenID: String) {
-        var updated = pageIndicatorOverrides
+        var updated = settingsStore.pageIndicatorOverrides
         if let override {
             updated[screenID] = override
         } else {
             updated.removeValue(forKey: screenID)
         }
-        pageIndicatorOverrides = updated
+        settingsStore.pageIndicatorOverrides = updated
         persistPageIndicatorOverrides(updated)
     }
 
     func applyIndicatorDefaults(to screenID: String) {
-        let override = PageIndicatorOverride(offset: pageIndicatorOffset,
-                                             topPadding: pageIndicatorTopPadding)
+        let override = PageIndicatorOverride(offset: settingsStore.pageIndicatorOffset,
+                                             topPadding: settingsStore.pageIndicatorTopPadding)
         setPageIndicatorOverride(override, for: screenID)
     }
 
     func notifyFolderContentChanged(_ folder: FolderInfo) {
-        for idx in items.indices {
-            if case .folder(let f) = items[idx], f.id == folder.id {
-                items[idx] = .folder(folder)
-            }
-        }
-        triggerFolderUpdate()
-        triggerGridRefresh()
-        persistence.saveAllOrder()
+        folderManager.notifyFolderContentChanged(folder)
     }
+
 
     private func clearIconCachesForLayoutChange() {
         FolderPreviewCache.shared.clear()
@@ -4163,131 +2351,30 @@ private struct DefaultsCache {
         }
     }
 
-    // MARK: - dragwhenautoCreatenewpage
-    private var pendingNewPage: (pageIndex: Int, itemCount: Int)? = nil
-    
+    // MARK: - drag when auto Create new page
+
     func createNewPageForDrag() -> Bool {
-        let itemsPerPage = self.itemsPerPage
-        let currentPages = (items.count + itemsPerPage - 1) / itemsPerPage
-        let newPageIndex = currentPages
-        
-        // asnewpageaddemptyplaceholder
-        for _ in 0..<itemsPerPage {
-            items.append(.empty(UUID().uuidString))
-        }
-        
-        // recordpendingProcessnewpageinfo
-        pendingNewPage = (pageIndex: newPageIndex, itemCount: itemsPerPage)
-        
-        // triggergridviewrefresh
-        triggerGridRefresh()
-        
-        return true
+        return folderManager.createNewPageForDrag()
     }
+
     
     func cleanupUnusedNewPage() {
-        guard let pending = pendingNewPage else { return }
-        
-        // checknewpagewhetheruse（whetherhasnotemptyitemitem )
-        let pageStart = pending.pageIndex * pending.itemCount
-        let pageEnd = min(pageStart + pending.itemCount, items.count)
-        
-        if pageStart < items.count {
-            let pageSlice = Array(items[pageStart..<pageEnd])
-            let hasNonEmptyItems = pageSlice.contains { item in
-                if case .empty = item { return false } else { return true }
-            }
-            
-            if !hasNonEmptyItems {
-                // newpage has nouse，deleteit
-                items.removeSubrange(pageStart..<pageEnd)
-                
-                // triggergridviewrefresh
-                triggerGridRefresh()
-            }
-        }
-        
-        // clear pendingProcessinfo
-        pendingNewPage = nil
+        folderManager.cleanupUnusedNewPage()
     }
+
 
     // MARK: - autodeletenil/emptyemptypage
     /// autodeletenil/emptyemptypage：deleteallallisemptypaddingpage
     func removeEmptyPages() {
-        guard !items.isEmpty else { return }
-        let itemsPerPage = self.itemsPerPage
-        
-        var newItems: [LaunchpadItem] = []
-        var index = 0
-        
-        while index < items.count {
-            let end = min(index + itemsPerPage, items.count)
-            let pageSlice = Array(items[index..<end])
-            
-            // checkcurrentpagewhetherallallisempty
-            let isEmptyPage = pageSlice.allSatisfy { item in
-                if case .empty = item { return true } else { return false }
-            }
-            
-            // ifnotisnil/emptyemptypage，preservethepageContents
-            if !isEmptyPage {
-                newItems.append(contentsOf: pageSlice)
-            }
-            // ifisnil/emptyemptypage，Skipnotadd
-            
-            index = end
-        }
-        
-        // onlyhasinactualdeletenil/emptyemptypagewhenonly thenupdateitems
-        if newItems.count != items.count {
-            items = filteredItemsRemovingHidden(from: newItems)
-            
-            // deletenil/emptyemptypageafter，ensurecurrentpageindexinvalidrangeinside
-            let maxPageIndex = max(0, (items.count - 1) / itemsPerPage)
-            if currentPage > maxPageIndex {
-                currentPage = maxPageIndex
-            }
-            
-            // triggergridviewrefresh
-            triggerGridRefresh()
-        }
+        folderManager.removeEmptyPages()
     }
 
-    private func handleGridConfigurationChange() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.compactItemsWithinPages()
-            self.removeEmptyPages()
-            self.cleanupUnusedNewPage()
-            let maxPageIndex = max(0, (self.items.count - 1) / max(self.itemsPerPage, 1))
-            if self.currentPage > maxPageIndex {
-                self.currentPage = maxPageIndex
-            }
-            self.triggerGridRefresh()
-            self.cacheManager.refreshCache(from: self.apps,
-                                           items: self.items,
-                                           itemsPerPage: self.itemsPerPage,
-                                           columns: self.gridColumnsPerPage,
-                                           rows: self.gridRowsPerPage)
-            if self.rememberLastPage {
-                UserDefaults.standard.set(self.currentPage, forKey: Self.rememberedPageIndexKey)
-            }
-            self.persistence.saveAllOrder()
-        }
-    }
-    
-    // MARK: - exportapporder/sortfeature
+    // MARK: - export app order/sort feature
     /// exportapporder/sortasJSONformat
     func exportAppOrderAsJSON() -> String? {
-        let exportData = buildExportData()
-        
-        do {
-            let jsonData = try JSONSerialization.data(withJSONObject: exportData, options: [.prettyPrinted, .sortedKeys])
-            return String(data: jsonData, encoding: .utf8)
-        } catch {
-            return nil
-        }
+        return folderManager.exportAppOrderAsJSON()
     }
+
     
     /// buildexportdata
     private func buildExportData() -> [String: Any] {
@@ -4320,7 +2407,7 @@ private struct DefaultsCache {
             "exportDate": ISO8601DateFormatter().string(from: Date()),
             "totalPages": (items.count + itemsPerPage - 1) / itemsPerPage,
             "totalItems": items.count,
-            "fullscreenMode": isFullscreenMode,
+            "fullscreenMode": settingsStore.isFullscreenMode,
             "pages": pages
         ]
     }
@@ -4355,29 +2442,9 @@ private struct DefaultsCache {
     
     /// usesystemfilesavefordialogsaveexportfile
     func saveExportFileWithDialog(content: String, filename: String, fileExtension: String, fileType: String) -> Bool {
-        let savePanel = NSSavePanel()
-        savePanel.title = "saveexportfile"
-        savePanel.nameFieldStringValue = filename
-        savePanel.allowedContentTypes = [UTType(filenameExtension: fileExtension) ?? .plainText]
-        savePanel.canCreateDirectories = true
-        savePanel.isExtensionHidden = false
-        
-        // setdefaultsavepositionasdesktopside
-        if let desktopURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first {
-            savePanel.directoryURL = desktopURL
-        }
-        
-        let response = savePanel.runModal()
-        if response == .OK, let url = savePanel.url {
-            do {
-                try content.write(to: url, atomically: true, encoding: .utf8)
-                return true
-            } catch {
-                return false
-            }
-        }
-        return false
+        return folderManager.saveExportFileWithDialog(content: content, filename: filename, fileExtension: fileExtension, fileType: fileType)
     }
+
     
     // MARK: - cachemanagement
     
@@ -4390,8 +2457,8 @@ private struct DefaultsCache {
             cacheManager.generateCache(from: apps,
                                       items: items,
                                       itemsPerPage: itemsPerPage,
-                                      columns: gridColumnsPerPage,
-                                      rows: gridRowsPerPage)
+                                      columns: settingsStore.gridColumnsPerPage,
+                                      rows: settingsStore.gridRowsPerPage)
         } else {
             // cachevalid，butcanPreloadicon
             let appPaths = apps.map { $0.url.path }
@@ -4452,8 +2519,8 @@ private struct DefaultsCache {
             cacheManager.generateCache(from: apps,
                                       items: items,
                                       itemsPerPage: itemsPerPage,
-                                      columns: gridColumnsPerPage,
-                                      rows: gridRowsPerPage)
+                                      columns: settingsStore.gridColumnsPerPage,
+                                      rows: settingsStore.gridRowsPerPage)
         } else {
             // cachevalid，onlyupdatechangepartial
             let changedAppPaths = apps.map { $0.url.path }
@@ -4462,7 +2529,7 @@ private struct DefaultsCache {
     }
 
     private var resolvedLanguage: AppLanguage {
-        preferredLanguage == .system ? AppLanguage.resolveSystemDefault() : preferredLanguage
+        settingsStore.preferredLanguage == .system ? AppLanguage.resolveSystemDefault() : settingsStore.preferredLanguage
     }
 
     func localized(_ key: LocalizationKey) -> String {
@@ -4736,7 +2803,7 @@ private struct DefaultsCache {
     }
 
     var uninstallToolAppURL: URL? {
-        let trimmed = uninstallToolAppPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = settingsStore.uninstallToolAppPath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         let resolved = URL(fileURLWithPath: trimmed).resolvingSymlinksInPath()
         var isDir: ObjCBool = false
@@ -4788,14 +2855,14 @@ private struct DefaultsCache {
     }
 
     var uninstallToolConfiguredButMissing: Bool {
-        let trimmed = uninstallToolAppPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = settingsStore.uninstallToolAppPath.trimmingCharacters(in: .whitespacesAndNewlines)
         return !trimmed.isEmpty && uninstallToolAppURL == nil
     }
 
     @discardableResult
     func setUninstallToolApplication(url: URL?) -> Bool {
         guard let url else {
-            uninstallToolAppPath = ""
+            settingsStore.uninstallToolAppPath = ""
             return true
         }
 
@@ -4803,7 +2870,7 @@ private struct DefaultsCache {
         var isDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: resolved.path, isDirectory: &isDir), isDir.boolValue else { return false }
         guard resolved.pathExtension.caseInsensitiveCompare("app") == .orderedSame else { return false }
-        uninstallToolAppPath = resolved.path
+        settingsStore.uninstallToolAppPath = resolved.path
         return true
     }
 
@@ -4898,8 +2965,8 @@ private struct DefaultsCache {
             self.cacheManager.refreshCache(from: self.apps,
                                            items: self.items,
                                            itemsPerPage: self.itemsPerPage,
-                                           columns: self.gridColumnsPerPage,
-                                           rows: self.gridRowsPerPage)
+                                           columns: settingsStore.gridColumnsPerPage,
+                                           rows: settingsStore.gridRowsPerPage)
         }
         customTitleRefreshWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
@@ -5005,33 +3072,21 @@ private struct DefaultsCache {
 
     /// folderoperationafterRefresh cache, ensure search functionality works
     func refreshCacheAfterFolderOperation() {
-        // directlyrefreshcache，ensureincludeallapp（includingfolderinsideapp)
-        cacheManager.refreshCache(from: apps,
-                                  items: items,
-                                  itemsPerPage: itemsPerPage,
-                                  columns: gridColumnsPerPage,
-                                  rows: gridRowsPerPage)
-        
-        // Clear searchinfothis，ensuresearchstatereset
-        // this waycanavoidsearchwhenshowoverwhenresults
-        if !searchText.isEmpty {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                self?.searchText = ""
-            }
-        }
+        folderManager.refreshCacheAfterFolderOperation()
     }
+
 
     func setGlobalHotKey(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags) {
         let normalized = modifierFlags.normalizedShortcutFlags
         let configuration = HotKeyConfiguration(keyCode: keyCode, modifierFlags: normalized)
-        if globalHotKey != configuration {
-            globalHotKey = configuration
+        if settingsStore.globalHotKey != configuration {
+            settingsStore.globalHotKey = configuration
         }
     }
 
     func clearGlobalHotKey() {
-        if globalHotKey != nil {
-            globalHotKey = nil
+        if settingsStore.globalHotKey != nil {
+            settingsStore.globalHotKey = nil
         }
     }
 
@@ -5050,12 +3105,12 @@ private struct DefaultsCache {
     // }
 
     func persistCurrentPageIfNeeded() {
-        guard rememberLastPage else { return }
+        guard settingsStore.rememberLastPage else { return }
         UserDefaults.standard.set(currentPage, forKey: Self.rememberedPageIndexKey)
     }
 
     func hotKeyDisplayText(nonePlaceholder: String) -> String {
-        guard let config = globalHotKey else { return nonePlaceholder }
+        guard let config = settingsStore.globalHotKey else { return nonePlaceholder }
         let base = config.displayString
         if config.modifierFlags.isEmpty {
             return base + " • " + localized(.shortcutNoModifierWarning)
@@ -5064,7 +3119,7 @@ private struct DefaultsCache {
     }
 
     func syncGlobalHotKeyRegistration() {
-        AppDelegate.shared?.updateGlobalHotKey(configuration: globalHotKey)
+        AppDelegate.shared?.updateGlobalHotKey(configuration: settingsStore.globalHotKey)
     }
 
     // func aiOverlayHotKeyDisplayText(nonePlaceholder: String) -> String {
@@ -5083,76 +3138,15 @@ private struct DefaultsCache {
     // MARK: - importapporder/sortfeature
     /// fromJSONdataimportapporder/sort
     func importAppOrderFromJSON(_ jsonData: Data) -> Bool {
-        do {
-            let importData = try JSONSerialization.jsonObject(with: jsonData, options: [])
-            return processImportedData(importData)
-        } catch {
-            return false
-        }
+        return importer.importAppOrderFromJSON(jsonData)
     }
+
 
     @discardableResult
     func applyMacOS26PresetLayout() -> Bool {
-        let candidates = presetCandidateAppsInCurrentOrder()
-        guard !candidates.isEmpty else { return false }
-
-        let candidateByPath = Dictionary(uniqueKeysWithValues: candidates.map { ($0.path, $0) })
-        var unusedPaths = Set(candidates.map(\.path))
-        var rebuiltItems: [LaunchpadItem] = []
-        rebuiltItems.reserveCapacity(candidates.count + 1)
-        var rebuiltFolders: [FolderInfo] = []
-
-        for slot in LayoutPresetCatalog.macOS26Default.slots {
-            switch slot {
-            case let .app(bundleIdentifiers, aliases):
-                guard let matchedPath = matchPresetSlot(bundleIdentifiers: bundleIdentifiers,
-                                                        aliases: aliases,
-                                                        candidates: candidates,
-                                                        unusedPaths: unusedPaths),
-                      let matched = candidateByPath[matchedPath] else {
-                    continue
-                }
-                unusedPaths.remove(matchedPath)
-                rebuiltItems.append(.app(matched.app))
-            case .utilitiesFolder:
-                let folderApps = candidates
-                    .filter { unusedPaths.contains($0.path) && shouldIncludeInPresetOtherFolder($0) }
-                    .map(\.app)
-
-                guard !folderApps.isEmpty else { continue }
-                for app in folderApps {
-                    unusedPaths.remove(standardizedFilePath(app.url.path))
-                }
-
-                let folder = FolderInfo(name: localized(.layoutPresetOtherFolderTitle), apps: folderApps)
-                rebuiltFolders.append(folder)
-                rebuiltItems.append(.folder(folder))
-            }
-        }
-
-        let remainingApps = candidates
-            .filter { unusedPaths.contains($0.path) }
-            .map(\.app)
-        rebuiltItems.append(contentsOf: remainingApps.map { .app($0) })
-
-        guard !rebuiltItems.isEmpty else { return false }
-
-        apps = candidates.map(\.app)
-        pruneHiddenAppsFromAppList()
-        folders = sanitizedFolders(rebuiltFolders)
-        items = filteredItemsRemovingHidden(from: rebuiltItems)
-        openFolder = nil
-        compactItemsWithinPages()
-        removeEmptyPages()
-        currentPage = 0
-        if !searchText.isEmpty { searchText = "" }
-        refreshMissingPlaceholders()
-        triggerFolderUpdate()
-        triggerGridRefresh()
-        updateCacheAfterChanges()
-        persistence.saveAllOrder()
-        return true
+        return importer.applyMacOS26PresetLayout()
     }
+
 
     private struct PresetAppCandidate {
         let app: AppInfo
@@ -5283,50 +3277,15 @@ private struct DefaultsCache {
 
     /// fromnative macOS Launchpad importlayout
     func importFromNativeLaunchpad() async -> (success: Bool, message: String) {
-        guard let modelContext = self.modelContext else {
-            return (false, "datastorenot yetinitialize")
-        }
-
-        do {
-            let importer = NativeLaunchpadImporter(modelContext: modelContext)
-            let result = try importer.importFromNativeLaunchpad()
-
-            // Import successfulafterrefreshappdata
-            DispatchQueue.main.async { [weak self] in
-                self?.performInitialScanIfNeeded()
-                // newversionuse SwiftData unifiedloadentry point
-                self?.persistence.loadAllOrder()
-                self?.triggerGridRefresh()
-            }
-
-            return (true, result.summary)
-        } catch {
-            return (false, "Import failed: \(error.localizedDescription)")
-        }
+        return await importer.importFromNativeLaunchpad()
     }
+
 
     /// fromLegacy archive (.lmy/.zip ordirectly db)import
     func importFromLegacyLaunchpadArchive(url: URL) async -> (success: Bool, message: String) {
-        guard let modelContext = self.modelContext else {
-            return (false, "datastorenot yetinitialize")
-        }
-
-        do {
-            let importer = NativeLaunchpadImporter(modelContext: modelContext)
-            let result = try importer.importFromLegacyArchive(at: url)
-
-            // Import successfulafterrefreshappdata
-            DispatchQueue.main.async { [weak self] in
-                self?.performInitialScanIfNeeded()
-                self?.persistence.loadAllOrder()
-                self?.triggerGridRefresh()
-            }
-
-            return (true, result.summary)
-        } catch {
-            return (false, "Import failed: \(error.localizedDescription)")
-        }
+        return await importer.importFromLegacyLaunchpadArchive(url: url)
     }
+
 
     /// Process import dataand rebuild app layout
     private func processImportedData(_ importData: Any) -> Bool {
@@ -5514,28 +3473,9 @@ private struct DefaultsCache {
     
     /// verificationimportdatacompleteity
     func validateImportData(_ jsonData: Data) -> (isValid: Bool, message: String) {
-        do {
-            let importData = try JSONSerialization.jsonObject(with: jsonData, options: [])
-            guard let data = importData as? [String: Any] else {
-                return (false, "dataformatinvalid")
-            }
-            
-            guard let pagesData = data["pages"] as? [[String: Any]] else {
-                return (false, "missingpagedata")
-            }
-            
-            let totalPages = data["totalPages"] as? Int ?? 0
-            let totalItems = data["totalItems"] as? Int ?? 0
-            
-            if pagesData.isEmpty {
-                return (false, "nofoundappdata")
-            }
-            
-            return (true, "dataverificationvia，shared\(totalPages)page，\(totalItems)itemitem ")
-        } catch {
-            return (false, "JSONParse failed: \(error.localizedDescription)")
-        }
+        return importer.validateImportData(jsonData)
     }
+
 
     // MARK: - Update checkfeature (routed to UpdateChecker)
 
@@ -5548,7 +3488,7 @@ private struct DefaultsCache {
 
 // MARK: - AppStoreServiceDelegate Conformance
 
-extension AppStore: AppStoreServiceDelegate {
+extension AppStore: AppStoreServiceDelegate, SettingsSideEffects {
     // State reads
     var currentApps: [AppInfo] { apps }
     var currentFolders: [FolderInfo] { folders }
@@ -5618,6 +3558,108 @@ extension AppStore: AppStoreServiceDelegate {
     // Persistence Helpers: removableSourcePath, updateMissingPlaceholder,
     // clearMissingPlaceholder, appInfo, standardizedFilePath, placeholderAppInfo,
     // pruneHiddenAppsFromAppList, refreshMissingPlaceholders already exist on AppStore
+
+    // MARK: - SettingsSideEffects Conformance
+
+    func handleGridRefresh() {
+        triggerGridRefresh()
+    }
+
+    func handleFolderUpdate() {
+        triggerFolderUpdate()
+    }
+
+    func handleGridConfigurationChange() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.compactItemsWithinPages()
+            self.removeEmptyPages()
+            self.cleanupUnusedNewPage()
+            let maxPageIndex = max(0, (self.items.count - 1) / max(self.itemsPerPage, 1))
+            if self.currentPage > maxPageIndex {
+                self.currentPage = maxPageIndex
+            }
+            self.triggerGridRefresh()
+            self.cacheManager.refreshCache(from: self.apps,
+                                           items: self.items,
+                                           itemsPerPage: self.itemsPerPage,
+                                           columns: self.settingsStore.gridColumnsPerPage,
+                                           rows: self.settingsStore.gridRowsPerPage)
+            if self.settingsStore.rememberLastPage {
+                UserDefaults.standard.set(self.currentPage, forKey: AppStore.rememberedPageIndexKey)
+            }
+            self.persistence.saveAllOrder()
+        }
+    }
+
+    func handleRestartAutoRescan() {
+        restartAutoRescan()
+    }
+
+    func handleScanWithOrderPreservation() {
+        scanApplicationsWithOrderPreservation()
+    }
+
+    func handleRemoveEmptyPages() {
+        removeEmptyPages()
+    }
+
+    func handleClearIconCachesForLayoutChange() {
+        clearIconCachesForLayoutChange()
+    }
+
+    func handleUpdateWindowMode(isFullscreen: Bool) {
+        DispatchQueue.main.async {
+            if let appDelegate = AppDelegate.shared {
+                appDelegate.updateWindowMode(isFullscreen: isFullscreen)
+            }
+        }
+    }
+
+    func handleRegisterStartOnLogin(_ enabled: Bool) {
+        settingsStore.isStartOnLogin = enabled
+    }
+
+    func handleSetupSearchPipeline() {
+        setupSearchPipeline()
+    }
+
+    func handleRefresh() {
+        refresh()
+    }
+
+    func handleUpdateActivationPolicy() {
+        updateActivationPolicy()
+    }
+
+    func handleSyncGlobalHotKeyRegistration() {
+        syncGlobalHotKeyRegistration()
+    }
+
+    func handleSyncActiveAppearance() {
+        settingsStore.syncActiveAppearanceProxies(from: settingsStore.currentAppearanceLayoutMode)
+    }
+
+    func handlePersistLegacyAppearanceProxies() {
+        settingsStore.persistLegacyAppearanceProxyValues()
+    }
+
+    func handleScheduleSystemAppearanceRefresh() {
+        scheduleSystemAppearanceRefresh()
+    }
+
+    func handleCompactItemsWithinPages() {
+        compactItemsWithinPages()
+    }
+
+    func handleTriggerFolderUpdate() {
+        triggerFolderUpdate()
+    }
+
+    func handleTriggerGridRefresh() {
+        triggerGridRefresh()
+    }
+
 }
 
 extension NSEvent.ModifierFlags {
