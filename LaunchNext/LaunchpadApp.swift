@@ -348,25 +348,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         // so the monitor can be rebuilt from a single source of truth.
         // If gesture support is removed later, delete this binder together with
         // updateGestureMonitor()/handleGestureTrigger() and the Gesture folder.
-        Publishers.CombineLatest(
-            Publishers.CombineLatest4(
-                appStore.settingsStore.$gestureEnabled.removeDuplicates(),
-                appStore.settingsStore.$gestureCloseOnPinchOut.removeDuplicates(),
-                appStore.settingsStore.$gestureTapAction.removeDuplicates(),
-                appStore.settingsStore.$gestureFingerCount.removeDuplicates()
-            ),
-            Publishers.CombineLatest(
-                appStore.settingsStore.$gestureDeviceSelectionMode.removeDuplicates(),
-                appStore.settingsStore.$gestureSelectedDeviceIDs.removeDuplicates()
-            )
+        Publishers.CombineLatest3(
+            appStore.settingsStore.$gestureEnabled.removeDuplicates(),
+            appStore.settingsStore.$gestureCloseOnPinchOut.removeDuplicates(),
+            appStore.settingsStore.$gestureTapAction.removeDuplicates()
         )
         .receive(on: RunLoop.main)
-        .sink { [weak self] _ in
-            guard let self else { return }
-            self.updateGestureMonitor(
-                enabled: self.appStore.settingsStore.gestureEnabled,
-                closeOnPinchOut: self.appStore.settingsStore.gestureCloseOnPinchOut,
-                tapAction: self.appStore.settingsStore.gestureTapAction
+        .sink { [weak self] enabled, closeOnPinchOut, tapAction in
+            self?.updateGestureMonitor(
+                enabled: enabled,
+                closeOnPinchOut: closeOnPinchOut,
+                tapAction: tapAction
             )
         }
         .store(in: &cancellables)
@@ -1436,6 +1428,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     }
 
     private func bindSystemUIVisibility() {
+        // fullscreen mode is included because updateWindowLevelForSystemUI()
+        // needs to cover the menu bar when both hideMenuBar && isFullscreenMode
         Publishers.CombineLatest3(
             appStore.settingsStore.$hideDock.removeDuplicates(),
             appStore.settingsStore.$hideMenuBar.removeDuplicates(),

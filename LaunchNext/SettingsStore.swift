@@ -1026,20 +1026,6 @@ final class SettingsStore: ObservableObject {
         }
     }
 
-    // MARK: - Gesture (Extended)
-
-    @Published var gestureFingerCount: Int = UserDefaults.standard.integer(forKey: "gestureFingerCount") {
-        didSet { UserDefaults.standard.set(gestureFingerCount, forKey: "gestureFingerCount") }
-    }
-
-    @Published var gestureDeviceSelectionMode: Int = UserDefaults.standard.integer(forKey: "gestureDeviceSelectionMode") {
-        didSet { UserDefaults.standard.set(gestureDeviceSelectionMode, forKey: "gestureDeviceSelectionMode") }
-    }
-
-    @Published var gestureSelectedDeviceIDs: [String] = UserDefaults.standard.stringArray(forKey: "gestureSelectedDeviceIDs") ?? [] {
-        didSet { UserDefaults.standard.set(gestureSelectedDeviceIDs, forKey: "gestureSelectedDeviceIDs") }
-    }
-
     // MARK: - Language
 
     @Published var preferredLanguage: AppLanguage = {
