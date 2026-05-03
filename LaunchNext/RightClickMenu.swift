@@ -1,3 +1,4 @@
+import LaunchNextCore
 import SwiftUI
 import AppKit
 
@@ -28,10 +29,11 @@ extension LaunchpadItem {
 }
 
 extension View {
-    // Adds app-level context menu actions when the current tile is an app.
+    // Adds context menu actions using the registry-based strategy pattern.
     @ViewBuilder
     func launchNextHideAppContextMenu(app: AppInfo?, folder: FolderInfo? = nil, appStore: AppStore) -> some View {
         if let app {
+            let item = LaunchpadItem.app(app)
             contextMenu {
                 Button {
                     if !appStore.showAppInFinder(app) {
@@ -71,9 +73,9 @@ extension View {
                             } else {
                                 Image(systemName: "trash")
                                     .foregroundStyle(.red)
+                            } else {
+                                Label(action.title, systemImage: action.icon)
                             }
-                            Text(appStore.localized(.contextMenuUninstallWithConfiguredTool))
-                                .foregroundStyle(.red)
                         }
                     }
                 }
@@ -122,7 +124,6 @@ extension CAGridView {
 
         switch item {
         case .app(let app):
-            // Keep the target app so action handler can execute hide.
             contextMenuTargetApp = app
             contextMenuTargetFolder = nil
             let menu = NSMenu(title: "")
@@ -155,6 +156,32 @@ extension CAGridView {
             hideItem.target = self
             menu.addItem(hideItem)
 
+            // Add registry-based actions
+            let registryActions = ContextMenuActionRegistry.shared.actions(for: item)
+            for action in registryActions {
+                if action.isSeparator {
+                    menu.addItem(NSMenuItem.separator())
+                } else {
+                    let menuItem = NSMenuItem(
+                        title: action.title,
+                        action: #selector(handleRegistryContextMenuAction(_:)),
+                        keyEquivalent: action.keyEquivalent
+                    )
+                    menuItem.image = NSImage(systemSymbolName: action.icon, accessibilityDescription: nil)
+                    menuItem.target = self
+                    menuItem.representedObject = action.identifier
+                    if action.isDestructive {
+                        menuItem.attributedTitle = NSAttributedString(
+                            string: action.title,
+                            attributes: [.foregroundColor: NSColor.systemRed]
+                        )
+                        menuItem.image = redMenuSymbolImage(named: action.icon)
+                    }
+                    menu.addItem(menuItem)
+                }
+            }
+
+            // Add batch selection (CAGridView-specific, not in registry)
             if allowsBatchSelectionMode {
                 menu.addItem(NSMenuItem.separator())
                 let batchMenuTitle = isBatchSelectionMode ? finishBatchSelectionMenuTitle : batchSelectAppsMenuTitle
@@ -169,21 +196,6 @@ extension CAGridView {
                 menu.addItem(batchItem)
             }
 
-            if canUseConfiguredUninstallTool {
-                menu.addItem(NSMenuItem.separator())
-                let uninstallItem = NSMenuItem(
-                    title: uninstallWithToolMenuTitle,
-                    action: #selector(handleUninstallWithToolFromContextMenu(_:)),
-                    keyEquivalent: ""
-                )
-                uninstallItem.attributedTitle = NSAttributedString(
-                    string: uninstallWithToolMenuTitle,
-                    attributes: [.foregroundColor: NSColor.systemRed]
-                )
-                uninstallItem.image = redMenuSymbolImage(named: "trash")
-                uninstallItem.target = self
-                menu.addItem(uninstallItem)
-            }
             return menu
         case .folder(let folder):
             contextMenuTargetApp = nil
