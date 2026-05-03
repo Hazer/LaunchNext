@@ -79,6 +79,9 @@ private struct SemanticVersion: Comparable, Equatable {
 }
 
 final class AppStore: ObservableObject {
+    // Settings facade — views use `appStore.settingsStore.<property>` for settings access.
+    lazy var settingsStore = SettingsStore(store: self)
+
     enum UpdateState: Equatable {
         case idle
         case checking
