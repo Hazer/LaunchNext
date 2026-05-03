@@ -1,3 +1,4 @@
+import LaunchNextCore
 import SwiftUI
 import AppKit
 
@@ -28,52 +29,25 @@ extension LaunchpadItem {
 }
 
 extension View {
-    // Adds app-level context menu actions when the current tile is an app.
+    // Adds context menu actions using the registry-based strategy pattern.
     @ViewBuilder
     func launchNextHideAppContextMenu(app: AppInfo?, folder: FolderInfo? = nil, appStore: AppStore) -> some View {
         if let app {
+            let item = LaunchpadItem.app(app)
             contextMenu {
-                Button {
-                    if !appStore.showAppInFinder(app) {
-                        NSSound.beep()
-                    }
-                } label: {
-                    Label(appStore.localized(.contextMenuShowInFinder), systemImage: "folder")
-                }
-
-                Button {
-                    if !appStore.copyAppPath(app) {
-                        NSSound.beep()
-                    }
-                } label: {
-                    Label(appStore.localized(.contextMenuCopyAppPath), systemImage: "doc.on.doc")
-                }
-
-                Divider()
-
-                Button {
-                    _ = appStore.hideApp(app)
-                } label: {
-                    Label(appStore.localized(.hiddenAppsAddButton), systemImage: "eye.slash")
-                }
-
-                if appStore.uninstallToolAppURL != nil {
-                    Divider()
-                    Button(role: .destructive) {
-                        if !appStore.openConfiguredUninstallTool(for: app) {
-                            NSSound.beep()
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            if let redTrash = redMenuSymbolImage(named: "trash") {
-                                Image(nsImage: redTrash)
-                                    .renderingMode(.original)
-                            } else {
-                                Image(systemName: "trash")
+                ForEach(ContextMenuActionRegistry.shared.actions(for: item), id: \.identifier) { action in
+                    if action.isSeparator {
+                        Divider()
+                    } else {
+                        Button {
+                            action.execute(for: item, in: appStore)
+                        } label: {
+                            if action.isDestructive {
+                                Label(action.title, systemImage: action.icon)
                                     .foregroundStyle(.red)
+                            } else {
+                                Label(action.title, systemImage: action.icon)
                             }
-                            Text(appStore.localized(.contextMenuUninstallWithConfiguredTool))
-                                .foregroundStyle(.red)
                         }
                     }
                 }
@@ -122,39 +96,36 @@ extension CAGridView {
 
         switch item {
         case .app(let app):
-            // Keep the target app so action handler can execute hide.
             contextMenuTargetApp = app
             contextMenuTargetFolder = nil
             let menu = NSMenu(title: "")
-            let showInFinderItem = NSMenuItem(
-                title: showInFinderMenuTitle,
-                action: #selector(handleShowAppInFinderFromContextMenu(_:)),
-                keyEquivalent: ""
-            )
-            showInFinderItem.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
-            showInFinderItem.target = self
-            menu.addItem(showInFinderItem)
 
-            let copyPathItem = NSMenuItem(
-                title: copyAppPathMenuTitle,
-                action: #selector(handleCopyAppPathFromContextMenu(_:)),
-                keyEquivalent: ""
-            )
-            copyPathItem.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)
-            copyPathItem.target = self
-            menu.addItem(copyPathItem)
+            // Add registry-based actions
+            let registryActions = ContextMenuActionRegistry.shared.actions(for: item)
+            for action in registryActions {
+                if action.isSeparator {
+                    menu.addItem(NSMenuItem.separator())
+                } else {
+                    let menuItem = NSMenuItem(
+                        title: action.title,
+                        action: #selector(handleRegistryContextMenuAction(_:)),
+                        keyEquivalent: action.keyEquivalent
+                    )
+                    menuItem.image = NSImage(systemSymbolName: action.icon, accessibilityDescription: nil)
+                    menuItem.target = self
+                    menuItem.representedObject = action.identifier
+                    if action.isDestructive {
+                        menuItem.attributedTitle = NSAttributedString(
+                            string: action.title,
+                            attributes: [.foregroundColor: NSColor.systemRed]
+                        )
+                        menuItem.image = redMenuSymbolImage(named: action.icon)
+                    }
+                    menu.addItem(menuItem)
+                }
+            }
 
-            menu.addItem(NSMenuItem.separator())
-
-            let hideItem = NSMenuItem(
-                title: hideAppMenuTitle,
-                action: #selector(handleHideAppFromContextMenu(_:)),
-                keyEquivalent: ""
-            )
-            hideItem.image = NSImage(systemSymbolName: "eye.slash", accessibilityDescription: nil)
-            hideItem.target = self
-            menu.addItem(hideItem)
-
+            // Add batch selection (CAGridView-specific, not in registry)
             if allowsBatchSelectionMode {
                 menu.addItem(NSMenuItem.separator())
                 let batchMenuTitle = isBatchSelectionMode ? finishBatchSelectionMenuTitle : batchSelectAppsMenuTitle
@@ -169,21 +140,6 @@ extension CAGridView {
                 menu.addItem(batchItem)
             }
 
-            if canUseConfiguredUninstallTool {
-                menu.addItem(NSMenuItem.separator())
-                let uninstallItem = NSMenuItem(
-                    title: uninstallWithToolMenuTitle,
-                    action: #selector(handleUninstallWithToolFromContextMenu(_:)),
-                    keyEquivalent: ""
-                )
-                uninstallItem.attributedTitle = NSAttributedString(
-                    string: uninstallWithToolMenuTitle,
-                    attributes: [.foregroundColor: NSColor.systemRed]
-                )
-                uninstallItem.image = redMenuSymbolImage(named: "trash")
-                uninstallItem.target = self
-                menu.addItem(uninstallItem)
-            }
             return menu
         case .folder(let folder):
             contextMenuTargetApp = nil
@@ -220,16 +176,13 @@ extension CAGridView {
         }
     }
 
-    @objc private func handleShowAppInFinderFromContextMenu(_ sender: NSMenuItem) {
-        guard let app = contextMenuTargetApp else { return }
-        onShowAppInFinder?(app)
-        contextMenuTargetApp = nil
-        contextMenuTargetFolder = nil
-    }
-
-    @objc private func handleCopyAppPathFromContextMenu(_ sender: NSMenuItem) {
-        guard let app = contextMenuTargetApp else { return }
-        onCopyAppPath?(app)
+    @objc private func handleRegistryContextMenuAction(_ sender: NSMenuItem) {
+        guard let actionId = sender.representedObject as? String,
+              let action = ContextMenuActionRegistry.shared.action(for: actionId),
+              let app = contextMenuTargetApp else { return }
+        let item = LaunchpadItem.app(app)
+        guard let store = appStore else { return }
+        action.execute(for: item, in: store)
         contextMenuTargetApp = nil
         contextMenuTargetFolder = nil
     }
