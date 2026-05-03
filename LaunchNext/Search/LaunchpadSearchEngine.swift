@@ -1,4 +1,5 @@
 import Foundation
+import LaunchNextCore
 
 struct LaunchpadSearchEngine {
     private let matcher = FuzzyMatcher()

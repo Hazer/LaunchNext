@@ -1,5 +1,6 @@
 import AppKit
 import QuartzCore
+import LaunchNextCore
 
 final class CAFolderGridView: NSView {
     var apps: [AppInfo] = [] {

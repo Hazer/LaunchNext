@@ -1,5 +1,7 @@
 import AppKit
 import SwiftUI
+import LaunchNextCore
+import LaunchNextUtilities
 
 struct CAFolderGridViewRepresentable: NSViewRepresentable {
     @ObservedObject var appStore: AppStore
