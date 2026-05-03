@@ -96,7 +96,13 @@ struct FolderView: View {
             // Force view refresh when app list changes
             forceRefreshTrigger = UUID()
         }
-        .onChange(of: appStore.voiceFeedbackEnabled) { _, enabled in
+        .onChange(of: folder.id) {
+            resetFolderPagingState()
+        }
+        .onChange(of: appStore.folderLayoutMode) {
+            resetFolderPagingState()
+        }
+        .onChange(of: appStore.settingsStore.voiceFeedbackEnabled) { _, enabled in (refactor: migrate FolderView + RightClickMenu to use settingsStore)
             if enabled {
                 announceSelectedAppIfNeeded()
             } else {
@@ -300,14 +306,14 @@ extension FolderView {
             iconSize: iconSize,
             labelWidth: labelWidth,
             isSelected: isSelected,
-            showLabel: appStore.showLabels,
-            labelFontSize: CGFloat(appStore.iconLabelFontSize),
-            labelFontWeight: appStore.iconLabelFontWeightValue,
+            showLabel: appStore.settingsStore.showLabels,
+            labelFontSize: CGFloat(appStore.settingsStore.iconLabelFontSize),
+            labelFontWeight: appStore.settingsStore.iconLabelFontWeightValue,
             shouldAllowHover: draggingApp == nil,
-            hoverMagnificationEnabled: appStore.enableHoverMagnification,
-            hoverMagnificationScale: CGFloat(appStore.hoverMagnificationScale),
-            activePressEffectEnabled: appStore.enableActivePressEffect,
-            activePressScale: CGFloat(appStore.activePressScale),
+            hoverMagnificationEnabled: appStore.settingsStore.enableHoverMagnification,
+            hoverMagnificationScale: CGFloat(appStore.settingsStore.hoverMagnificationScale),
+            activePressEffectEnabled: appStore.settingsStore.enableActivePressEffect,
+            activePressScale: CGFloat(appStore.settingsStore.activePressScale),
             onTap: {
                 // Do not launch app in edit state
                 if draggingApp == nil && !isEditingName {
@@ -324,7 +330,7 @@ extension FolderView {
 
         let isDraggingThisTile = (draggingApp == app)
 
-        if appStore.isLayoutLocked {
+        if appStore.settingsStore.isLayoutLocked {
             base
                 .launchNextHideAppContextMenu(app: app, appStore: appStore)
         } else {
@@ -335,8 +341,7 @@ extension FolderView {
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 2, coordinateSpace: .named("folderGrid"))
                         .onChanged { value in
-                            guard !appStore.isLayoutLocked else { return }
-                            // Disable drag in edit state
+                            guard !appStore.settingsStore.isLayoutLocked else { return }
                             if isEditingName { return }
                         
                         if draggingApp == nil {
@@ -397,8 +402,7 @@ extension FolderView {
                         }
                     }
                     .onEnded { _ in
-                        if appStore.isLayoutLocked { return }
-                        // ineditstateSkipdragend
+                        if appStore.settingsStore.isLayoutLocked { return }
                         if isEditingName { return }
                         
                         guard let dragging = draggingApp else { return }
@@ -652,7 +656,7 @@ extension FolderView {
     }
 
     private func handleControllerCommand(_ command: ControllerCommand) {
-        guard appStore.gameControllerEnabled else { return }
+        guard appStore.settingsStore.gameControllerEnabled else { return }
         guard ControllerInputManager.shared.isActive else { return }
         guard !isEditingName else { return }
 
@@ -722,7 +726,7 @@ extension FolderView {
     }
 
     private func announceSelectedAppIfNeeded() {
-        guard appStore.voiceFeedbackEnabled,
+        guard appStore.settingsStore.voiceFeedbackEnabled,
               let index = selectedIndex,
               folder.apps.indices.contains(index) else { return }
         VoiceManager.shared.announceSelection(item: .app(folder.apps[index]))
