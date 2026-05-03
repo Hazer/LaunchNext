@@ -1,3 +1,5 @@
+import LaunchNextCore
+import LaunchNextStrategies
 import AppKit
 import SwiftUI
 
@@ -5,7 +7,7 @@ import SwiftUI
 
 struct CAGridViewRepresentable: NSViewRepresentable {
     @ObservedObject var appStore: AppStore
-    var items: [LaunchpadItem]  // 支持传入过滤后的 items
+    var items: [LaunchpadItem]  // Support passing filtered items
     var iconSize: CGFloat
     var columnSpacing: CGFloat
     var rowSpacing: CGFloat
@@ -17,7 +19,7 @@ struct CAGridViewRepresentable: NSViewRepresentable {
     var externalDragHoverIndex: Int?
     var selectedIndex: Int?
 
-    // 监听这些触发器来强制刷新
+    // Monitor these triggers to force refresh
     var gridRefreshTrigger: UUID { appStore.gridRefreshTrigger }
     var folderUpdateTrigger: UUID { appStore.folderUpdateTrigger }
     var iconCacheRefreshTrigger: UUID { appStore.iconCacheRefreshTrigger }
@@ -49,6 +51,7 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         view.activePressScale = CGFloat(appStore.activePressScale)
         view.animationsEnabled = appStore.enableAnimations
         view.animationDuration = appStore.animationDuration
+        view.layoutMode = appStore.layoutMode
         view.dockDragEnabled = appStore.dockDragEnabled
         view.dockDragSide = appStore.dockDragSide
         view.externalAppDragTriggerDistance = CGFloat(appStore.dockDragTriggerDistance)
@@ -61,6 +64,7 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         view.batchSelectAppsMenuTitle = appStore.localized(.contextMenuBatchSelectApps)
         view.finishBatchSelectionMenuTitle = appStore.localized(.contextMenuFinishBatchSelection)
         view.canUseConfiguredUninstallTool = appStore.uninstallToolAppURL != nil
+        view.appStore = appStore
         view.allowsBatchSelectionMode = appStore.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         
         // Set current page BEFORE items to ensure correct initial position
@@ -68,7 +72,7 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         view.items = items
 
         view.onItemClicked = { item, index in
-            // 单击打开应用或文件夹
+            // Single click to open app or folder
             switch item {
             case .app(let app):
                 onOpenApp?(app)
@@ -79,17 +83,17 @@ struct CAGridViewRepresentable: NSViewRepresentable {
             case .folder(let folder):
                 onOpenFolder?(folder)
             case .missingApp:
-                // 丢失的应用，不处理
+                // Missing app，Skip
                 break
             case .empty:
-                // 空白位置，不做任何操作（和真实Launchpad一致）
-                // 只有点击网格外的空白区域才关闭窗口
+                // empty position，Do nothing (like real Launchpad)
+                // Only close window when clicking empty area outside grid
                 break
             }
         }
 
         view.onItemDoubleClicked = { item, index in
-            // 双击也处理（兼容）
+            // Also process double-click (compatibility)
         }
 
         view.onPageChanged = { page in
@@ -101,11 +105,11 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         }
 
         view.onFPSUpdate = { fps in
-            // 可以在这里更新 FPS 显示
+            // Can update FPS display here
         }
 
         view.onEmptyAreaClicked = {
-            // 点击空白区域关闭窗口
+            // Click empty area to close window
             AppDelegate.shared?.hideWindow()
         }
 
@@ -146,14 +150,14 @@ struct CAGridViewRepresentable: NSViewRepresentable {
             }
         }
 
-        // 拖拽创建文件夹
+        // dragCreate folder
         view.onCreateFolder = { dragApp, targetApp, insertAt in
             DispatchQueue.main.async {
                 _ = appStore.createFolder(with: [dragApp, targetApp], insertAt: insertAt)
             }
         }
 
-        // 拖拽移入文件夹
+        // dragMove into folder
         view.onMoveToFolder = { app, folder in
             DispatchQueue.main.async {
                 appStore.addAppToFolder(app, folder: folder)
@@ -161,50 +165,21 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         }
 
         // Drag reorder
-        view.onReorderItems = { fromIndex, toIndex in
+        view.onReorderItems = { [weak appStore] fromIndex, toIndex in
+            guard let appStore else { return }
             DispatchQueue.main.async {
-                guard fromIndex < appStore.items.count else { return }
-                let itemsPerPage = appStore.gridColumnsPerPage * appStore.gridRowsPerPage
-                let sourcePage = fromIndex / itemsPerPage
-                let targetPage = toIndex / itemsPerPage
-                
-                if sourcePage == targetPage {
-                    // Same page: use simple swap logic
-                    let pageStart = sourcePage * itemsPerPage
-                    let pageEnd = min(pageStart + itemsPerPage, appStore.items.count)
-                    var newItems = appStore.items
-                    var pageSlice = Array(newItems[pageStart..<pageEnd])
-                    let localFrom = fromIndex - pageStart
-                    let localTo = min(toIndex - pageStart, pageSlice.count - 1)
-                    
-                    if localFrom != localTo && localFrom < pageSlice.count && localTo < pageSlice.count {
-                        let moving = pageSlice.remove(at: localFrom)
-                        pageSlice.insert(moving, at: localTo)
-                        newItems.replaceSubrange(pageStart..<pageEnd, with: pageSlice)
-                        appStore.items = newItems
-                    }
-                    appStore.triggerGridRefresh()
-                    appStore.saveAllOrder()
-                    
-                    // Compact after same-page drag
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        appStore.compactItemsWithinPages()
-                    }
-                } else {
-                    // Cross-page: use cascade insert logic
-                let item = appStore.items[fromIndex]
-                appStore.moveItemAcrossPagesWithCascade(item: item, to: toIndex)
-                }
+                Self.handleReorder(appStore: appStore, fromIndex: fromIndex, toIndex: toIndex)
             }
         }
 
-        view.onReorderAppBatch = { appPathsOrdered, toIndex in
+        view.onReorderAppBatch = { [weak appStore] appPathsOrdered, toIndex in
+            guard let appStore else { return }
             DispatchQueue.main.async {
                 appStore.moveSelectedAppsAcrossPagesWithCascade(appPathsOrdered: appPathsOrdered, to: toIndex)
             }
         }
 
-        // 请求创建新页面（拖拽到右边缘时）
+        // Request new page creation (when dragged to right edge)
         view.onRequestNewPage = {
             DispatchQueue.main.async {
                 let itemsPerPage = appStore.gridColumnsPerPage * appStore.gridRowsPerPage
@@ -221,10 +196,9 @@ struct CAGridViewRepresentable: NSViewRepresentable {
 
     func updateNSView(_ nsView: CAGridView, context: Context) {
         // print("🔄 [CAGrid #\(nsView.debugInstanceId)] updateNSView, window=\(nsView.window != nil), isVisible=\(nsView.window?.isVisible ?? false)")
-        // 确保滚轮事件监听器已安装（窗口重新显示时需要）
         nsView.ensureScrollMonitorInstalled()
 
-        // 更新配置
+        // updateconfig
         let configChanged = nsView.columns != appStore.gridColumnsPerPage ||
                             nsView.rows != appStore.gridRowsPerPage ||
                             nsView.iconSize != iconSize ||
@@ -268,6 +242,7 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         nsView.activePressScale = CGFloat(appStore.activePressScale)
         nsView.animationsEnabled = appStore.enableAnimations
         nsView.animationDuration = appStore.animationDuration
+        nsView.layoutMode = appStore.layoutMode
         nsView.isScrollEnabled = appStore.openFolder == nil && !appStore.isSetting
         nsView.showInFinderMenuTitle = appStore.localized(.contextMenuShowInFinder)
         nsView.copyAppPathMenuTitle = appStore.localized(.contextMenuCopyAppPath)
@@ -280,7 +255,7 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         nsView.canUseConfiguredUninstallTool = appStore.uninstallToolAppURL != nil
         nsView.allowsBatchSelectionMode = appStore.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 
-        // 检查刷新触发器是否变化（文件夹创建/修改会触发）
+        // Check if refresh trigger changed (folder creation/modification triggers)
         let triggerChanged = context.coordinator.lastGridRefreshTrigger != gridRefreshTrigger ||
                              context.coordinator.lastFolderUpdateTrigger != folderUpdateTrigger
 
@@ -298,7 +273,7 @@ struct CAGridViewRepresentable: NSViewRepresentable {
             nsView.items = items
             didUpdateItems = true
         } else if itemsChanged(nsView.items, items) {
-            // 更新 items - 始终检查完整变化（包括文件夹名称等）
+            // update items - Always check for full changes (including folder name etc.)
             // print("🔄 [CAGrid] Updating items: \(nsView.items.count) -> \(items.count)")
             nsView.items = items
             didUpdateItems = true
@@ -314,7 +289,7 @@ struct CAGridViewRepresentable: NSViewRepresentable {
             }
         }
 
-        // 同步页面
+        // Syncpage
         if nsView.currentPage != appStore.currentPage {
             // print("📄 [CAGrid] Page sync: \(nsView.currentPage) -> \(appStore.currentPage)")
             nsView.navigateToPage(appStore.currentPage, animated: appStore.enableAnimations)
@@ -366,23 +341,55 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         var lastIconCacheRefreshTrigger: UUID = UUID()
     }
 
-    // 检查 items 是否变化（完整比较所有 item 的 id 和名称）
+    static func handleReorder(appStore: AppStore, fromIndex: Int, toIndex: Int) {
+        guard fromIndex < appStore.items.count else { return }
+        let itemsPerPage = appStore.gridColumnsPerPage * appStore.gridRowsPerPage
+        let sourcePage = fromIndex / itemsPerPage
+        let targetPage = toIndex / itemsPerPage
+
+        if sourcePage == targetPage {
+            let pageStart = sourcePage * itemsPerPage
+            let pageEnd = min(pageStart + itemsPerPage, appStore.items.count)
+            var newItems = appStore.items
+            var pageSlice = Array(newItems[pageStart..<pageEnd])
+            let localFrom = fromIndex - pageStart
+            let localTo = min(toIndex - pageStart, pageSlice.count - 1)
+
+            if localFrom != localTo && localFrom < pageSlice.count && localTo < pageSlice.count {
+                let moving = pageSlice.remove(at: localFrom)
+                pageSlice.insert(moving, at: localTo)
+                newItems.replaceSubrange(pageStart..<pageEnd, with: pageSlice)
+                appStore.items = newItems
+            }
+            appStore.triggerGridRefresh()
+            appStore.persistence.saveAllOrder()
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                appStore.compactItemsWithinPages()
+            }
+        } else {
+            let item = appStore.items[fromIndex]
+            appStore.moveItemAcrossPagesWithCascade(item: item, to: toIndex)
+        }
+    }
+
+    // Check if items changed (full comparison of all item IDs and names)
     private func itemsChanged(_ old: [LaunchpadItem], _ new: [LaunchpadItem]) -> Bool {
         guard old.count == new.count else { return true }
         guard !old.isEmpty else { return !new.isEmpty }
 
-        // 完整比较每个 item
+        // Full comparison of each item
         for i in 0..<old.count {
             let oldItem = old[i]
             let newItem = new[i]
 
-            // 比较 id
+            // Compare id
             if oldItem.id != newItem.id { return true }
 
-            // 比较名称（文件夹改名后需要刷新）
+            // Compare name (refresh needed after folder rename)
             if oldItem.name != newItem.name { return true }
 
-            // 对于文件夹，还要比较内部应用数量
+            // For folders, also compare internal app count
             if case .folder(let oldFolder) = oldItem, case .folder(let newFolder) = newItem {
                 if oldFolder.apps.count != newFolder.apps.count { return true }
             }
