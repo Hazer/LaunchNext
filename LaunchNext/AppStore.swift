@@ -95,20 +95,6 @@ private struct DefaultsCache {
 }
 
 @MainActor final class AppStore: ObservableObject {
-    enum UpdateState: Equatable {
-        case idle
-        case checking
-        case upToDate(latest: String)
-        case updateAvailable(UpdateRelease)
-        case failed(String)
-    }
-
-    struct UpdateRelease: Equatable {
-        let version: String
-        let url: URL
-        let notes: String?
-    }
-
     struct PageIndicatorOverride: Codable, Equatable {
         var offset: Double
         var topPadding: Double
@@ -2014,11 +2000,11 @@ private struct DefaultsCache {
         return URL(fileURLWithPath: expanded).standardized.path
     }
 
-    private func standardizedFilePath(_ path: String) -> String {
+    func standardizedFilePath(_ path: String) -> String {
         URL(fileURLWithPath: path).standardized.path
     }
 
-    private func removableSourcePath(forAppPath path: String) -> String? {
+    func removableSourcePath(forAppPath path: String) -> String? {
         let standardizedApp = standardizedFilePath(path)
         for source in customAppSourcePaths {
             guard let normalizedSource = normalizeApplicationPath(source) else { continue }
@@ -2045,9 +2031,9 @@ private struct DefaultsCache {
         return normalizedPath
     }
 
-    private func updateMissingPlaceholder(path: String,
-                                          displayName: String? = nil,
-                                          removableSource: String? = nil) -> MissingAppPlaceholder? {
+    func updateMissingPlaceholder(path: String,
+                                           displayName: String? = nil,
+                                           removableSource: String? = nil) -> MissingAppPlaceholder? {
         let normalizedPath = standardizedFilePath(path)
         let resolvedDisplayName = placeholderDisplayName(for: normalizedPath, preferred: displayName)
         let resolvedSource = removableSource ?? removableSourcePath(forAppPath: normalizedPath) ?? missingPlaceholders[normalizedPath]?.removableSource
@@ -2079,7 +2065,7 @@ private struct DefaultsCache {
         return customSources.contains(normalizedSource)
     }
 
-    private func clearMissingPlaceholder(for path: String) {
+    func clearMissingPlaceholder(for path: String) {
         missingPlaceholders.removeValue(forKey: standardizedFilePath(path))
     }
 
@@ -3924,7 +3910,7 @@ private struct DefaultsCache {
         NSWorkspace.shared.isFilePackage(atPath: url.path)
     }
 
-    private func appInfo(from url: URL, preferredName: String? = nil, loadIcon: Bool? = nil) -> AppInfo {
+    func appInfo(from url: URL, preferredName: String? = nil, loadIcon: Bool? = nil) -> AppInfo {
         let shouldLoad = loadIcon ?? (PerformanceMode.current == .full)
         return AppInfo.from(url: url,
                      preferredName: preferredName,
@@ -4780,7 +4766,7 @@ private struct DefaultsCache {
     }
 
     // triggerfolderupdate，notificationallrelatedviewrefreshicon
-    private func triggerFolderUpdate() {
+    func triggerFolderUpdate() {
         folderUpdateTrigger = UUID()
         FolderPreviewCache.shared.clear()
     }
@@ -5371,7 +5357,7 @@ private struct DefaultsCache {
         }
     }
 
-    private func sanitizedFolders(_ input: [FolderInfo]) -> [FolderInfo] {
+    func sanitizedFolders(_ input: [FolderInfo]) -> [FolderInfo] {
         guard !hiddenAppPaths.isEmpty else { return input }
         let hidden = hiddenAppPaths
         var result: [FolderInfo] = []
@@ -5387,7 +5373,7 @@ private struct DefaultsCache {
         return didChange ? result : input
     }
 
-    private func filteredItemsRemovingHidden(from input: [LaunchpadItem]) -> [LaunchpadItem] {
+    func filteredItemsRemovingHidden(from input: [LaunchpadItem]) -> [LaunchpadItem] {
         guard !hiddenAppPaths.isEmpty else { return input }
         let hidden = hiddenAppPaths
         var result: [LaunchpadItem] = []
@@ -5773,7 +5759,7 @@ private struct DefaultsCache {
     }
 
     /// folderoperationafterRefresh cache, ensure search functionality works
-    private func refreshCacheAfterFolderOperation() {
+    func refreshCacheAfterFolderOperation() {
         // directlyrefreshcache，ensureincludeallapp（includingfolderinsideapp)
         cacheManager.refreshCache(from: apps,
                                   items: items,
@@ -6621,6 +6607,78 @@ private struct DefaultsCache {
     func openReleaseURL(_ url: URL) {
         NSWorkspace.shared.open(url)
     }
+}
+
+// MARK: - AppStoreServiceDelegate Conformance
+
+extension AppStore: AppStoreServiceDelegate {
+    // State reads
+    var currentApps: [AppInfo] { apps }
+    var currentFolders: [FolderInfo] { folders }
+    var currentItems: [LaunchpadItem] { items }
+    var currentHiddenAppPaths: Set<String> { hiddenAppPaths }
+    var currentMissingPlaceholders: [String: MissingAppPlaceholder] { missingPlaceholders }
+    var currentModelContext: ModelContext? { modelContext }
+
+    // State writes
+    func applyScanResults(_ apps: [AppInfo],
+                          missing: [String: MissingAppPlaceholder],
+                          hidden: Set<String>) {
+        self.apps = apps
+        self.missingPlaceholders = missing
+        self.hiddenAppPaths = hidden
+    }
+
+    func applyOrderedItems(_ items: [LaunchpadItem], folders: [FolderInfo]) {
+        self.items = items
+        self.folders = folders
+    }
+
+    func applyFolderChanges(_ folders: [FolderInfo], items: [LaunchpadItem]) {
+        self.folders = folders
+        self.items = items
+    }
+
+    func applyUpdateState(_ state: UpdateState) {
+        self.updateState = state
+    }
+
+    // UI Triggers
+    func triggerObjectWillChange() {
+        objectWillChange.send()
+    }
+
+    // triggerGridRefresh, triggerFolderUpdate, refreshCacheAfterFolderOperation
+    // already exist as methods on AppStore and satisfy the protocol requirements
+
+    // Layout Helpers
+    func compactItemsWithinPagesReturning() -> [LaunchpadItem] {
+        compactItemsWithinPages()
+        return items
+    }
+
+    func removeEmptyPagesReturning() -> [LaunchpadItem] {
+        removeEmptyPages()
+        return items
+    }
+
+    // filteredItemsRemovingHidden and sanitizedFolders already exist on AppStore
+
+    // Cross-Manager Routing
+    func persistenceSaveAllOrder() {
+        saveAllOrder()
+    }
+
+    func persistenceLoadAllOrder() {
+        loadAllOrder()
+    }
+
+    func persistenceRebuildItems() {
+        rebuildItems()
+    }
+
+    // Persistence Helpers: removableSourcePath, updateMissingPlaceholder,
+    // clearMissingPlaceholder, appInfo, standardizedFilePath already exist on AppStore
 }
 
 private final class UpdateNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {

@@ -5503,7 +5503,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     private var updatesStatusCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            let availableRelease: AppStore.UpdateRelease? = {
+            let availableRelease: UpdateRelease? = {
                 if case .updateAvailable(let release) = appStore.updateState { return release }
                 return nil
             }()
@@ -5646,7 +5646,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         }
     }
 
-    private var currentAvailableRelease: AppStore.UpdateRelease? {
+    private var currentAvailableRelease: UpdateRelease? {
         if case .updateAvailable(let release) = appStore.updateState {
             return release
         }
