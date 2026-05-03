@@ -1,29 +1,29 @@
 import Foundation
 
-public struct LayoutPresetDefinition {
-    public let id: String
-    public let slots: [LayoutPresetSlot]
+struct LayoutPresetDefinition {
+    let id: String
+    let slots: [LayoutPresetSlot]
 
-    public init(id: String, slots: [LayoutPresetSlot]) {
+    init(id: String, slots: [LayoutPresetSlot]) {
         self.id = id
         self.slots = slots
     }
 }
 
-public enum LayoutPresetSlot {
+enum LayoutPresetSlot {
     case app(bundleIdentifiers: [String], aliases: [String])
     case utilitiesFolder
 }
 
-public enum LayoutPresetCatalog {
-    public static let utilityRootPaths: [String] = [
+enum LayoutPresetCatalog {
+    static let utilityRootPaths: [String] = [
         "/System/Applications/Utilities",
         "/Applications/Utilities"
     ].map { URL(fileURLWithPath: $0).standardized.path }
 
     // Extra apps that should fall back into the "Other" folder when still unused.
     // Matching priority remains: bundle identifier/path first, alias only as final fallback.
-    public static let otherExtraBundleIDs: Set<String> = Set([
+    static let otherExtraBundleIDs: Set<String> = Set([
         "com.apple.backup.launcher",
         "com.apple.FontBook",
         "com.apple.exposelauncher",
@@ -40,7 +40,7 @@ public enum LayoutPresetCatalog {
         "com.apple.siri.launcher"
     ].map { $0.lowercased() })
 
-    public static let otherExtraAliases: [String] = [
+    static let otherExtraAliases: [String] = [
         "Time Machine",
         "Font Book",
         "Mission Control",
@@ -54,7 +54,7 @@ public enum LayoutPresetCatalog {
         "Siri"
     ]
 
-    public static let otherExtraPathSuffixes: [String] = [
+    static let otherExtraPathSuffixes: [String] = [
         "/time machine.app",
         "/font book.app",
         "/mission control.app",
@@ -68,7 +68,7 @@ public enum LayoutPresetCatalog {
         "/siri.app"
     ]
 
-    public static let macOS26Default = LayoutPresetDefinition(
+    static let macOS26Default = LayoutPresetDefinition(
         id: "macos26_default",
         slots: [
             .app(bundleIdentifiers: ["com.apple.AppStore"], aliases: ["App Store"]),

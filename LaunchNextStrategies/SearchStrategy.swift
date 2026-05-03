@@ -1,4 +1,3 @@
-import LaunchNextCore
 import Combine
 import Foundation
 
@@ -7,7 +6,7 @@ import Foundation
 public protocol SearchStrategy {
     var identifier: String { get }
     var displayName: String { get }
-    func apply<T: Publisher>(to publisher: T) -> AnyPublisher<T.Output, T.Failure>
+    func apply(to publisher: AnyPublisher<String, Never>) -> AnyPublisher<String, Never>
 }
 
 // MARK: - Strategy Implementations
@@ -21,7 +20,7 @@ public struct DebounceStrategy: SearchStrategy {
         self.milliseconds = milliseconds
     }
 
-    public func apply<T: Publisher>(to publisher: T) -> AnyPublisher<T.Output, T.Failure> {
+    public func apply(to publisher: AnyPublisher<String, Never>) -> AnyPublisher<String, Never> {
         publisher
             .debounce(for: .milliseconds(milliseconds), scheduler: DispatchQueue.main)
             .eraseToAnyPublisher()
@@ -39,7 +38,7 @@ public struct ThrottleStrategy: SearchStrategy {
         self.emitLatest = emitLatest
     }
 
-    public func apply<T: Publisher>(to publisher: T) -> AnyPublisher<T.Output, T.Failure> {
+    public func apply(to publisher: AnyPublisher<String, Never>) -> AnyPublisher<String, Never> {
         publisher
             .throttle(for: .milliseconds(milliseconds), scheduler: DispatchQueue.main, latest: emitLatest)
             .eraseToAnyPublisher()
@@ -52,8 +51,8 @@ public struct InstantStrategy: SearchStrategy {
 
     public init() {}
 
-    public func apply<T: Publisher>(to publisher: T) -> AnyPublisher<T.Output, T.Failure> {
-        publisher.eraseToAnyPublisher()
+    public func apply(to publisher: AnyPublisher<String, Never>) -> AnyPublisher<String, Never> {
+        publisher
     }
 }
 

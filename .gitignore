@@ -27,5 +27,5 @@ parallel_version/
 
 # Local AI notes
 LaunchNext/AI/TODO.md
-.worktrees/
+.claude/worktrees/
 DerivedData*/

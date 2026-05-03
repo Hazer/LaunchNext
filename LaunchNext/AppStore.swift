@@ -437,7 +437,7 @@ enum AppearancePreference: String, CaseIterable, Identifiable {
         searchCancellable?.cancel()
 
         searchCancellable = settingsStore.currentSearchStrategy
-            .apply(to: $searchText.removeDuplicates())
+            .apply(to: $searchText.removeDuplicates().eraseToAnyPublisher())
             .sink { [weak self] value in
                 self?.searchQuery = value
             }
