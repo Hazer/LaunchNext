@@ -1,4 +1,6 @@
 import SwiftUI
+import Combine
+import ServiceManagement
 import LaunchNextCore
 import LaunchNextStrategies
 import LaunchNextInput
@@ -27,6 +29,22 @@ protocol SettingsSideEffects: AnyObject {
     func handleTriggerFolderUpdate()
     func handleTriggerGridRefresh()
 }
+
+// MARK: - Type Aliases for AppStore Nested Types
+
+typealias RGBAColor = AppStore.RGBAColor
+typealias DualModeAppearanceSettings = AppStore.DualModeAppearanceSettings
+typealias PageIndicatorOverride = AppStore.PageIndicatorOverride
+typealias HotKeyConfiguration = AppStore.HotKeyConfiguration
+typealias AppearanceLayoutMode = AppStore.AppearanceLayoutMode
+typealias ModeScopedAppearanceSettings = AppStore.ModeScopedAppearanceSettings
+typealias GestureTapAction = AppStore.GestureTapAction
+typealias DevelopmentBackgroundOverride = AppStore.DevelopmentBackgroundOverride
+typealias SidebarIconPreset = AppStore.SidebarIconPreset
+typealias IconLabelFontWeightOption = AppStore.IconLabelFontWeightOption
+typealias DockDragSide = AppStore.DockDragSide
+typealias HotCornerPosition = AppStore.HotCornerPosition
+typealias BackgroundStyle = AppStore.BackgroundStyle
 
 // MARK: - SettingsStore
 
@@ -1008,6 +1026,20 @@ final class SettingsStore: ObservableObject {
         }
     }
 
+    // MARK: - Gesture (Extended)
+
+    @Published var gestureFingerCount: Int = UserDefaults.standard.integer(forKey: "gestureFingerCount") {
+        didSet { UserDefaults.standard.set(gestureFingerCount, forKey: "gestureFingerCount") }
+    }
+
+    @Published var gestureDeviceSelectionMode: Int = UserDefaults.standard.integer(forKey: "gestureDeviceSelectionMode") {
+        didSet { UserDefaults.standard.set(gestureDeviceSelectionMode, forKey: "gestureDeviceSelectionMode") }
+    }
+
+    @Published var gestureSelectedDeviceIDs: [String] = UserDefaults.standard.stringArray(forKey: "gestureSelectedDeviceIDs") ?? [] {
+        didSet { UserDefaults.standard.set(gestureSelectedDeviceIDs, forKey: "gestureSelectedDeviceIDs") }
+    }
+
     // MARK: - Language
 
     @Published var preferredLanguage: AppLanguage = {
@@ -1056,8 +1088,8 @@ final class SettingsStore: ObservableObject {
         let defaults = UserDefaults.standard
 
         scrollSensitivity = defaults.object(forKey: "scrollSensitivity") as? Double ?? Self.defaultScrollSensitivity
-        gridColumnsPerPage = Self.clampColumns(defaults.integer(forKey: Self.gridColumnsKey).clamped(to: Self.gridColumnRange))
-        gridRowsPerPage = Self.clampRows(defaults.integer(forKey: Self.gridRowsKey).clamped(to: Self.gridRowRange))
+        gridColumnsPerPage = Self.clampColumns(min(max(defaults.integer(forKey: Self.gridColumnsKey), Self.gridColumnRange.lowerBound), Self.gridColumnRange.upperBound))
+        gridRowsPerPage = Self.clampRows(min(max(defaults.integer(forKey: Self.gridRowsKey), Self.gridRowRange.lowerBound), Self.gridRowRange.upperBound))
         iconColumnSpacing = Self.clampColumnSpacing(defaults.object(forKey: Self.columnSpacingKey) as? Double ?? 18)
         iconRowSpacing = Self.clampRowSpacing(defaults.object(forKey: Self.rowSpacingKey) as? Double ?? 14)
 
@@ -1149,16 +1181,21 @@ final class SettingsStore: ObservableObject {
     }
 
     private static func loadHotKeyConfiguration() -> HotKeyConfiguration? {
-        guard let data = UserDefaults.standard.data(forKey: globalHotKeyKey),
-              let config = try? JSONDecoder().decode(HotKeyConfiguration.self, from: data) else {
+        guard let dict = UserDefaults.standard.dictionary(forKey: globalHotKeyKey),
+              let keyCode = dict["keyCode"] as? Int,
+              let modifiersRawValue = dict["modifiersRawValue"] as? Int else {
             return nil
         }
-        return config
+        return HotKeyConfiguration(keyCode: UInt16(keyCode), modifierFlags: NSEvent.ModifierFlags(rawValue: UInt(modifiersRawValue)))
     }
 
     private func persistHotKeyConfiguration() {
-        if let config = globalHotKey, let data = try? JSONEncoder().encode(config) {
-            UserDefaults.standard.set(data, forKey: Self.globalHotKeyKey)
+        if let config = globalHotKey {
+            let dict: [String: Any] = [
+                "keyCode": Int(config.keyCode),
+                "modifiersRawValue": Int(config.modifiersRawValue)
+            ]
+            UserDefaults.standard.set(dict, forKey: Self.globalHotKeyKey)
         } else {
             UserDefaults.standard.removeObject(forKey: Self.globalHotKeyKey)
         }

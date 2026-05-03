@@ -72,7 +72,7 @@ final class AppScanner {
                               !self.isInsideAnotherApp(resolved) else { continue }
                         if !seenPaths.contains(resolved.path) {
                             seenPaths.insert(resolved.path)
-                            found.append(delegate.appInfo(from: resolved, loadIcon: false))
+                            found.append(delegate.appInfo(from: resolved, preferredName: nil, loadIcon: false))
                         }
                     }
                 }
@@ -132,7 +132,7 @@ final class AppScanner {
                                   !self.isInsideAnotherApp(resolved) else { continue }
                             if !localSeenPaths.contains(resolved.path) {
                                 localSeenPaths.insert(resolved.path)
-                                localFound.append(delegate.appInfo(from: resolved, loadIcon: false))
+                                localFound.append(delegate.appInfo(from: resolved, preferredName: nil, loadIcon: false))
                             }
                         }
 
@@ -234,7 +234,7 @@ final class AppScanner {
         delegate.pruneHiddenAppsFromAppList()
 
         // Step 4: Smart-rebuild items list, preserve user order
-        delegate.smartRebuildItemsWithOrderPreservation(currentItems: currentItems, newApps: newAppsToAdd)
+        delegate.persistenceSmartRebuildItemsWithOrderPreservation(currentItems: currentItems, newApps: newAppsToAdd)
 
         // Step 5: Auto-fill within pages
         delegate.compactItemsWithinPages()
@@ -500,7 +500,7 @@ final class AppScanner {
                 let exists = FileManager.default.fileExists(atPath: url.path)
                 let valid = exists && self!.isValidApp(at: url) && !self!.isInsideAnotherApp(url)
                 if valid {
-                    let info = delegate.appInfo(from: url)
+                    let info = delegate.appInfo(from: url, preferredName: nil, loadIcon: nil)
                     if pathToIndex[url.path] != nil {
                         changes.append(.update(info))
                     } else {

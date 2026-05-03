@@ -311,7 +311,7 @@ struct LaunchpadView: View {
     private var launchpadEventBoundView: some View {
         launchpadBaseView
         .sheet(isPresented: $appStore.isSetting) {
-            SettingsView(appStore: appStore)
+            SettingsView(appStore: appStore, settingsStore: appStore.settingsStore)
         }
         .onChange(of: appStore.settingsStore.followScrollPagingEnabled) { _ in
             if scrollState.followOffset != 0 || scrollState.accumulatedX != 0 || scrollState.isUserSwiping {
@@ -666,8 +666,8 @@ struct LaunchpadView: View {
 
             if let openFolder = appStore.openFolder {
                 GeometryReader { proxy in
-                    let widthFactor: CGFloat = appStore.settingsStore.isFullscreenMode ? 0.7 : CGFloat(appStore.folderPopoverWidthFactor)
-                    let heightFactor: CGFloat = appStore.settingsStore.isFullscreenMode ? 0.7 : CGFloat(appStore.folderPopoverHeightFactor)
+                    let widthFactor: CGFloat = appStore.settingsStore.isFullscreenMode ? 0.7 : CGFloat(appStore.settingsStore.folderPopoverWidthFactor)
+                    let heightFactor: CGFloat = appStore.settingsStore.isFullscreenMode ? 0.7 : CGFloat(appStore.settingsStore.folderPopoverHeightFactor)
                     let minWidth: CGFloat = appStore.settingsStore.isFullscreenMode ? 520 : 560
                     let minHeight: CGFloat = 420
                     let rawHorizontalMargin: CGFloat = appStore.settingsStore.isFullscreenMode ? max(proxy.size.width * 0.15, 120) : 32
@@ -2657,7 +2657,7 @@ extension LaunchpadView {
         if scrollState.wheelLastDirection != direction { scrollState.wheelAccumulated = 0 }
         scrollState.wheelLastDirection = direction
         scrollState.wheelAccumulated += abs(primaryDelta)
-        let baselineSensitivity = max(AppStore.defaultScrollSensitivity, 0.0001)
+        let baselineSensitivity = max(SettingsStore.defaultScrollSensitivity, 0.0001)
         let relativeSensitivity = max(appStore.settingsStore.scrollSensitivity, 0.0001) / baselineSensitivity
         // Scale wheel threshold by sensitivity.
         let threshold: CGFloat = 2.0 / CGFloat(relativeSensitivity)
@@ -2672,7 +2672,7 @@ extension LaunchpadView {
     }
 
     private func flipThreshold(_ pageWidth: CGFloat) -> CGFloat {
-        let baseline = max(AppStore.defaultScrollSensitivity, 0.001)
+        let baseline = max(SettingsStore.defaultScrollSensitivity, 0.001)
         return pageWidth * ((baseline * baseline) / max(appStore.settingsStore.scrollSensitivity, 0.001))
     }
 

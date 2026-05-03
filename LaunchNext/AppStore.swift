@@ -637,9 +637,7 @@ enum AppearancePreference: String, CaseIterable, Identifiable {
     // Background refresh queue and throttle
     private let refreshQueue = DispatchQueue(label: "app.store.refresh", qos: .userInitiated)
     private var gridRefreshWorkItem: DispatchWorkItem?
-    private var rescanWorkItem: DispatchWorkItem?
     private var customTitleRefreshWorkItem: DispatchWorkItem?
-    private let fsEventsQueue = DispatchQueue(label: "app.store.fsevents")
     private let customIconFileURL: URL
     private let defaultAppIcon: NSImage
     private var volumeObservers: [NSObjectProtocol] = []
@@ -1709,137 +1707,22 @@ enum AppearancePreference: String, CaseIterable, Identifiable {
         }
     }
 
-    // MARK: - FSEvents wiring
+    // MARK: - FSEvents forwarding (implemented in AppScanner)
+
     func startAutoRescan() {
-        guard fsEventStream == nil else { return }
-
-        let pathsToWatch = applicationSearchPaths
-        guard !pathsToWatch.isEmpty else { return }
-
-        let box = FSEventContextBox(store: self)
-        let ptr = Unmanaged.passRetained(box).toOpaque()
-        fsEventContextPointer = UnsafeMutableRawPointer(ptr)
-        var context = FSEventStreamContext(
-            version: 0,
-            info: fsEventContextPointer,
-            retain: nil,
-            release: nil,
-            copyDescription: nil
-        )
-
-        let callback: FSEventStreamCallback = { (_, clientInfo, numEvents, eventPaths, eventFlags, _) in
-            guard let info = clientInfo else { return }
-            let box = Unmanaged<FSEventContextBox>.fromOpaque(info).takeUnretainedValue()
-            guard let appStore = box.store else { return }
-
-            guard numEvents > 0 else {
-                appStore.handleFSEvents(paths: [], flagsPointer: eventFlags, count: 0)
-                return
-            }
-
-            // With kFSEventStreamCreateFlagUseCFTypes, eventPaths is a CFArray of CFString
-            let cfArray = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue()
-            let nsArray = cfArray as NSArray
-            guard let pathsArray = nsArray as? [String] else { return }
-
-            appStore.handleFSEvents(paths: pathsArray, flagsPointer: eventFlags, count: numEvents)
-        }
-
-        let flags = FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer | kFSEventStreamCreateFlagUseCFTypes)
-        let latency: CFTimeInterval = 0.0
-
-        guard let stream = FSEventStreamCreate(
-            kCFAllocatorDefault,
-            callback,
-            &context,
-            pathsToWatch as CFArray,
-            FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
-            latency,
-            flags
-        ) else {
-            // Balance the passRetained if stream creation fails
-            Unmanaged<FSEventContextBox>.fromOpaque(ptr).release()
-            fsEventContextPointer = nil
-            return
-        }
-
-        fsEventStream = stream
-        FSEventStreamSetDispatchQueue(stream, fsEventsQueue)
-        FSEventStreamStart(stream)
+        scanner.startAutoRescan()
     }
 
     func stopAutoRescan() {
-        // Balance the passRetained from startAutoRescan
-        if let ptr = fsEventContextPointer {
-            Unmanaged<FSEventContextBox>.fromOpaque(ptr).release()
-            fsEventContextPointer = nil
-        }
-        guard let stream = fsEventStream else { return }
-        FSEventStreamStop(stream)
-        FSEventStreamInvalidate(stream)
-        FSEventStreamRelease(stream)
-        fsEventStream = nil
-        stopFallbackScanTimer()
+        scanner.stopAutoRescan()
     }
 
     func restartAutoRescan() {
-        stopAutoRescan()
-        startAutoRescan()
+        scanner.restartAutoRescan()
     }
-
-    // MARK: - Fallback periodic scan
-
-    /// Periodically verifies the app list against the filesystem to catch
-    /// changes that FSEvents may have missed (e.g. events dropped during
-    /// app install, or while the process was suspended).
-    private static let fallbackScanInterval: TimeInterval = 5 * 60 // 5 minutes
 
     func startFallbackScanTimer() {
-        stopFallbackScanTimer()
-        let timer = DispatchSource.makeTimerSource(queue: refreshQueue)
-        timer.schedule(deadline: .now() + Self.fallbackScanInterval,
-                       repeating: Self.fallbackScanInterval)
-        timer.setEventHandler { [weak self] in
-            self?.performFallbackScanIfNeeded()
-        }
-        timer.activate()
-        fallbackScanTimer = timer
-    }
-
-    private func stopFallbackScanTimer() {
-        fallbackScanTimer?.cancel()
-        fallbackScanTimer = nil
-    }
-
-    private func performFallbackScanIfNeeded() {
-        guard !apps.isEmpty else { return }
-        let currentPaths = Set(apps.map { $0.url.path })
-
-        refreshQueue.async { [weak self] in
-            guard let self else { return }
-            var diskPaths = Set<String>()
-            for path in self.applicationSearchPaths {
-                let url = URL(fileURLWithPath: path)
-                if let enumerator = FileManager.default.enumerator(
-                    at: url,
-                    includingPropertiesForKeys: nil,
-                    options: [.skipsHiddenFiles, .skipsPackageDescendants]
-                ) {
-                    for case let item as URL in enumerator {
-                        let resolved = item.resolvingSymlinksInPath()
-                        guard resolved.pathExtension == "app",
-                              self.isValidApp(at: resolved),
-                              !self.isInsideAnotherApp(resolved) else { continue }
-                        diskPaths.insert(resolved.path)
-                    }
-                }
-            }
-            if diskPaths != currentPaths {
-                DispatchQueue.main.async { [weak self] in
-                    self?.scanApplicationsWithOrderPreservation()
-                }
-            }
-        }
+        scanner.startFallbackScanTimer()
     }
 
     @discardableResult
@@ -1915,157 +1798,6 @@ enum AppearancePreference: String, CaseIterable, Identifiable {
             self.restartAutoRescan()
             self.scanApplicationsWithOrderPreservation()
         }
-    }
-
-    private func handleFSEvents(paths: [String], flagsPointer: UnsafePointer<FSEventStreamEventFlags>?, count: Int) {
-        let maxCount = min(paths.count, count)
-        var localForceFull = false
-        
-        for i in 0..<maxCount {
-            let rawPath = paths[i]
-            let flags = flagsPointer?[i] ?? 0
-
-            let created = (flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemCreated)) != 0
-            let removed = (flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemRemoved)) != 0
-            let renamed = (flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemRenamed)) != 0
-            let modified = (flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemModified)) != 0
-            let isDir = (flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemIsDir)) != 0
-
-            if isDir && (created || removed || renamed), applicationSearchPaths.contains(where: { rawPath.hasPrefix($0) }) {
-                localForceFull = true
-                break
-            }
-
-            guard let appBundlePath = self.canonicalAppBundlePath(for: rawPath) else { continue }
-            if created || removed || renamed || modified {
-                pendingChangedAppPaths.insert(appBundlePath)
-            }
-        }
-
-        if localForceFull { pendingForceFullScan = true }
-        scheduleRescan()
-    }
-
-    private func scheduleRescan() {
-        // Debounce to coalesce rapid FSEvents (e.g. app installs write many files).
-        // 1 second lets the dust settle before rescanning.
-        rescanWorkItem?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.performImmediateRefresh() }
-        rescanWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
-    }
-
-    private func performImmediateRefresh() {
-        if pendingForceFullScan || pendingChangedAppPaths.count > fullRescanThreshold {
-            pendingForceFullScan = false
-            pendingChangedAppPaths.removeAll()
-            scanApplications()
-            return
-        }
-        
-        let changed = pendingChangedAppPaths
-        pendingChangedAppPaths.removeAll()
-        
-        if !changed.isEmpty {
-            applyIncrementalChanges(for: changed)
-        }
-    }
-
-
-    private func applyIncrementalChanges(for changedPaths: Set<String>) {
-        guard !changedPaths.isEmpty else { return }
-        
-        // Move disk I/O and icon parsing to background; main thread only applies results to reduce jank
-        let snapshotApps = self.apps
-        refreshQueue.async { [weak self] in
-            guard let self else { return }
-            
-            enum PendingChange {
-                case insert(AppInfo)
-                case update(AppInfo)
-                case remove(String) // path
-            }
-            var changes: [PendingChange] = []
-            var pathToIndex: [String: Int] = [:]
-            for (idx, app) in snapshotApps.enumerated() { pathToIndex[app.url.path] = idx }
-            
-            for path in changedPaths {
-                let url = URL(fileURLWithPath: path).resolvingSymlinksInPath()
-                let exists = FileManager.default.fileExists(atPath: url.path)
-                let valid = exists && self.isValidApp(at: url) && !self.isInsideAnotherApp(url)
-                if valid {
-                    let info = self.appInfo(from: url)
-                    if pathToIndex[url.path] != nil {
-                        changes.append(.update(info))
-                    } else {
-                        changes.append(.insert(info))
-                    }
-                } else {
-                    changes.append(.remove(url.path))
-                }
-            }
-            
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                
-                // App delete event: preserve existing icon, etc. pending volume remount
-                
-                // appupdate
-                let updates: [AppInfo] = changes.compactMap { if case .update(let info) = $0 { return info } else { return nil } }
-                if !updates.isEmpty {
-                    var map: [String: Int] = [:]
-                    for (idx, app) in self.apps.enumerated() { map[app.url.path] = idx }
-                    for info in updates {
-                        let standardizedInfoPath = self.standardizedFilePath(info.url.path)
-                        if let idx = map[info.url.path], self.apps.indices.contains(idx) { self.apps[idx] = info }
-                        for fIdx in self.folders.indices {
-                            for aIdx in self.folders[fIdx].apps.indices where self.folders[fIdx].apps[aIdx].url.path == info.url.path {
-                                self.folders[fIdx].apps[aIdx] = info
-                            }
-                        }
-                        for iIdx in self.items.indices {
-                            switch self.items[iIdx] {
-                            case .app(let a):
-                                if self.standardizedFilePath(a.url.path) == standardizedInfoPath {
-                                    self.items[iIdx] = .app(info)
-                                    self.clearMissingPlaceholder(for: standardizedInfoPath)
-                                }
-                            case .missingApp(let placeholder):
-                                if self.standardizedFilePath(placeholder.bundlePath) == standardizedInfoPath {
-                                    self.items[iIdx] = .app(info)
-                                    self.clearMissingPlaceholder(for: standardizedInfoPath)
-                                }
-                            default:
-                                break
-                            }
-                        }
-                    }
-                    self.persistence.rebuildItems()
-                }
-                
-                // Add new apps
-                let inserts: [AppInfo] = changes.compactMap { if case .insert(let info) = $0 { return info } else { return nil } }
-                if !inserts.isEmpty {
-                    self.apps.append(contentsOf: inserts)
-                    self.apps.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-                    self.persistence.rebuildItems()
-                }
-                
-                // refreshandPersistence
-                self.triggerFolderUpdate()
-                self.triggerGridRefresh()
-                self.refreshMissingPlaceholders()
-                self.persistence.saveAllOrder()
-                self.updateCacheAfterChanges()
-            }
-        }
-    }
-
-    private func canonicalAppBundlePath(for rawPath: String) -> String? {
-        guard let range = rawPath.range(of: ".app") else { return nil }
-        let end = rawPath.index(range.lowerBound, offsetBy: 4)
-        let bundlePath = String(rawPath[..<end])
-        return bundlePath
     }
 
     private func isInsideAnotherApp(_ url: URL) -> Bool {
@@ -2280,14 +2012,7 @@ enum AppearancePreference: String, CaseIterable, Identifiable {
     }
 
     func setPageIndicatorOverride(_ override: PageIndicatorOverride?, for screenID: String) {
-        var updated = settingsStore.pageIndicatorOverrides
-        if let override {
-            updated[screenID] = override
-        } else {
-            updated.removeValue(forKey: screenID)
-        }
-        settingsStore.pageIndicatorOverrides = updated
-        persistPageIndicatorOverrides(updated)
+        settingsStore.setPageIndicatorOverride(override, for: screenID)
     }
 
     func applyIndicatorDefaults(to screenID: String) {
@@ -2512,7 +2237,7 @@ enum AppearancePreference: String, CaseIterable, Identifiable {
     }
     
     /// Incremental updateafterupdatecache
-    private func updateCacheAfterChanges() {
+    func updateCacheAfterChanges() {
         // checkcachewhetherneedupdate
         if !cacheManager.isCacheValid {
             // cacheinvalid，renewGenerate
@@ -3558,6 +3283,61 @@ extension AppStore: AppStoreServiceDelegate, SettingsSideEffects {
     // Persistence Helpers: removableSourcePath, updateMissingPlaceholder,
     // clearMissingPlaceholder, appInfo, standardizedFilePath, placeholderAppInfo,
     // pruneHiddenAppsFromAppList, refreshMissingPlaceholders already exist on AppStore
+
+    // Additional state reads (settings-routed)
+    var currentApplicationSearchPaths: [String] { applicationSearchPaths }
+    var currentCustomAppSourcePaths: [String] { settingsStore.customAppSourcePaths }
+    var currentIsFullscreenMode: Bool { settingsStore.isFullscreenMode }
+    var currentGridColumnsPerPage: Int { settingsStore.gridColumnsPerPage }
+    var currentGridRowsPerPage: Int { settingsStore.gridRowsPerPage }
+    var currentRememberLastPage: Bool { settingsStore.rememberLastPage }
+
+    // Additional state writes
+    func applyAppListChanges(_ apps: [AppInfo]) {
+        self.apps = apps
+    }
+
+    func applyClearFolders() {
+        folders = []
+    }
+
+    func applyOpenFolder(_ folder: FolderInfo?) {
+        openFolder = folder
+    }
+
+    func applyCurrentPage(_ page: Int) {
+        currentPage = page
+    }
+
+    func applyHasPerformedInitialScan(_ value: Bool) {
+        hasPerformedInitialScan = value
+    }
+
+    func persistenceSmartRebuildItemsWithOrderPreservation(currentItems: [LaunchpadItem], newApps: [AppInfo]) {
+        persistence.smartRebuildItemsWithOrderPreservation(currentItems: currentItems, newApps: newApps)
+    }
+
+    func persistenceClearAllPersistedData() {
+        persistence.clearAllPersistedData()
+    }
+
+    func triggerFullRescan(loadPersistedOrder: Bool) {
+        if loadPersistedOrder {
+            scanApplicationsWithOrderPreservation()
+        } else {
+            forceFullRescan()
+        }
+    }
+
+    func clearAllCaches() {
+        cacheManager.clearAllCaches()
+    }
+
+    func refreshCacheAfterScan() {
+        cacheManager.refreshCache(from: apps, items: items, itemsPerPage: itemsPerPage,
+                                   columns: settingsStore.gridColumnsPerPage,
+                                   rows: settingsStore.gridRowsPerPage)
+    }
 
     // MARK: - SettingsSideEffects Conformance
 
