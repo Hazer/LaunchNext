@@ -1730,7 +1730,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
             }
             self.appStore.searchText = ""
             self.appStore.openFolder = nil
-            self.appStore.saveAllOrder()
+            self.appStore.persistence.saveAllOrder()
             NotificationCenter.default.post(name: .launchpadWindowHidden, object: nil)
         }
 

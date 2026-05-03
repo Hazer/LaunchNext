@@ -3761,7 +3761,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         appStore.removeEmptyPages()
         appStore.folderUpdateTrigger = UUID()
         appStore.gridRefreshTrigger = UUID()
-        appStore.saveAllOrder()
+        appStore.persistence.saveAllOrder()
     }
 
     private var shortcutsSection: some View {

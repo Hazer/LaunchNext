@@ -1894,7 +1894,8 @@ private struct DefaultsCache {
     // State flags
     private var hasPerformedInitialScan: Bool = false
     private var cancellables: Set<AnyCancellable> = []
-    private var hasAppliedOrderFromStore: Bool = false
+    var hasAppliedOrderFromStore: Bool = false
+    private(set) lazy var persistence = OrderPersistence(delegate: self)
     
     // Background refresh queue and throttle
     private let refreshQueue = DispatchQueue(label: "app.store.refresh", qos: .userInitiated)
@@ -2014,7 +2015,7 @@ private struct DefaultsCache {
         return .missingApp(currentPlaceholder)
     }
 
-    private func placeholderAppInfo(forMissingPath path: String, preferredName: String? = nil) -> AppInfo? {
+    func placeholderAppInfo(forMissingPath path: String, preferredName: String? = nil) -> AppInfo? {
         guard let placeholder = updateMissingPlaceholder(path: path, displayName: preferredName) else {
             return nil
         }
@@ -2025,7 +2026,7 @@ private struct DefaultsCache {
         return info
     }
 
-    private func refreshMissingPlaceholders() {
+    func refreshMissingPlaceholders() {
         guard !items.isEmpty else {
             if !missingPlaceholders.isEmpty {
                 missingPlaceholders.removeAll()
@@ -2235,7 +2236,7 @@ private struct DefaultsCache {
         triggerGridRefresh()
         compactItemsWithinPages()
         refreshMissingPlaceholders()
-        saveAllOrder()
+        persistence.saveAllOrder()
     }
 
     private func sanitizedCustomPaths(from rawPaths: [String]) -> [String] {
@@ -2777,7 +2778,7 @@ private struct DefaultsCache {
         
         // Try loading persistence data immediately (if available) — do not set flag too early, wait until loading completes
         if !hasAppliedOrderFromStore {
-            loadAllOrder()
+            persistence.loadAllOrder()
         }
         
         $apps
@@ -2787,7 +2788,7 @@ private struct DefaultsCache {
             .sink { [weak self] _ in
                 guard let self else { return }
                 if !self.hasAppliedOrderFromStore {
-                    self.loadAllOrder()
+                    self.persistence.loadAllOrder()
                 }
             }
             .store(in: &cancellables)
@@ -2799,7 +2800,7 @@ private struct DefaultsCache {
                 guard let self = self, !self.items.isEmpty else { return }
                 // Debounced save to avoid frequent writes
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    self.saveAllOrder()
+                    self.persistence.saveAllOrder()
                 }
             }
             .store(in: &cancellables)
@@ -2848,13 +2849,13 @@ private struct DefaultsCache {
     private func isExistingUserForOnboarding() -> Bool {
         if !hiddenAppPaths.isEmpty { return true }
         if !customTitles.isEmpty { return true }
-        if hasPersistedOrderData() { return true }
+        if persistence.hasPersistedOrderData() { return true }
         return false
     }
 
     // MARK: - Order Persistence
     func applyOrderAndFolders() {
-        self.loadAllOrder()
+        self.persistence.loadAllOrder()
     }
 
     // MARK: - Initial scan (once)
@@ -2863,7 +2864,7 @@ private struct DefaultsCache {
 
         // Load persisted order first (before scan can overwrite it)
         if !hasAppliedOrderFromStore {
-            loadAllOrder()
+            persistence.loadAllOrder()
         }
 
         hasPerformedInitialScan = true
@@ -2976,11 +2977,11 @@ private struct DefaultsCache {
                 self.apps = sorted
                 self.pruneHiddenAppsFromAppList()
                 if loadPersistedOrder {
-                    self.rebuildItems()
-                    self.loadAllOrder()
+                    self.persistence.rebuildItems()
+                    self.persistence.loadAllOrder()
                 } else {
                     self.items = self.filteredItemsRemovingHidden(from: sorted.map { .app($0) })
-                    self.saveAllOrder()
+                    self.persistence.saveAllOrder()
                 }
                 self.refreshMissingPlaceholders()
                 
@@ -3120,7 +3121,7 @@ private struct DefaultsCache {
         pruneHiddenAppsFromAppList()
         
         // Step 4: Smart-rebuild items list, preserve user order
-        self.smartRebuildItemsWithOrderPreservation(currentItems: currentItems, newApps: newAppsToAdd)
+        self.persistence.smartRebuildItemsWithOrderPreservation(currentItems: currentItems, newApps: newAppsToAdd)
         
         // Step 5: Auto-fill within pages
         self.compactItemsWithinPages()
@@ -3129,319 +3130,11 @@ private struct DefaultsCache {
         self.refreshMissingPlaceholders()
 
         // Step 6: Save new order
-        self.saveAllOrder()
+        self.persistence.saveAllOrder()
 
         // Trigger UI update
         self.triggerFolderUpdate()
         self.triggerGridRefresh()
-    }
-    
-    /// Strict order-preserving rebuild method
-    private func rebuildItemsWithStrictOrderPreservation(currentItems: [LaunchpadItem]) {
-        
-        var newItems: [LaunchpadItem] = []
-        let appsInFolders = Set(self.folders.flatMap { $0.apps })
-        
-        // Strictly maintain existing items order and positions
-        for (_, item) in currentItems.enumerated() {
-            switch item {
-            case .folder(let folder):
-                // Check if folder still exists in
-                if self.folders.contains(where: { $0.id == folder.id }) {
-                    // Update folderreference，maintainoriginal position
-                    if let updatedFolder = self.folders.first(where: { $0.id == folder.id }) {
-                        newItems.append(.folder(updatedFolder))
-                    } else {
-                        // folderdeleted，maintainempty slot
-                        newItems.append(.empty(UUID().uuidString))
-                    }
-                } else {
-                    // folderdeleted，maintainempty slot
-                    newItems.append(.empty(UUID().uuidString))
-                }
-                
-            case .app(let app):
-                let standardizedPath = standardizedFilePath(app.url.path)
-                // Check if app still exists in
-                if self.apps.contains(where: { standardizedFilePath($0.url.path) == standardizedPath }) {
-                    if !appsInFolders.contains(app) {
-                        // appStill exists and not in a folder，maintainoriginal position
-                        newItems.append(.app(app))
-                    } else {
-                        // appNow in a folder，maintainempty slot
-                        newItems.append(.empty(UUID().uuidString))
-                    }
-                } else {
-                    // appmissing：Convert to placeholder
-                    if let placeholder = updateMissingPlaceholder(path: standardizedPath, displayName: app.name) {
-                        newItems.append(.missingApp(placeholder))
-                    } else {
-                        newItems.append(.empty(UUID().uuidString))
-                    }
-                }
-            case .missingApp(let placeholder):
-                if let item = currentMissingAppItem(for: placeholder) {
-                    newItems.append(item)
-                } else {
-                    newItems.append(.empty(UUID().uuidString))
-                }
-            case .empty(let token):
-                // Maintain empty slots, preserve page layout
-                newItems.append(.empty(token))
-            }
-        }
-
-        // Append free apps (not in any folder) to the end of last page
-        let existingAppPaths = Set(newItems.compactMap { item -> String? in
-            switch item {
-            case .app(let app):
-                return standardizedFilePath(app.url.path)
-            case .missingApp(let placeholder):
-                return standardizedFilePath(placeholder.bundlePath)
-            default:
-                return nil
-            }
-        })
-        
-        let newFreeApps = self.apps.filter { app in
-            !appsInFolders.contains(app) && !existingAppPaths.contains(standardizedFilePath(app.url.path))
-        }
-        
-        if !newFreeApps.isEmpty {
-            var pendingApps = newFreeApps
-            let itemsPerPage = self.itemsPerPage
-
-            if newItems.count > 0 {
-                let lastPageStart = ((newItems.count - 1) / itemsPerPage) * itemsPerPage
-                let lastPageIndices = Array(lastPageStart..<newItems.count)
-                let emptyIndices = lastPageIndices.filter { index in
-                    if case .empty = newItems[index] { return true }
-                    return false
-                }
-                let fillCount = min(pendingApps.count, emptyIndices.count)
-                for i in 0..<fillCount {
-                    newItems[emptyIndices[i]] = .app(pendingApps.removeFirst())
-                }
-            }
-
-            if !pendingApps.isEmpty {
-                let remainder = newItems.count % itemsPerPage
-                if remainder != 0 {
-                    let fillCount = min(itemsPerPage - remainder, pendingApps.count)
-                    for _ in 0..<fillCount {
-                        newItems.append(.app(pendingApps.removeFirst()))
-                    }
-                }
-
-                while !pendingApps.isEmpty {
-                    for _ in 0..<itemsPerPage {
-                        if pendingApps.isEmpty {
-                            newItems.append(.empty(UUID().uuidString))
-                        } else {
-                            newItems.append(.app(pendingApps.removeFirst()))
-                        }
-                    }
-                }
-            }
-        }
-
-        self.items = filteredItemsRemovingHidden(from: newItems)
-    }
-    
-    /// Smart rebuild items list, maintain user order
-    private func smartRebuildItemsWithOrderPreservation(currentItems: [LaunchpadItem], newApps: [AppInfo]) {
-        
-        // Save current persistence data, but do not load immediately (avoid overwriting existing order)
-        let hasPersistedData = self.hasPersistedOrderData()
-        
-        if hasPersistedData {
-            
-            // Smart merge existing order with persistence data
-            self.mergeCurrentOrderWithPersistedData(currentItems: currentItems, newApps: newApps, loadPersistedFolders: true)
-        } else {
-            
-            // When no persistence data, merge directly based on current order
-            self.mergeCurrentOrderWithPersistedData(currentItems: currentItems, newApps: newApps, loadPersistedFolders: false)
-        }
-        
-    }
-    
-    /// Check if persistence data exists
-    private func hasPersistedOrderData() -> Bool {
-        guard let modelContext = self.modelContext else { return false }
-        
-        do {
-            let pageEntries = try modelContext.fetch(FetchDescriptor<PageEntryData>())
-            let topItems = try modelContext.fetch(FetchDescriptor<TopItemData>())
-            return !pageEntries.isEmpty || !topItems.isEmpty
-        } catch {
-            return false
-        }
-    }
-    
-    /// Smart merge existing order with persistence data
-    private func mergeCurrentOrderWithPersistedData(currentItems: [LaunchpadItem], newApps: [AppInfo], loadPersistedFolders: Bool = true) {
-        
-        // Save current item order
-        let currentOrder = currentItems
-        
-        // Load persistence data, but only update folder info
-        if loadPersistedFolders {
-            self.loadFoldersFromPersistedData()
-        }
-        
-        // Rebuild items list, strictly maintain existing order
-        var newItems: [LaunchpadItem] = []
-        let appsInFolders = Set(self.folders.flatMap { $0.apps })
-        let refreshedAppsByPath = Dictionary(uniqueKeysWithValues: self.apps.map { ($0.url.path, $0) })
-
-        // Step 1: Process existing items, maintain order
-        for (_, item) in currentOrder.enumerated() {
-            switch item {
-            case .folder(let folder):
-                // Check if folder still exists in
-                if self.folders.contains(where: { $0.id == folder.id }) {
-                    // Update folderreference，maintainoriginal position
-                    if let updatedFolder = self.folders.first(where: { $0.id == folder.id }) {
-                        newItems.append(.folder(updatedFolder))
-                    } else {
-                        // folderdeleted，maintainempty slot
-                        newItems.append(.empty(UUID().uuidString))
-                    }
-                } else {
-                    // folderdeleted，maintainempty slot
-                    newItems.append(.empty(UUID().uuidString))
-                }
-                
-            case .app(let app):
-                let standardizedPath = standardizedFilePath(app.url.path)
-                // Check if app still exists in
-                if self.apps.contains(where: { standardizedFilePath($0.url.path) == standardizedPath }) {
-                    if !appsInFolders.contains(app) {
-                        // appStill exists and not in a folder，updateaslatestinfo
-                        let updatedApp = refreshedAppsByPath[app.url.path] ?? app
-                        newItems.append(.app(updatedApp))
-                    } else {
-                        // appNow in a folder，maintainempty slot
-                        newItems.append(.empty(UUID().uuidString))
-                    }
-                } else {
-                    // appmissing：Convert to placeholder
-                    if let placeholder = updateMissingPlaceholder(path: standardizedPath, displayName: app.name) {
-                        newItems.append(.missingApp(placeholder))
-                    } else {
-                        newItems.append(.empty(UUID().uuidString))
-                    }
-                }
-            case .missingApp(let placeholder):
-                if let item = currentMissingAppItem(for: placeholder) {
-                    newItems.append(item)
-                } else {
-                    newItems.append(.empty(UUID().uuidString))
-                }
-            case .empty(let token):
-                // Maintain empty slots, preserve page layout
-                newItems.append(.empty(token))
-            }
-        }
-
-        // Step 2: Append free apps (not in any folder) to the end of last page
-        let existingAppPaths = Set(newItems.compactMap { item -> String? in
-            switch item {
-            case .app(let app):
-                return standardizedFilePath(app.url.path)
-            case .missingApp(let placeholder):
-                return standardizedFilePath(placeholder.bundlePath)
-            default:
-                return nil
-            }
-        })
-
-        let newFreeApps = self.apps.filter { app in
-            !appsInFolders.contains(app) && !existingAppPaths.contains(standardizedFilePath(app.url.path))
-        }
-        
-        if !newFreeApps.isEmpty {
-            var pendingApps = newFreeApps
-            let itemsPerPage = self.itemsPerPage
-
-            if newItems.count > 0 {
-                let lastPageStart = ((newItems.count - 1) / itemsPerPage) * itemsPerPage
-                let lastPageIndices = Array(lastPageStart..<newItems.count)
-                let emptyIndices = lastPageIndices.filter { index in
-                    if case .empty = newItems[index] { return true }
-                    return false
-                }
-                let fillCount = min(pendingApps.count, emptyIndices.count)
-                for i in 0..<fillCount {
-                    newItems[emptyIndices[i]] = .app(pendingApps.removeFirst())
-                }
-            }
-
-            if !pendingApps.isEmpty {
-                let remainder = newItems.count % itemsPerPage
-                if remainder != 0 {
-                    let fillCount = min(itemsPerPage - remainder, pendingApps.count)
-                    for _ in 0..<fillCount {
-                        newItems.append(.app(pendingApps.removeFirst()))
-                    }
-                }
-
-                while !pendingApps.isEmpty {
-                    for _ in 0..<itemsPerPage {
-                        if pendingApps.isEmpty {
-                            newItems.append(.empty(UUID().uuidString))
-                        } else {
-                            newItems.append(.app(pendingApps.removeFirst()))
-                        }
-                    }
-                }
-            }
-        }
-        
-        self.items = filteredItemsRemovingHidden(from: newItems)
-
-    }
-    
-    /// Only load folder info, do not rebuild item order
-    private func loadFoldersFromPersistedData() {
-        guard let modelContext = self.modelContext else { return }
-        
-        do {
-            // Try reading folder info from new page-slot model
-            let saved = try modelContext.fetch(FetchDescriptor<PageEntryData>(
-                sortBy: [SortDescriptor(\.pageIndex, order: .forward), SortDescriptor(\.position, order: .forward)]
-            ))
-            
-            if !saved.isEmpty {
-                // buildfolder
-                var folderMap: [String: FolderInfo] = [:]
-                var foldersInOrder: [FolderInfo] = []
-                
-                for row in saved where row.kind == "folder" {
-                    guard let fid = row.folderId else { continue }
-                    if folderMap[fid] != nil { continue }
-                    
-                    let folderApps: [AppInfo] = row.appPaths.compactMap { path in
-                        if let existing = apps.first(where: { $0.url.path == path }) {
-                            return existing
-                        }
-                        let url = URL(fileURLWithPath: path)
-                        if FileManager.default.fileExists(atPath: url.path) {
-                            return self.appInfo(from: url)
-                        }
-                        return self.placeholderAppInfo(forMissingPath: path)
-                    }
-                    
-                    let folder = FolderInfo(id: fid, name: row.folderName ?? "Untitled", apps: folderApps, createdAt: row.createdAt)
-                    folderMap[fid] = folder
-                    foldersInOrder.append(folder)
-                }
-                
-                self.folders = self.sanitizedFolders(foldersInOrder)
-            }
-        } catch {
-        }
     }
 
     // MARK: - AI Overlay Preview
@@ -3811,7 +3504,7 @@ private struct DefaultsCache {
                             }
                         }
                     }
-                    self.rebuildItems()
+                    self.persistence.rebuildItems()
                 }
                 
                 // Add new apps
@@ -3819,14 +3512,14 @@ private struct DefaultsCache {
                 if !inserts.isEmpty {
                     self.apps.append(contentsOf: inserts)
                     self.apps.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-                    self.rebuildItems()
+                    self.persistence.rebuildItems()
                 }
                 
                 // refreshandPersistence
                 self.triggerFolderUpdate()
                 self.triggerGridRefresh()
                 self.refreshMissingPlaceholders()
-                self.saveAllOrder()
+                self.persistence.saveAllOrder()
                 self.updateCacheAfterChanges()
             }
         }
@@ -3914,7 +3607,7 @@ private struct DefaultsCache {
         // Refresh cache, ensure search can find newly created folder's apps
         refreshCacheAfterFolderOperation()
 
-        saveAllOrder()
+        persistence.saveAllOrder()
         return folder
     }
     
@@ -3941,7 +3634,7 @@ private struct DefaultsCache {
             removeEmptyPages()
         } else {
             // If not found, fall back to rebuild
-            rebuildItems()
+            persistence.rebuildItems()
         }
         
         // Ensure items for corresponding folder also update to latest contents, for search visibility
@@ -3960,7 +3653,7 @@ private struct DefaultsCache {
         // refreshcache，ensuresearchwhencan findnewaddapp
         refreshCacheAfterFolderOperation()
         
-        saveAllOrder()
+        persistence.saveAllOrder()
     }
     
     func removeAppFromFolder(_ app: AppInfo, folder: FolderInfo) {
@@ -4031,7 +3724,7 @@ private struct DefaultsCache {
         // refreshcache，ensuresearchwhencan findfromfolderremoveapp（inrebuildafterrefresh)
         refreshCacheAfterFolderOperation()
 
-        saveAllOrder()
+        persistence.saveAllOrder()
     }
     
     func renameFolder(_ folder: FolderInfo, newName: String) {
@@ -4060,8 +3753,8 @@ private struct DefaultsCache {
         // Refresh cache, ensure search functionality works
         refreshCacheAfterFolderOperation()
         
-        rebuildItems()
-        saveAllOrder()
+        persistence.rebuildItems()
+        persistence.saveAllOrder()
     }
 
     @discardableResult
@@ -4130,7 +3823,7 @@ private struct DefaultsCache {
         triggerFolderUpdate()
         triggerGridRefresh()
         refreshCacheAfterFolderOperation()
-        saveAllOrder()
+        persistence.saveAllOrder()
         return true
     }
     
@@ -4143,7 +3836,7 @@ private struct DefaultsCache {
         folders.removeAll()
         
         // clearallPersistenceorder/sortdata
-        clearAllPersistedData()
+        persistence.clearAllPersistedData()
         
         // Clear cache
         cacheManager.clearAllCaches()
@@ -4263,7 +3956,7 @@ private struct DefaultsCache {
         compactItemsWithinPages()
         removeEmptyPages()
         triggerGridRefresh()
-        saveAllOrder()
+        persistence.saveAllOrder()
     }
 
     func moveItemAcrossPagesWithCascade(item: LaunchpadItem, to targetIndex: Int) {
@@ -4298,7 +3991,7 @@ private struct DefaultsCache {
         // Trigger grid view refresh, ensure UI updates immediately
         triggerGridRefresh()
         
-        saveAllOrder()
+        persistence.saveAllOrder()
     }
 
     private func cascadeInsert(into array: [LaunchpadItem], item: LaunchpadItem, at targetIndex: Int) -> [LaunchpadItem] {
@@ -4352,356 +4045,6 @@ private struct DefaultsCache {
             }
         }
         return result
-    }
-    
-    func rebuildItems() {
-        // add debounceandoptimizationcheck
-        let currentItemsCount = items.count
-        let appsInFolders: Set<AppInfo> = Set(folders.flatMap { $0.apps })
-        let folderById: [String: FolderInfo] = Dictionary(uniqueKeysWithValues: folders.map { ($0.id, $0) })
-
-        var newItems: [LaunchpadItem] = []
-        newItems.reserveCapacity(currentItemsCount + 10) // preallocatecapacity
-        var seenAppPaths = Set<String>()
-        var seenFolderIds = Set<String>()
-        seenAppPaths.reserveCapacity(apps.count)
-        seenFolderIds.reserveCapacity(folders.count)
-
-        for item in items {
-            switch item {
-            case .folder(let folder):
-                if let updated = folderById[folder.id] {
-                    newItems.append(.folder(updated))
-                    seenFolderIds.insert(updated.id)
-                }
-                // ifthefolderalreadydeleted，thenSkip（notre-preserve)
-            case .app(let app):
-                // if app alreadyentering afolder，thenfromtop-layerremove；otherwisepreserveitsoriginal position
-                if !appsInFolders.contains(app) {
-                    newItems.append(.app(app))
-                    seenAppPaths.insert(standardizedFilePath(app.url.path))
-                }
-            case .missingApp(let placeholder):
-                if let item = currentMissingAppItem(for: placeholder) {
-                    newItems.append(item)
-                    if case .missingApp(let current) = item {
-                        seenAppPaths.insert(standardizedFilePath(current.bundlePath))
-                    }
-                } else {
-                    newItems.append(.empty(UUID().uuidString))
-                }
-            case .empty(let token):
-                // preserve empty asasplaceholder，maintaineachpage independence
-                newItems.append(.empty(token))
-            }
-        }
-
-        // append missedfreeapp（not yetintop-layerappear，butalsonotinanyfolderin)
-        let missingFreeApps = apps.filter {
-            guard !appsInFolders.contains($0) else { return false }
-            return !seenAppPaths.contains(standardizedFilePath($0.url.path))
-        }
-        newItems.append(contentsOf: missingFreeApps.map { .app($0) })
-
-        // Note：notneeds automissingfolderappendtoend，
-        // to avoidinloadPersistenceorderafter，becauseIncremental updatetriggerrebuildwhenfolderpushtoLast page。
-
-        // onlyhasinactualchangewhenonly thenupdateitems
-        if newItems.count != items.count || !newItems.elementsEqual(items, by: { $0.id == $1.id }) {
-            items = filteredItemsRemovingHidden(from: newItems)
-        }
-    }
-    
-    // MARK: - Persistence：eachpage independenceorder/sort（new)+ compatibleoldversion
-    func loadAllOrder() {
-        guard let modelContext else {
-            print("LaunchNext: ModelContext is nil, cannot load persisted order")
-            return
-        }
-        
-        print("LaunchNext: Attempting to load persisted order data...")
-        
-        // try firstfromnew page-slot modelread
-        if loadOrderFromPageEntries(using: modelContext) {
-            print("LaunchNext: Successfully loaded order from PageEntryData")
-            return
-        }
-        
-        print("LaunchNext: PageEntryData not found, trying legacy TopItemData...")
-        // fallback：oldversionglobalordermodel
-        loadOrderFromLegacyTopItems(using: modelContext)
-        print("LaunchNext: Finished loading order from legacy data")
-    }
-
-    private func loadOrderFromPageEntries(using modelContext: ModelContext) -> Bool {
-        do {
-            let descriptor = FetchDescriptor<PageEntryData>(
-                sortBy: [SortDescriptor(\.pageIndex, order: .forward), SortDescriptor(\.position, order: .forward)]
-            )
-            let saved = try modelContext.fetch(descriptor)
-            guard !saved.isEmpty else { return false }
-
-            // buildfolder：byfirsttime(s)appearorder
-            var folderMap: [String: FolderInfo] = [:]
-            var foldersInOrder: [FolderInfo] = []
-
-            // collect firstall folder  appPaths，avoidduplicatebuild
-            for row in saved where row.kind == "folder" {
-                guard let fid = row.folderId else { continue }
-                if folderMap[fid] != nil { continue }
-
-                let folderApps: [AppInfo] = row.appPaths.compactMap { path in
-                    if let existing = apps.first(where: { $0.url.path == path }) {
-                        return existing
-                    }
-                    let url = URL(fileURLWithPath: path)
-                    if FileManager.default.fileExists(atPath: url.path) {
-                        return self.appInfo(from: url)
-                    }
-                    return self.placeholderAppInfo(forMissingPath: path, preferredName: row.folderName)
-                }
-                let folder = FolderInfo(id: fid, name: row.folderName ?? "Untitled", apps: folderApps, createdAt: row.createdAt)
-                folderMap[fid] = folder
-                foldersInOrder.append(folder)
-            }
-
-            let folderAppPathSet: Set<String> = Set(foldersInOrder.flatMap { $0.apps.map { $0.url.path } })
-
-            // compositetop-layer items（bypageandpositionorder；preserve empty to maintaineachpage independenceslot)
-            var combined: [LaunchpadItem] = []
-            combined.reserveCapacity(saved.count)
-            for row in saved {
-                switch row.kind {
-                case "folder":
-                    if let fid = row.folderId, let folder = folderMap[fid] {
-                        combined.append(.folder(folder))
-                    }
-                case "app":
-                    if let path = row.appPath, !folderAppPathSet.contains(path) {
-                        if let existing = apps.first(where: { $0.url.path == path }) {
-                            clearMissingPlaceholder(for: path)
-                            combined.append(.app(existing))
-                        } else {
-                            let url = URL(fileURLWithPath: path)
-                            if FileManager.default.fileExists(atPath: url.path) {
-                                let info = self.appInfo(from: url)
-                                clearMissingPlaceholder(for: path)
-                                combined.append(.app(info))
-                            } else if let placeholder = updateMissingPlaceholder(path: path,
-                                                                                displayName: row.appDisplayName,
-                                                                                removableSource: row.removableSource) {
-                                combined.append(.missingApp(placeholder))
-                            }
-                        }
-                    }
-                case "missing":
-                    if let path = row.appPath {
-                        if let existing = apps.first(where: { $0.url.path == path }) {
-                            clearMissingPlaceholder(for: path)
-                            combined.append(.app(existing))
-                        } else {
-                            let url = URL(fileURLWithPath: path)
-                            if FileManager.default.fileExists(atPath: url.path) {
-                                let info = self.appInfo(from: url)
-                                clearMissingPlaceholder(for: path)
-                                combined.append(.app(info))
-                            } else if let placeholder = updateMissingPlaceholder(path: path,
-                                                                                displayName: row.appDisplayName,
-                                                                                removableSource: row.removableSource) {
-                                combined.append(.missingApp(placeholder))
-                            }
-                        }
-                    }
-                case "empty":
-                    combined.append(.empty(row.slotId))
-                default:
-                    break
-                }
-            }
-
-            DispatchQueue.main.async {
-                self.folders = self.sanitizedFolders(foldersInOrder)
-                if !combined.isEmpty {
-                    self.items = self.filteredItemsRemovingHidden(from: combined)
-                    // ifapplistasnil/empty，fromPersistencedatainresumeapplist
-                    if self.apps.isEmpty {
-                        let freeApps: [AppInfo] = combined.compactMap { if case let .app(a) = $0 { return a } else { return nil } }
-                        self.apps = freeApps
-                        self.pruneHiddenAppsFromAppList()
-                    }
-                }
-                self.refreshMissingPlaceholders()
-                self.hasAppliedOrderFromStore = true
-            }
-            return true
-        } catch {
-            return false
-        }
-    }
-
-    private func loadOrderFromLegacyTopItems(using modelContext: ModelContext) {
-        do {
-            let descriptor = FetchDescriptor<TopItemData>(sortBy: [SortDescriptor(\.orderIndex, order: .forward)])
-            let saved = try modelContext.fetch(descriptor)
-            guard !saved.isEmpty else { return }
-
-            var folderMap: [String: FolderInfo] = [:]
-            var foldersInOrder: [FolderInfo] = []
-            let folderAppPathSet: Set<String> = Set(saved.filter { $0.kind == "folder" }.flatMap { $0.appPaths })
-            for row in saved where row.kind == "folder" {
-                let folderApps: [AppInfo] = row.appPaths.compactMap { path in
-                    if let existing = apps.first(where: { $0.url.path == path }) { return existing }
-                    let url = URL(fileURLWithPath: path)
-                    if FileManager.default.fileExists(atPath: url.path) {
-                        return self.appInfo(from: url)
-                    }
-                    return self.placeholderAppInfo(forMissingPath: path, preferredName: row.folderName)
-                }
-                let folder = FolderInfo(id: row.id, name: row.folderName ?? "Untitled", apps: folderApps, createdAt: row.createdAt)
-                folderMap[row.id] = folder
-                foldersInOrder.append(folder)
-            }
-
-            var combined: [LaunchpadItem] = saved.sorted { $0.orderIndex < $1.orderIndex }.compactMap { row in
-                if row.kind == "folder" { return folderMap[row.id].map { .folder($0) } }
-                if row.kind == "empty" { return .empty(row.id) }
-                if row.kind == "app", let path = row.appPath {
-                    if folderAppPathSet.contains(path) { return nil }
-                    if let existing = apps.first(where: { $0.url.path == path }) {
-                        clearMissingPlaceholder(for: path)
-                        return .app(existing)
-                    }
-                    let url = URL(fileURLWithPath: path)
-                    if FileManager.default.fileExists(atPath: url.path) {
-                        clearMissingPlaceholder(for: path)
-                        return .app(self.appInfo(from: url))
-                    }
-                    if let placeholder = updateMissingPlaceholder(path: path) {
-                        return .missingApp(placeholder)
-                    }
-                    return nil
-                }
-                return nil
-            }
-
-            let appsInFolders = Set(foldersInOrder.flatMap { $0.apps })
-            let seenPaths = Set(combined.compactMap { item -> String? in
-                switch item {
-                case .app(let app):
-                    return standardizedFilePath(app.url.path)
-                case .missingApp(let placeholder):
-                    return standardizedFilePath(placeholder.bundlePath)
-                default:
-                    return nil
-                }
-            })
-            let missingFreeApps = apps
-                .filter { !appsInFolders.contains($0) && !seenPaths.contains(standardizedFilePath($0.url.path)) }
-                .map { LaunchpadItem.app($0) }
-            combined.append(contentsOf: missingFreeApps)
-
-            DispatchQueue.main.async {
-                self.folders = self.sanitizedFolders(foldersInOrder)
-                if !combined.isEmpty {
-                    self.items = self.filteredItemsRemovingHidden(from: combined)
-                    // ifapplistasnil/empty，fromPersistencedatainresumeapplist
-                    if self.apps.isEmpty {
-                        let freeAppsAfterLoad: [AppInfo] = combined.compactMap { if case let .app(a) = $0 { return a } else { return nil } }
-                        self.apps = freeAppsAfterLoad
-                        self.pruneHiddenAppsFromAppList()
-                    }
-                }
-                self.refreshMissingPlaceholders()
-                self.hasAppliedOrderFromStore = true
-            }
-        } catch {
-            // ignore
-        }
-    }
-
-    func saveAllOrder() {
-        guard let modelContext else {
-            print("LaunchNext: ModelContext is nil, cannot save order")
-            return
-        }
-        guard !items.isEmpty else {
-            print("LaunchNext: Items list is empty, skipping save")
-            return
-        }
-
-        print("LaunchNext: Saving order data for \(items.count) items...")
-        
-        // writenewmodel：bypage-slot
-        do {
-            let existing = try modelContext.fetch(FetchDescriptor<PageEntryData>())
-            print("LaunchNext: Found \(existing.count) existing entries, clearing...")
-            for row in existing { modelContext.delete(row) }
-
-            // build folders findtable
-            let folderById: [String: FolderInfo] = Dictionary(uniqueKeysWithValues: folders.map { ($0.id, $0) })
-            let itemsPerPage = self.itemsPerPage // useComputed properties
-
-            for (idx, item) in items.enumerated() {
-                let pageIndex = idx / itemsPerPage
-                let position = idx % itemsPerPage
-                let slotId = "page-\(pageIndex)-pos-\(position)"
-                switch item {
-                case .folder(let folder):
-                    let authoritativeFolder = folderById[folder.id] ?? folder
-                    let row = PageEntryData(
-                        slotId: slotId,
-                        pageIndex: pageIndex,
-                        position: position,
-                        kind: "folder",
-                        folderId: authoritativeFolder.id,
-                        folderName: authoritativeFolder.name,
-                        appPaths: authoritativeFolder.apps.map { $0.url.path }
-                    )
-                    modelContext.insert(row)
-                case .app(let app):
-                    let row = PageEntryData(
-                        slotId: slotId,
-                        pageIndex: pageIndex,
-                        position: position,
-                        kind: "app",
-                        appPath: app.url.path,
-                        appDisplayName: app.name,
-                        removableSource: removableSourcePath(forAppPath: app.url.path)
-                    )
-                    modelContext.insert(row)
-                case .missingApp(let placeholder):
-                    let row = PageEntryData(
-                        slotId: slotId,
-                        pageIndex: pageIndex,
-                        position: position,
-                        kind: "missing",
-                        appPath: placeholder.bundlePath,
-                        appDisplayName: placeholder.displayName,
-                        removableSource: placeholder.removableSource
-                    )
-                    modelContext.insert(row)
-                case .empty:
-                    let row = PageEntryData(
-                        slotId: slotId,
-                        pageIndex: pageIndex,
-                        position: position,
-                        kind: "empty"
-                    )
-                    modelContext.insert(row)
-                }
-            }
-            try modelContext.save()
-            print("LaunchNext: Successfully saved order data")
-            
-            // cleanoldversiontable，avoidoccupyusenil/emptybetween（ignoreerror)
-            do {
-                let legacy = try modelContext.fetch(FetchDescriptor<TopItemData>())
-                for row in legacy { modelContext.delete(row) }
-                try? modelContext.save()
-            } catch { }
-        } catch {
-            print("LaunchNext: Error saving order data: \(error)")
-        }
     }
 
     // triggerfolderupdate，notificationallrelatedviewrefreshicon
@@ -4779,7 +4122,7 @@ private struct DefaultsCache {
         }
         triggerFolderUpdate()
         triggerGridRefresh()
-        saveAllOrder()
+        persistence.saveAllOrder()
     }
 
     private func clearIconCachesForLayoutChange() {
@@ -4824,31 +4167,6 @@ private struct DefaultsCache {
     }
     
     
-    // clearallPersistenceorder/sortandfolderdata
-    private func clearAllPersistedData() {
-        guard let modelContext else { return }
-        
-        do {
-            // clearnewpage-slotdata
-            let pageEntries = try modelContext.fetch(FetchDescriptor<PageEntryData>())
-            for entry in pageEntries {
-                modelContext.delete(entry)
-            }
-            
-            // clearoldversionglobalorderdata
-            let legacyEntries = try modelContext.fetch(FetchDescriptor<TopItemData>())
-            for entry in legacyEntries {
-                modelContext.delete(entry)
-            }
-            
-            // savemorechange
-            try modelContext.save()
-            missingPlaceholders.removeAll()
-        } catch {
-            // ignoreerror，ensureresetflowcontinueenterrow
-        }
-    }
-
     private func clampCurrentPageWithinBounds() {
         let perPage = max(itemsPerPage, 1)
         let maxPageIndex = items.isEmpty ? 0 : max(0, (items.count - 1) / perPage)
@@ -4966,7 +4284,7 @@ private struct DefaultsCache {
             if self.rememberLastPage {
                 UserDefaults.standard.set(self.currentPage, forKey: Self.rememberedPageIndexKey)
             }
-            self.saveAllOrder()
+            self.persistence.saveAllOrder()
         }
     }
     
@@ -5202,7 +4520,7 @@ private struct DefaultsCache {
         triggerFolderUpdate()
         triggerGridRefresh()
         updateCacheAfterChanges()
-        saveAllOrder()
+        persistence.saveAllOrder()
         return true
     }
 
@@ -5241,7 +4559,7 @@ private struct DefaultsCache {
         triggerFolderUpdate()
         triggerGridRefresh()
         updateCacheAfterChanges()
-        saveAllOrder()
+        persistence.saveAllOrder()
         return true
     }
 
@@ -5267,14 +4585,14 @@ private struct DefaultsCache {
             apps.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         }
 
-        rebuildItems()
+        persistence.rebuildItems()
         folders = sanitizedFolders(folders)
         applyHiddenFilteringToOpenFolder()
         compactItemsWithinPages()
         triggerFolderUpdate()
         triggerGridRefresh()
         updateCacheAfterChanges()
-        saveAllOrder()
+        persistence.saveAllOrder()
     }
 
     private func removeHiddenAppMetadata(forPath path: String) {
@@ -5283,7 +4601,7 @@ private struct DefaultsCache {
         }
     }
 
-    private func pruneHiddenAppsFromAppList() {
+    func pruneHiddenAppsFromAppList() {
         guard !hiddenAppPaths.isEmpty else { return }
         apps.removeAll { hiddenAppPaths.contains($0.url.path) }
     }
@@ -5844,7 +5162,7 @@ private struct DefaultsCache {
         triggerFolderUpdate()
         triggerGridRefresh()
         updateCacheAfterChanges()
-        saveAllOrder()
+        persistence.saveAllOrder()
         return true
     }
 
@@ -5989,7 +5307,7 @@ private struct DefaultsCache {
             DispatchQueue.main.async { [weak self] in
                 self?.performInitialScanIfNeeded()
                 // newversionuse SwiftData unifiedloadentry point
-                self?.loadAllOrder()
+                self?.persistence.loadAllOrder()
                 self?.triggerGridRefresh()
             }
 
@@ -6012,7 +5330,7 @@ private struct DefaultsCache {
             // Import successfulafterrefreshappdata
             DispatchQueue.main.async { [weak self] in
                 self?.performInitialScanIfNeeded()
-                self?.loadAllOrder()
+                self?.persistence.loadAllOrder()
                 self?.triggerGridRefresh()
             }
 
@@ -6196,7 +5514,7 @@ private struct DefaultsCache {
             self.triggerGridRefresh()
             
             // savenewlayout
-            self.saveAllOrder()
+            self.persistence.saveAllOrder()
             
             
             // tempwhennotadjustusepagefill，maintainimportoriginalorder
@@ -6250,6 +5568,7 @@ extension AppStore: AppStoreServiceDelegate {
     var currentHiddenAppPaths: Set<String> { hiddenAppPaths }
     var currentMissingPlaceholders: [String: MissingAppPlaceholder] { missingPlaceholders }
     var currentModelContext: ModelContext? { modelContext }
+    var currentItemsPerPage: Int { itemsPerPage }
 
     // State writes
     func applyScanResults(_ apps: [AppInfo],
@@ -6297,19 +5616,20 @@ extension AppStore: AppStoreServiceDelegate {
 
     // Cross-Manager Routing
     func persistenceSaveAllOrder() {
-        saveAllOrder()
+        persistence.saveAllOrder()
     }
 
     func persistenceLoadAllOrder() {
-        loadAllOrder()
+        persistence.loadAllOrder()
     }
 
     func persistenceRebuildItems() {
-        rebuildItems()
+        persistence.rebuildItems()
     }
 
     // Persistence Helpers: removableSourcePath, updateMissingPlaceholder,
-    // clearMissingPlaceholder, appInfo, standardizedFilePath already exist on AppStore
+    // clearMissingPlaceholder, appInfo, standardizedFilePath, placeholderAppInfo,
+    // pruneHiddenAppsFromAppList, refreshMissingPlaceholders already exist on AppStore
 }
 
 extension NSEvent.ModifierFlags {

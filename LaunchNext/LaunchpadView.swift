@@ -462,7 +462,7 @@ struct LaunchpadView: View {
             blankDragConsumed = false
             appStore.cleanupUnusedNewPage()
             appStore.removeEmptyPages()
-            appStore.saveAllOrder()
+            appStore.persistence.saveAllOrder()
             clampSelection()
         }
     }
@@ -1200,7 +1200,7 @@ struct LaunchpadView: View {
                 // Maintain consistent cleanup with normal drag end
                 appStore.cleanupUnusedNewPage()
                 appStore.removeEmptyPages()
-                appStore.saveAllOrder()
+                appStore.persistence.saveAllOrder()
                 // Trigger grid refresh, ensure drag gesture correctly re-added
                 appStore.triggerGridRefresh()
             }
@@ -2423,7 +2423,7 @@ extension LaunchpadView {
                                     appStore.removeEmptyPages()
                                     
                                     // Ensure drag operation completes before immediately saving
-                                    appStore.saveAllOrder()
+                                    appStore.persistence.saveAllOrder()
                                 }
                             }
                     )
@@ -3337,7 +3337,7 @@ extension LaunchpadView {
                     appStore.items = newItems
                 }
                 appStore.triggerGridRefresh()
-                appStore.saveAllOrder()
+                appStore.persistence.saveAllOrder()
                 
                 // samepagedragendafteralsoenterrowcompact，ensureemptyitemitem movetopageend
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

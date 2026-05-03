@@ -29,6 +29,7 @@ public protocol AppStoreServiceDelegate: AnyObject {
     var currentHiddenAppPaths: Set<String> { get }
     var currentMissingPlaceholders: [String: MissingAppPlaceholder] { get }
     var currentModelContext: ModelContext? { get }
+    var currentItemsPerPage: Int { get }
 
     // MARK: - Layout Helpers
     func compactItemsWithinPagesReturning() -> [LaunchpadItem]
@@ -47,4 +48,10 @@ public protocol AppStoreServiceDelegate: AnyObject {
     func clearMissingPlaceholder(for path: String)
     func appInfo(from url: URL, preferredName: String?, loadIcon: Bool?) -> AppInfo
     func standardizedFilePath(_ path: String) -> String
+    func placeholderAppInfo(forMissingPath path: String, preferredName: String?) -> AppInfo?
+    func pruneHiddenAppsFromAppList()
+    func refreshMissingPlaceholders()
+
+    // MARK: - Persistence State
+    var hasAppliedOrderFromStore: Bool { get set }
 }
