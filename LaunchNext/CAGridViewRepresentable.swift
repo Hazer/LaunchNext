@@ -143,44 +143,15 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         }
 
         // Drag reorder
-        view.onReorderItems = { fromIndex, toIndex in
+        view.onReorderItems = { [weak appStore] fromIndex, toIndex in
+            guard let appStore else { return }
             DispatchQueue.main.async {
-                guard fromIndex < appStore.items.count else { return }
-                let itemsPerPage = appStore.gridColumnsPerPage * appStore.gridRowsPerPage
-                let sourcePage = fromIndex / itemsPerPage
-                let targetPage = toIndex / itemsPerPage
-                
-                if sourcePage == targetPage {
-                    // Same page: use simple swap logic
-                    let pageStart = sourcePage * itemsPerPage
-                    let pageEnd = min(pageStart + itemsPerPage, appStore.items.count)
-                    var newItems = appStore.items
-                    var pageSlice = Array(newItems[pageStart..<pageEnd])
-                    let localFrom = fromIndex - pageStart
-                    let localTo = min(toIndex - pageStart, pageSlice.count - 1)
-                    
-                    if localFrom != localTo && localFrom < pageSlice.count && localTo < pageSlice.count {
-                        let moving = pageSlice.remove(at: localFrom)
-                        pageSlice.insert(moving, at: localTo)
-                        newItems.replaceSubrange(pageStart..<pageEnd, with: pageSlice)
-                        appStore.items = newItems
-                    }
-                    appStore.triggerGridRefresh()
-                    appStore.saveAllOrder()
-                    
-                    // Compact after same-page drag
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        appStore.compactItemsWithinPages()
-                    }
-                } else {
-                    // Cross-page: use cascade insert logic
-                let item = appStore.items[fromIndex]
-                appStore.moveItemAcrossPagesWithCascade(item: item, to: toIndex)
-                }
+                Self.handleReorder(appStore: appStore, fromIndex: fromIndex, toIndex: toIndex)
             }
         }
 
-        view.onReorderAppBatch = { appPathsOrdered, toIndex in
+        view.onReorderAppBatch = { [weak appStore] appPathsOrdered, toIndex in
+            guard let appStore else { return }
             DispatchQueue.main.async {
                 appStore.moveSelectedAppsAcrossPagesWithCascade(appPathsOrdered: appPathsOrdered, to: toIndex)
             }
@@ -343,6 +314,38 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         var lastGridRefreshTrigger: UUID = UUID()
         var lastFolderUpdateTrigger: UUID = UUID()
         var lastIconCacheRefreshTrigger: UUID = UUID()
+    }
+
+    static func handleReorder(appStore: AppStore, fromIndex: Int, toIndex: Int) {
+        guard fromIndex < appStore.items.count else { return }
+        let itemsPerPage = appStore.gridColumnsPerPage * appStore.gridRowsPerPage
+        let sourcePage = fromIndex / itemsPerPage
+        let targetPage = toIndex / itemsPerPage
+
+        if sourcePage == targetPage {
+            let pageStart = sourcePage * itemsPerPage
+            let pageEnd = min(pageStart + itemsPerPage, appStore.items.count)
+            var newItems = appStore.items
+            var pageSlice = Array(newItems[pageStart..<pageEnd])
+            let localFrom = fromIndex - pageStart
+            let localTo = min(toIndex - pageStart, pageSlice.count - 1)
+
+            if localFrom != localTo && localFrom < pageSlice.count && localTo < pageSlice.count {
+                let moving = pageSlice.remove(at: localFrom)
+                pageSlice.insert(moving, at: localTo)
+                newItems.replaceSubrange(pageStart..<pageEnd, with: pageSlice)
+                appStore.items = newItems
+            }
+            appStore.triggerGridRefresh()
+            appStore.saveAllOrder()
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                appStore.compactItemsWithinPages()
+            }
+        } else {
+            let item = appStore.items[fromIndex]
+            appStore.moveItemAcrossPagesWithCascade(item: item, to: toIndex)
+        }
     }
 
     // Check if items changed (full comparison of all item IDs and names)
