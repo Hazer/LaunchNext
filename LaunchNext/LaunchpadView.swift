@@ -177,15 +177,15 @@ struct LaunchpadView: View {
     }
     
     private var config: GridConfig {
-        GridConfig(isFullscreen: appStore.isFullscreenMode,
-                   columns: appStore.gridColumnsPerPage,
-                   rows: appStore.gridRowsPerPage,
-                   columnSpacing: CGFloat(appStore.iconColumnSpacing),
-                   rowSpacing: CGFloat(appStore.iconRowSpacing))
+        GridConfig(isFullscreen: appStore.settingsStore.isFullscreenMode,
+                   columns: appStore.settingsStore.gridColumnsPerPage,
+                   rows: appStore.settingsStore.gridRowsPerPage,
+                   columnSpacing: CGFloat(appStore.settingsStore.iconColumnSpacing),
+                   rowSpacing: CGFloat(appStore.settingsStore.iconRowSpacing))
     }
 
     private var backdropOpacity: Double {
-        guard appStore.isFullscreenMode else { return 0.0 }
+        guard appStore.settingsStore.isFullscreenMode else { return 0.0 }
         if appStore.shouldShowOnboarding {
             return colorScheme == .dark ? 0.34 : 0.10
         }
@@ -193,7 +193,7 @@ struct LaunchpadView: View {
     }
 
     private var onboardingLightFilterOpacity: Double {
-        guard appStore.isFullscreenMode, appStore.shouldShowOnboarding, colorScheme == .light else { return 0.0 }
+        guard appStore.settingsStore.isFullscreenMode, appStore.shouldShowOnboarding, colorScheme == .light else { return 0.0 }
         return 0.20
     }
 
@@ -313,7 +313,7 @@ struct LaunchpadView: View {
         .sheet(isPresented: $appStore.isSetting) {
             SettingsView(appStore: appStore)
         }
-        .onChange(of: appStore.followScrollPagingEnabled) { _ in
+        .onChange(of: appStore.settingsStore.followScrollPagingEnabled) { _ in
             if scrollState.followOffset != 0 || scrollState.accumulatedX != 0 || scrollState.isUserSwiping {
                 scrollState.followOffset = 0
                 scrollState.accumulatedX = 0
@@ -326,7 +326,7 @@ struct LaunchpadView: View {
             appStore.scheduleSystemAppearanceRefresh()
         }
         .overlay(alignment: .bottomTrailing) {
-            if appStore.showFPSOverlay {
+            if appStore.settingsStore.showFPSOverlay {
                 Text(String(format: "%.0f FPS  %.1f ms", fpsValue, frameTimeMilliseconds))
                     .font(.caption.monospacedDigit()).bold()
                     .padding(.horizontal, 12)
@@ -337,7 +337,7 @@ struct LaunchpadView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: appStore.showFPSOverlay)
+        .animation(.easeInOut(duration: 0.2), value: appStore.settingsStore.showFPSOverlay)
          .onChange(of: appStore.items) {
              guard draggingItem == nil else { return }
              clampSelection()
@@ -383,7 +383,7 @@ struct LaunchpadView: View {
               }
                isKeyboardNavigationActive = false
                clampSelection()
-              if appStore.showFPSOverlay {
+              if appStore.settingsStore.showFPSOverlay {
                   startFPSMonitoring()
               }
            }
@@ -420,7 +420,7 @@ struct LaunchpadView: View {
             guard !loading, pendingPostOnboardingReveal, !appStore.shouldShowOnboarding else { return }
             playPostOnboardingGridReveal()
         }
-        .onChange(of: appStore.showFPSOverlay) { enabled in
+        .onChange(of: appStore.settingsStore.showFPSOverlay) { enabled in
             if enabled {
                 startFPSMonitoring()
             } else {
@@ -428,7 +428,7 @@ struct LaunchpadView: View {
                 fpsValue = 0
             }
         }
-        .onChange(of: appStore.voiceFeedbackEnabled) { _, enabled in
+        .onChange(of: appStore.settingsStore.voiceFeedbackEnabled) { _, enabled in
             if enabled {
                 if let idx = selectedIndex, filteredItems.indices.contains(idx) {
                     let item = filteredItems[idx]
@@ -438,7 +438,7 @@ struct LaunchpadView: View {
                 VoiceManager.shared.stop()
             }
         }
-        .onChange(of: appStore.isLayoutLocked) { _, locked in
+        .onChange(of: appStore.settingsStore.isLayoutLocked) { _, locked in
             guard locked else { return }
             if let monitor = handoffEventMonitor {
                 NSEvent.removeMonitor(monitor)
@@ -472,9 +472,9 @@ struct LaunchpadView: View {
             launchpadMainContent(in: geo)
         }
         .padding()
-        .launchpadBackgroundStyle(appStore.launchpadBackgroundStyle,
-                                  cornerRadius: appStore.isFullscreenMode ? 0 : 30,
-                                  forcedColor: appStore.developmentBackgroundOverride.color,
+        .launchpadBackgroundStyle(appStore.settingsStore.launchpadBackgroundStyle,
+                                  cornerRadius: appStore.settingsStore.isFullscreenMode ? 0 : 30,
+                                  forcedColor: appStore.settingsStore.developmentBackgroundOverride.color,
                                   maskColor: appStore.backgroundMaskColor(for: colorScheme))
         .background(
             ZStack {
@@ -537,7 +537,7 @@ struct LaunchpadView: View {
 
                 HStack(spacing: 8) {
                     Spacer()
-                    if appStore.showQuickRefreshButton {
+                    if appStore.settingsStore.showQuickRefreshButton {
                         Button {
                             appStore.refresh()
                         } label: {
@@ -597,7 +597,7 @@ struct LaunchpadView: View {
             .scaleEffect(appStore.shouldShowOnboarding ? 1 : postOnboardingGridScale)
 
             // Merged PageIndicator - add tap to jump to page
-            if !appStore.shouldShowOnboarding && pages.count > 1 && appStore.layoutMode == .paged {
+            if !appStore.shouldShowOnboarding && pages.count > 1 && appStore.settingsStore.layoutMode == .paged {
                 HStack(spacing: 8) {
                     ForEach(0..<pages.count, id: \.self) { index in
                         Circle()
@@ -627,7 +627,7 @@ struct LaunchpadView: View {
     private var launchpadInteractionOverlay: some View {
         ZStack {
             // Full-window scroll capture layer (does not intercept clicks，scroll only)
-            if !appStore.useCAGridRenderer {
+            if !appStore.settingsStore.useCAGridRenderer {
                 ScrollEventCatcher { deltaX, deltaY, phase, isMomentum, isPrecise in
                     guard !appStore.isSetting else { return }
                     let pageWidth = currentContainerSize.width + config.pageSpacing
@@ -666,12 +666,12 @@ struct LaunchpadView: View {
 
             if let openFolder = appStore.openFolder {
                 GeometryReader { proxy in
-                    let widthFactor: CGFloat = appStore.isFullscreenMode ? 0.7 : CGFloat(appStore.folderPopoverWidthFactor)
-                    let heightFactor: CGFloat = appStore.isFullscreenMode ? 0.7 : CGFloat(appStore.folderPopoverHeightFactor)
-                    let minWidth: CGFloat = appStore.isFullscreenMode ? 520 : 560
+                    let widthFactor: CGFloat = appStore.settingsStore.isFullscreenMode ? 0.7 : CGFloat(appStore.folderPopoverWidthFactor)
+                    let heightFactor: CGFloat = appStore.settingsStore.isFullscreenMode ? 0.7 : CGFloat(appStore.folderPopoverHeightFactor)
+                    let minWidth: CGFloat = appStore.settingsStore.isFullscreenMode ? 520 : 560
                     let minHeight: CGFloat = 420
-                    let rawHorizontalMargin: CGFloat = appStore.isFullscreenMode ? max(proxy.size.width * 0.15, 120) : 32
-                    let rawVerticalMargin: CGFloat = appStore.isFullscreenMode ? max(proxy.size.height * 0.15, 120) : 32
+                    let rawHorizontalMargin: CGFloat = appStore.settingsStore.isFullscreenMode ? max(proxy.size.width * 0.15, 120) : 32
+                    let rawVerticalMargin: CGFloat = appStore.settingsStore.isFullscreenMode ? max(proxy.size.height * 0.15, 120) : 32
                     let horizontalMargin = min(rawHorizontalMargin, proxy.size.width / 2)
                     let verticalMargin = min(rawVerticalMargin, proxy.size.height / 2)
 
@@ -707,7 +707,7 @@ struct LaunchpadView: View {
                     FolderView(
                         appStore: appStore,
                         folder: folderBinding,
-                        preferredIconSize: currentIconSize * CGFloat(min(max(appStore.iconScale, 0.6), 1.15)),
+                        preferredIconSize: currentIconSize * CGFloat(min(max(appStore.settingsStore.iconScale, 0.6), 1.15)),
                         onClose: {
                             let closingFolder = appStore.openFolder
                             withAnimation(LNAnimations.springFast) {
@@ -831,7 +831,7 @@ struct LaunchpadView: View {
             return max(40, width)
         }()
 
-        let iconSize: CGFloat = min(columnWidth, appHeight) * CGFloat(min(max(appStore.iconScale, 0.6), 1.15))
+        let iconSize: CGFloat = min(columnWidth, appHeight) * CGFloat(min(max(appStore.settingsStore.iconScale, 0.6), 1.15))
         let effectivePageWidth = geo.size.width + config.pageSpacing
 
         // Helper: decide whether to close when tapping at a point in grid space
@@ -889,7 +889,7 @@ struct LaunchpadView: View {
             )
         }
 
-        if appStore.useCAGridRenderer {
+        if appStore.settingsStore.useCAGridRenderer {
             let caInsets = NSEdgeInsets(top: actualTopPadding,
                                         left: 0,
                                         bottom: actualBottomPadding,
@@ -960,7 +960,7 @@ struct LaunchpadView: View {
         }
 
         let hStackOffset = -CGFloat(appStore.currentPage) * effectivePageWidth
-            + (appStore.followScrollPagingEnabled ? scrollState.followOffset : 0)
+            + (appStore.settingsStore.followScrollPagingEnabled ? scrollState.followOffset : 0)
 
         return AnyView(
             ZStack(alignment: .topLeading) {
@@ -1102,7 +1102,7 @@ struct LaunchpadView: View {
     // MARK: - Handoff drag from folder
     private func startHandoffDragIfNeeded(geo: GeometryProxy, columnWidth: CGFloat, appHeight: CGFloat, iconSize: CGFloat) {
         guard draggingItem == nil, let app = appStore.handoffDraggingApp else { return }
-        if appStore.isLayoutLocked {
+        if appStore.settingsStore.isLayoutLocked {
             appStore.handoffDraggingApp = nil
             appStore.handoffDragScreenLocation = nil
             return
@@ -1173,7 +1173,7 @@ struct LaunchpadView: View {
     }
 
     private func handleHandoffDragMove(to localPoint: CGPoint) {
-        guard !appStore.isLayoutLocked else { return }
+        guard !appStore.settingsStore.isLayoutLocked else { return }
         // Reuse fully consistent update logic as normal drag
         applyDragUpdate(at: localPoint,
                         containerSize: currentContainerSize,
@@ -1205,7 +1205,7 @@ struct LaunchpadView: View {
                 appStore.triggerGridRefresh()
             }
         }
-        if appStore.isLayoutLocked {
+        if appStore.settingsStore.isLayoutLocked {
             appStore.triggerGridRefresh()
             return
         }
@@ -1990,7 +1990,7 @@ extension LaunchpadView {
 
         let horizontalPadding: CGFloat = 8
         let verticalPadding: CGFloat = 8
-        let hasLabel = appStore.showLabels
+        let hasLabel = appStore.settingsStore.showLabels
         let iconLabelSpacing: CGFloat = hasLabel ? 8 : 0
 
         let iconRect = CGRect(
@@ -2251,7 +2251,7 @@ extension LaunchpadView {
     }
 
     private func handleControllerCommand(_ command: ControllerCommand) {
-        guard appStore.gameControllerEnabled else { return }
+        guard appStore.settingsStore.gameControllerEnabled else { return }
         guard ControllerInputManager.shared.isActive else { return }
 
         guard isWindowVisible else { return }
@@ -2402,21 +2402,21 @@ extension LaunchpadView {
                     iconSize: iconSize,
                     labelWidth: labelWidth,
                     isSelected: isSelected,
-                    showLabel: appStore.showLabels,
-                    labelFontSize: CGFloat(appStore.iconLabelFontSize),
-                    labelFontWeight: appStore.iconLabelFontWeightValue,
+                    showLabel: appStore.settingsStore.showLabels,
+                    labelFontSize: CGFloat(appStore.settingsStore.iconLabelFontSize),
+                    labelFontWeight: appStore.settingsStore.iconLabelFontWeightValue,
                     shouldAllowHover: shouldAllowHover,
                     externalScale: isCenterCreatingTarget ? 1.2 : nil,
-                    hoverMagnificationEnabled: appStore.enableHoverMagnification,
-                    hoverMagnificationScale: CGFloat(appStore.hoverMagnificationScale),
-                    activePressEffectEnabled: appStore.enableActivePressEffect,
-                    activePressScale: CGFloat(appStore.activePressScale),
+                    hoverMagnificationEnabled: appStore.settingsStore.enableHoverMagnification,
+                    hoverMagnificationScale: CGFloat(appStore.settingsStore.hoverMagnificationScale),
+                    activePressEffectEnabled: appStore.settingsStore.enableActivePressEffect,
+                    activePressScale: CGFloat(appStore.settingsStore.activePressScale),
                     onTap: { if draggingItem == nil { handleItemTap(item) } }
                 )
                 .frame(height: appHeight)
                 // Maintain stable view identity, avoid breaking drag gesture after folder update
                 .id(item.id)
-            if appStore.searchText.isEmpty && !isFolderOpen && !appStore.isLayoutLocked {
+            if appStore.searchText.isEmpty && !isFolderOpen && !appStore.settingsStore.isLayoutLocked {
                 let isDraggingThisTile = (draggingItem == item)
 
                 base
@@ -2565,7 +2565,7 @@ extension LaunchpadView {
         let horizontalPadding: CGFloat = 8
         let verticalPadding: CGFloat = 8
         let labelWidth = columnWidth * 0.9
-        let hasLabel = appStore.showLabels
+        let hasLabel = appStore.settingsStore.showLabels
         let iconLabelSpacing: CGFloat = hasLabel ? 8 : 0
         let contentWidth = min(columnWidth, max(iconSize, labelWidth) + horizontalPadding * 2)
         let rawLabelHeight = max(0, appHeight - iconSize - verticalPadding * 2 - iconLabelSpacing)
@@ -2596,7 +2596,7 @@ extension LaunchpadView {
                                                   pageSpacing: config.pageSpacing,
                                                   currentPage: appStore.currentPage)
 
-        let hasLabel = appStore.showLabels
+        let hasLabel = appStore.settingsStore.showLabels
         let verticalPadding: CGFloat = 8
         let iconLabelSpacing: CGFloat = hasLabel ? 8 : 0
         let contentHeight = iconSize + iconLabelSpacing + (hasLabel ? max(0, appHeight - iconSize - verticalPadding * 2 - iconLabelSpacing) : 0) + verticalPadding * 2
@@ -2628,7 +2628,7 @@ extension LaunchpadView {
         let now = Date()
         if now.timeIntervalSince(Self.lastGeometryUpdate) < geometryCacheTimeout,
            let cached = Self.geometryCache[cacheKey] {
-            let scale = CGFloat(appStore.folderDropZoneScale)
+            let scale = CGFloat(appStore.settingsStore.folderDropZoneScale)
             let centerAreaSize = iconSize * scale
             let centerAreaRect = CGRect(
                 x: cached.x - centerAreaSize / 2,
@@ -2640,7 +2640,7 @@ extension LaunchpadView {
         }
         
         let targetCenter = cellCenter(for: targetIndex, in: containerSize, pageIndex: pageIndex, columnWidth: columnWidth, appHeight: appHeight)
-        let scale = CGFloat(appStore.folderDropZoneScale)
+        let scale = CGFloat(appStore.settingsStore.folderDropZoneScale)
         let centerAreaSize = iconSize * scale
         let centerAreaRect = CGRect(
             x: targetCenter.x - centerAreaSize / 2,
@@ -2671,12 +2671,12 @@ extension LaunchpadView {
     private func handleWheelScroll(_ primaryDelta: CGFloat) {
         if primaryDelta == 0 { return }
         let direction = primaryDelta > 0 ? 1 : -1
-        let effectiveDirection = appStore.reverseWheelPagingDirection ? -direction : direction
+        let effectiveDirection = appStore.settingsStore.reverseWheelPagingDirection ? -direction : direction
         if scrollState.wheelLastDirection != direction { scrollState.wheelAccumulated = 0 }
         scrollState.wheelLastDirection = direction
         scrollState.wheelAccumulated += abs(primaryDelta)
         let baselineSensitivity = max(AppStore.defaultScrollSensitivity, 0.0001)
-        let relativeSensitivity = max(appStore.scrollSensitivity, 0.0001) / baselineSensitivity
+        let relativeSensitivity = max(appStore.settingsStore.scrollSensitivity, 0.0001) / baselineSensitivity
         // Scale wheel threshold by sensitivity.
         let threshold: CGFloat = 2.0 / CGFloat(relativeSensitivity)
         let now = Date()
@@ -2691,12 +2691,12 @@ extension LaunchpadView {
 
     private func flipThreshold(_ pageWidth: CGFloat) -> CGFloat {
         let baseline = max(AppStore.defaultScrollSensitivity, 0.001)
-        return pageWidth * ((baseline * baseline) / max(appStore.scrollSensitivity, 0.001))
+        return pageWidth * ((baseline * baseline) / max(appStore.settingsStore.scrollSensitivity, 0.001))
     }
 
     private func resetFollowOffset(animated: Bool) {
         guard scrollState.followOffset != 0 else { return }
-        if animated && appStore.enableAnimations {
+        if animated && appStore.settingsStore.enableAnimations {
             withAnimation(LNAnimations.springFast) { scrollState.followOffset = 0 }
         } else {
             scrollState.followOffset = 0
@@ -2720,7 +2720,7 @@ extension LaunchpadView {
         }
 
         // Precise scroll without follow: accumulate and flip once past the threshold.
-        if !appStore.followScrollPagingEnabled {
+        if !appStore.settingsStore.followScrollPagingEnabled {
             // Skip momentum to keep one flip per gesture.
             if isMomentum { return }
             // Treat vertical input as horizontal paging.
@@ -2955,7 +2955,7 @@ extension LaunchpadView {
     }
 
     fileprivate func predictedDropIndex(for pointer: CGPoint, in containerSize: CGSize, columnWidth: CGFloat, appHeight: CGFloat) -> Int? {
-        let queryPoint = appStore.enableDropPrediction
+        let queryPoint = appStore.settingsStore.enableDropPrediction
             ? clampPointWithinBounds(pointer, containerSize: containerSize)
             : pointer
 
@@ -3220,7 +3220,7 @@ extension LaunchpadView {
     
     // MARK: - SimplifydragProcessfunction
     private func handleDragChange(_ value: DragGesture.Value, item: LaunchpadItem, in containerSize: CGSize, columnWidth: CGFloat, appHeight: CGFloat, iconSize: CGFloat) {
-        guard !appStore.isLayoutLocked else { return }
+        guard !appStore.settingsStore.isLayoutLocked else { return }
         // initializedrag
         if draggingItem == nil {
             var tx = Transaction(); tx.disablesAnimations = true
@@ -3255,7 +3255,7 @@ extension LaunchpadView {
         guard let dragging = draggingItem else { return }
         defer { dragPointerOffset = .zero }
 
-        if appStore.isLayoutLocked {
+        if appStore.settingsStore.isLayoutLocked {
             appStore.isDragCreatingFolder = false
             appStore.folderCreationTarget = nil
             pendingDropIndex = nil
@@ -3384,12 +3384,12 @@ extension LaunchpadView {
                                  columnWidth: CGFloat,
                                  appHeight: CGFloat,
                                  iconSize: CGFloat) {
-        guard !appStore.isLayoutLocked else { return }
+        guard !appStore.settingsStore.isLayoutLocked else { return }
         let rawIconCenter = CGPoint(x: point.x - dragPointerOffset.x,
                                      y: point.y - dragPointerOffset.y)
         var iconCenter = rawIconCenter
         var hoverPoint = rawIconCenter
-        if appStore.enableDropPrediction {
+        if appStore.settingsStore.enableDropPrediction {
             let clamped = clampPointWithinBounds(rawIconCenter, containerSize: containerSize)
             iconCenter = clamped
             hoverPoint = clamped
@@ -3423,7 +3423,7 @@ extension LaunchpadView {
                             pointer: point,
                             iconSize: iconSize,
                             in: containerSize) {
-            let dropPoint = appStore.enableDropPrediction ? iconCenter : point
+            let dropPoint = appStore.settingsStore.enableDropPrediction ? iconCenter : point
             pendingDropIndex = predictedDropIndex(for: dropPoint,
                                                   in: containerSize,
                                                   columnWidth: columnWidth,
