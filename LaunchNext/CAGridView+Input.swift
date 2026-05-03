@@ -88,7 +88,7 @@ extension CAGridView {
         let deltaX = event.scrollingDeltaX
         let deltaY = event.scrollingDeltaY
         let delta = abs(deltaX) > abs(deltaY) ? deltaX : -deltaY
-        let baseline = max(AppStore.defaultScrollSensitivity, 0.0001)
+        let baseline = max(SettingsStore.defaultScrollSensitivity, 0.0001)
         let sensitivityScale = CGFloat(max(scrollSensitivity, 0.0001) / baseline)
         let scaledDelta = delta * sensitivityScale
         let isPrecise = event.hasPreciseScrollingDeltas
@@ -343,7 +343,7 @@ extension CAGridView {
             }
         } else {
             // Mouse wheel: discrete scrolling
-            let baseline = max(AppStore.defaultScrollSensitivity, 0.0001)
+            let baseline = max(SettingsStore.defaultScrollSensitivity, 0.0001)
             let sensitivityScale = CGFloat(max(scrollSensitivity, 0.0001) / baseline)
             let step = deltaY * sensitivityScale * 3
 

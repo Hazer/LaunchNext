@@ -23,7 +23,7 @@ final class VoiceManager: NSObject {
     }
 
     func announceSelection(item: LaunchpadItem?) {
-        guard let store = appStore, store.voiceFeedbackEnabled else { return }
+        guard let store = appStore, store.settingsStore.voiceFeedbackEnabled else { return }
 
         pendingAnnouncement?.cancel()
 
@@ -45,7 +45,7 @@ final class VoiceManager: NSObject {
     }
 
     private func speak(for item: LaunchpadItem?) {
-        guard let store = appStore, store.voiceFeedbackEnabled else { return }
+        guard let store = appStore, store.settingsStore.voiceFeedbackEnabled else { return }
 
         let phrase: String?
         switch item {
@@ -100,7 +100,7 @@ final class VoiceManager: NSObject {
     }
 
     private func speakQueuedPhraseIfNeeded() {
-        guard let store = appStore, store.voiceFeedbackEnabled else {
+        guard let store = appStore, store.settingsStore.voiceFeedbackEnabled else {
             queuedPhrase = nil
             return
         }

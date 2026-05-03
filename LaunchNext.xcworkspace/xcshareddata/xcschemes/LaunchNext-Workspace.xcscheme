@@ -20,6 +20,76 @@
                ReferencedContainer = "container:LaunchNext.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "C532B4E76A7A98351BF945DD"
+               BuildableName = "LaunchNextCLI.framework"
+               BlueprintName = "LaunchNextCLI"
+               ReferencedContainer = "container:LaunchNext.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "78BB00B387EA4C15C7FD96A4"
+               BuildableName = "LaunchNextCore.framework"
+               BlueprintName = "LaunchNextCore"
+               ReferencedContainer = "container:LaunchNext.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "62654AF67E998329D83A2845"
+               BuildableName = "LaunchNextInput.framework"
+               BlueprintName = "LaunchNextInput"
+               ReferencedContainer = "container:LaunchNext.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A14F626B997514B87C01E0B4"
+               BuildableName = "LaunchNextStrategies.framework"
+               BlueprintName = "LaunchNextStrategies"
+               ReferencedContainer = "container:LaunchNext.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "3D214B6544758EEAE35D71B0"
+               BuildableName = "LaunchNextUtilities.framework"
+               BlueprintName = "LaunchNextUtilities"
+               ReferencedContainer = "container:LaunchNext.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

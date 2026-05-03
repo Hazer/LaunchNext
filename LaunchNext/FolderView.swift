@@ -99,10 +99,10 @@ struct FolderView: View {
         .onChange(of: folder.id) {
             resetFolderPagingState()
         }
-        .onChange(of: appStore.folderLayoutMode) {
+        .onChange(of: appStore.settingsStore.isFullscreenMode) {
             resetFolderPagingState()
         }
-        .onChange(of: appStore.settingsStore.voiceFeedbackEnabled) { _, enabled in (refactor: migrate FolderView + RightClickMenu to use settingsStore)
+        .onChange(of: appStore.settingsStore.voiceFeedbackEnabled) { _, enabled in
             if enabled {
                 announceSelectedAppIfNeeded()
             } else {
@@ -723,6 +723,11 @@ extension FolderView {
         } else {
             selectedIndex = 0
         }
+    }
+
+    private func resetFolderPagingState() {
+        selectedIndex = nil
+        scrollOffsetY = 0
     }
 
     private func announceSelectedAppIfNeeded() {

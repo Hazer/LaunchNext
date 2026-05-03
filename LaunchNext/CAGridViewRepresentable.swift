@@ -56,7 +56,7 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         view.dockDragSide = appStore.settingsStore.dockDragSide
         view.externalAppDragTriggerDistance = CGFloat(appStore.settingsStore.dockDragTriggerDistance)
         view.showInFinderMenuTitle = appStore.localized(.contextMenuShowInFinder)
-        view.copyAppPathMenuTitle = appStore.localized(.contextMenuCopyAppPath) (refactor: migrate CAGridViewRepresentable to use settingsStore)
+        view.copyAppPathMenuTitle = appStore.localized(.contextMenuCopyAppPath)
         view.hideAppMenuTitle = appStore.localized(.hiddenAppsAddButton)
         view.dissolveFolderMenuTitle = appStore.localized(.contextMenuDissolveFolder)
         view.uninstallWithToolMenuTitle = appStore.localized(.contextMenuUninstallWithConfiguredTool)
@@ -180,7 +180,7 @@ struct CAGridViewRepresentable: NSViewRepresentable {
 
         // updateconfig
         let configChanged = nsView.columns != appStore.settingsStore.gridColumnsPerPage ||
-                            nsView.rows != appStore.settingsStore.gridRowsPerPage || (refactor: migrate CAGridViewRepresentable to use settingsStore)
+                            nsView.rows != appStore.settingsStore.gridRowsPerPage ||
                             nsView.iconSize != iconSize ||
                             nsView.columnSpacing != columnSpacing ||
                             nsView.rowSpacing != rowSpacing ||
@@ -222,7 +222,7 @@ struct CAGridViewRepresentable: NSViewRepresentable {
         nsView.activePressScale = CGFloat(appStore.settingsStore.activePressScale)
         nsView.animationsEnabled = appStore.settingsStore.enableAnimations
         nsView.animationDuration = appStore.settingsStore.animationDuration
-        nsView.layoutMode = appStore.settingsStore.layoutMode (refactor: migrate CAGridViewRepresentable to use settingsStore)
+        nsView.layoutMode = appStore.settingsStore.layoutMode
         nsView.isScrollEnabled = appStore.openFolder == nil && !appStore.isSetting
         nsView.hideAppMenuTitle = appStore.localized(.hiddenAppsAddButton)
         nsView.dissolveFolderMenuTitle = appStore.localized(.contextMenuDissolveFolder)

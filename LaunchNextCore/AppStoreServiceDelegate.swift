@@ -1,22 +1,84 @@
 import Foundation
+import SwiftData
 
 @MainActor
-protocol AppStoreServiceDelegate: AnyObject {
-    // AppScanner writes
-    func applyScanResults(_ apps: [AppInfo], missing: Set<String>, hidden: Set<String>)
-    func triggerObjectWillChange()
+public protocol AppStoreServiceDelegate: AnyObject {
+    // MARK: - State Writes
 
-    // OrderPersistence writes
+    /// AppScanner writes
+    func applyScanResults(_ apps: [AppInfo],
+                          missing: [String: MissingAppPlaceholder],
+                          hidden: Set<String>)
+    /// OrderPersistence writes
     func applyOrderedItems(_ items: [LaunchpadItem], folders: [FolderInfo])
-
-    // FolderManager writes
+    /// FolderManager writes
     func applyFolderChanges(_ folders: [FolderInfo], items: [LaunchpadItem])
+    /// UpdateChecker writes
+    func applyUpdateState(_ state: UpdateState)
 
-    // UpdateChecker writes
-    func applyUpdateState(available: Bool, version: String?, url: URL?)
+    // MARK: - UI Triggers
+    func triggerObjectWillChange()
+    func triggerGridRefresh()
+    func triggerFolderUpdate()
+    func refreshCacheAfterFolderOperation()
 
-    // Shared access — managers read current state
+    // MARK: - State Reads
     var currentApps: [AppInfo] { get }
     var currentFolders: [FolderInfo] { get }
     var currentItems: [LaunchpadItem] { get }
+    var currentHiddenAppPaths: Set<String> { get }
+    var currentMissingPlaceholders: [String: MissingAppPlaceholder] { get }
+    var currentModelContext: ModelContext? { get }
+    var currentItemsPerPage: Int { get }
+    var currentApplicationSearchPaths: [String] { get }
+    var currentCustomAppSourcePaths: [String] { get }
+    var currentIsFullscreenMode: Bool { get }
+    var currentGridColumnsPerPage: Int { get }
+    var currentGridRowsPerPage: Int { get }
+    var currentRememberLastPage: Bool { get }
+
+    // MARK: - Layout Helpers
+    func compactItemsWithinPagesReturning() -> [LaunchpadItem]
+    func removeEmptyPagesReturning() -> [LaunchpadItem]
+    func filteredItemsRemovingHidden(from items: [LaunchpadItem]) -> [LaunchpadItem]
+    func sanitizedFolders(_ folders: [FolderInfo]) -> [FolderInfo]
+    func compactItemsWithinPages()
+
+    // MARK: - App List Writes
+    /// FolderManager writes updated app list (after folder add/remove/dissolve)
+    func applyAppListChanges(_ apps: [AppInfo])
+    /// FolderManager clears folder list (resetLayout)
+    func applyClearFolders()
+    /// FolderManager sets open folder (dissolveFolder, resetLayout)
+    func applyOpenFolder(_ folder: FolderInfo?)
+    /// FolderManager sets current page (resetLayout)
+    func applyCurrentPage(_ page: Int)
+    /// FolderManager resets scan flag (resetLayout)
+    func applyHasPerformedInitialScan(_ value: Bool)
+
+    // MARK: - Cross-Manager Routing
+    func persistenceSaveAllOrder()
+    func persistenceLoadAllOrder()
+    func persistenceRebuildItems()
+    func persistenceSmartRebuildItemsWithOrderPreservation(currentItems: [LaunchpadItem], newApps: [AppInfo])
+    func persistenceClearAllPersistedData()
+    func triggerFullRescan(loadPersistedOrder: Bool)
+    func clearAllCaches()
+
+    // MARK: - Cache Refresh
+    func refreshCacheAfterScan()
+    func updateCacheAfterChanges()
+
+    // MARK: - Persistence Helpers
+    func removableSourcePath(forAppPath path: String) -> String?
+    func updateMissingPlaceholder(path: String, displayName: String?, removableSource: String?) -> MissingAppPlaceholder?
+    func clearMissingPlaceholder(for path: String)
+    func appInfo(from url: URL, preferredName: String?, loadIcon: Bool?) -> AppInfo
+    func standardizedFilePath(_ path: String) -> String
+    func placeholderAppInfo(forMissingPath path: String, preferredName: String?) -> AppInfo?
+    func pruneHiddenAppsFromAppList()
+    func refreshMissingPlaceholders()
+
+    // MARK: - Persistence State
+    var hasAppliedOrderFromStore: Bool { get set }
 }

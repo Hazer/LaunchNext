@@ -468,6 +468,7 @@ public enum LocalizationKey: String {
 
     // Context Menu Actions
     case contextMenuShowInFinder
+    case contextMenuCopyAppPath
     case contextMenuAddToDock
     case contextMenuGetInfo
     case contextMenuHideFromLaunchNext
@@ -738,6 +739,7 @@ public final class LocalizationManager {
 
                 // Context Menu Actions
                 .contextMenuShowInFinder: "Show in Finder",
+                .contextMenuCopyAppPath: "Copy App Path",
                 .contextMenuAddToDock: "Add to Dock",
                 .contextMenuGetInfo: "Get Info",
                 .contextMenuHideFromLaunchNext: "Hide from LaunchNext",

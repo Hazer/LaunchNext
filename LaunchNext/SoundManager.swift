@@ -39,8 +39,8 @@ final class SoundManager {
     }
 
     private func playInternal(event: SoundEvent) {
-        guard let store = appStore, store.soundEffectsEnabled else { return }
-        if store.voiceFeedbackEnabled, event == .navigation {
+        guard let store = appStore, store.settingsStore.soundEffectsEnabled else { return }
+        if store.settingsStore.voiceFeedbackEnabled, event == .navigation {
             return
         }
         guard let name = soundName(for: event), !name.isEmpty else { return }
@@ -51,18 +51,18 @@ final class SoundManager {
         guard let store = appStore else { return nil }
         switch event {
         case .launchpadOpen:
-            return store.soundLaunchpadOpenSound
+            return store.settingsStore.soundLaunchpadOpenSound
         case .launchpadClose:
-            return store.soundLaunchpadCloseSound
+            return store.settingsStore.soundLaunchpadCloseSound
         case .navigation:
-            return store.soundNavigationSound
+            return store.settingsStore.soundNavigationSound
         }
     }
 
     @discardableResult
     private func playSystemSound(named name: String, respectToggle: Bool) -> Bool {
         if respectToggle {
-            guard appStore?.soundEffectsEnabled == true else { return false }
+            guard appStore?.settingsStore.soundEffectsEnabled == true else { return false }
         }
         guard let sound = makeSound(named: name) else { return false }
         sound.volume = 1.0

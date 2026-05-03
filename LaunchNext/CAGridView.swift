@@ -40,7 +40,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     var labelFontWeight: NSFont.Weight = .medium { didSet { updateLabelFonts() } }
     var showLabels: Bool = true { didSet { updateLabelVisibility() } }
     var isLayoutLocked: Bool = false
-    var folderDropZoneScale: CGFloat = CGFloat(AppStore.defaultFolderDropZoneScale)
+    var folderDropZoneScale: CGFloat = CGFloat(SettingsStore.defaultFolderDropZoneScale)
     var folderPreviewScale: CGFloat = 1
     var contentInsets: NSEdgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0) { didSet { updateLayout() } }
     var pageSpacing: CGFloat = 0 { didSet { updateLayout() } }
@@ -87,7 +87,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     var targetScrollOffset: CGFloat = 0
     var scrollVelocity: CGFloat = 0
     var isScrollAnimating = false
-    var scrollSensitivity: Double = AppStore.defaultScrollSensitivity
+    var scrollSensitivity: Double = SettingsStore.defaultScrollSensitivity
     var reverseWheelPagingDirection: Bool = false
     var animationsEnabled: Bool = true
     var animationDuration: Double = 0.3
@@ -133,6 +133,8 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     var onReorderAppBatch: (([String], Int) -> Void)?       // Batch reorder (by path order)
     var onRequestNewPage: (() -> Void)?                     // Request new page creation
     var hideAppMenuTitle: String = "Hide application"
+    var showInFinderMenuTitle: String = "Show in Finder"
+    var copyAppPathMenuTitle: String = "Copy App Path"
     var dissolveFolderMenuTitle: String = "Dissolve folder"
     var uninstallWithToolMenuTitle: String = "Uninstall with configured tool"
     var batchSelectAppsMenuTitle: String = "Batch Select Apps"
@@ -205,7 +207,7 @@ final class CAGridView: NSView, CALayerDelegate, NSDraggingSource {
     var dockDragEnabled: Bool = true
     let externalAppDragOutset: CGFloat = 18
     var dockDragSide: AppStore.DockDragSide = .bottom
-    var externalAppDragTriggerDistance: CGFloat = CGFloat(AppStore.defaultDockDragTriggerDistance)
+    var externalAppDragTriggerDistance: CGFloat = CGFloat(SettingsStore.defaultDockDragTriggerDistance)
 
     func logIfMismatch(_ tag: String, appPage: Int? = nil) {
         guard debugScrollMismatch else { return }
