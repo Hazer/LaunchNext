@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/hazer/Projects/BrowserOSProjects/LaunchNext/LaunchNext -type f -name \"*.swift\" ! -path \"*/Derived*\" ! -path \"*/DerivedData*\" -exec wc -l {} +)",
+      "Bash(grep -r \"@Model\" /Users/hazer/Projects/BrowserOSProjects/LaunchNext/LaunchNext/*.swift)",
+      "Bash(grep -r \"^import \" /Users/hazer/Projects/BrowserOSProjects/LaunchNext/LaunchNext/*.swift)"
+    ]
+  }
+}

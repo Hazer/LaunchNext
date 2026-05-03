@@ -1,3 +1,6 @@
+import LaunchNextCLI
+import LaunchNextInput
+import LaunchNextCore
 import SwiftUI
 import AppKit
 import SwiftData
@@ -5,6 +8,7 @@ import Combine
 import QuartzCore
 import Carbon
 import Carbon.HIToolbox
+import CoreServices
 
 extension Notification.Name {
     static let launchpadWindowShown = Notification.Name("LaunchpadWindowShown")
@@ -32,8 +36,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     private var cancellables = Set<AnyCancellable>()
     private var hotKeyRef: EventHotKeyRef?
     private var hotKeyEventHandler: EventHandlerRef?
+    private var f4HotKeyRef: EventHotKeyRef?
     // private var aiHotKeyRef: EventHotKeyRef?
     private let launchpadHotKeySignature = fourCharCode("LNXK")
+    private let f4HotKeySignature = fourCharCode("F4KY")
     // private let aiOverlayHotKeySignature = fourCharCode("AIOV")
     
     let appStore = AppStore()
@@ -51,14 +57,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     private var cliEndpointSocketPath: String?
     private var cliEndpointMonitorTimer: DispatchSourceTimer?
     private var hotCornerMonitor: HotCornerMonitor?
-    // Experimental low-level gesture monitor.
-    // Remove this property if gesture support is dropped together with
-    // bindGesturePreference()/updateGestureMonitor()/handleGestureTrigger().
+    private var statusItem: NSStatusItem?
+    private var statusMenu: NSMenu?
+    // Gesture monitor (now uses unified HID-level event tap).
     private var gestureMonitor: GestureMonitor?
-    // Wake recovery work items for the experimental gesture monitor.
-    // If gesture support is removed later, delete this together with
-    // bindGestureWakeRecovery()/scheduleGestureWakeRecovery().
-    private var gestureWakeRecoveryWorkItems: [DispatchWorkItem] = []
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         if runHeadlessModeIfRequested() { return }
@@ -69,6 +71,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         // LLMProviderRegistry.shared.register(provider: copilotProvider)
 
         appStore.syncGlobalHotKeyRegistration()
+        appStore.updateActivationPolicy()
+        setupMenuBarItem()
+        registerF4HotKey()
         // appStore.syncAIOverlayHotKeyRegistration()
 
         SoundManager.shared.bind(appStore: appStore)
@@ -80,19 +85,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         setupWindow(showImmediately: !shouldSilentlyLaunch)
         appStore.performInitialScanIfNeeded()
         appStore.startAutoRescan()
+        appStore.startFallbackScanTimer()
 
         bindAppearancePreference()
         bindControllerPreference()
         bindControllerMenuToggle()
         bindSystemUIVisibility()
+        bindMenuBarVisibility()
         bindCLICodePreference()
         bindHotCornerPreference()
         // Experimental gesture wiring entry point.
         // Remove this call if the gesture feature is removed later.
         bindGesturePreference()
-        // Experimental wake recovery for low-level gesture input.
-        // Remove this call if gesture support is removed later.
-        bindGestureWakeRecovery()
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.applyAppearancePreference(self.appStore.appearancePreference)
@@ -344,81 +348,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         // so the monitor can be rebuilt from a single source of truth.
         // If gesture support is removed later, delete this binder together with
         // updateGestureMonitor()/handleGestureTrigger() and the Gesture folder.
-        Publishers.CombineLatest(
-            Publishers.CombineLatest4(
-                appStore.$gestureEnabled.removeDuplicates(),
-                appStore.$gestureCloseOnPinchOut.removeDuplicates(),
-                appStore.$gestureTapAction.removeDuplicates(),
-                appStore.$gestureFingerCount.removeDuplicates()
-            ),
-            Publishers.CombineLatest(
-                appStore.$gestureDeviceSelectionMode.removeDuplicates(),
-                appStore.$gestureSelectedDeviceIDs.removeDuplicates()
-            )
+        Publishers.CombineLatest3(
+            appStore.$gestureEnabled.removeDuplicates(),
+            appStore.$gestureCloseOnPinchOut.removeDuplicates(),
+            appStore.$gestureTapAction.removeDuplicates()
         )
         .receive(on: RunLoop.main)
-        .sink { [weak self] combined, deviceSelection in
-            let (enabled, closeOnPinchOut, tapAction, fingerCount) = combined
-            let (deviceSelectionMode, selectedDeviceIDs) = deviceSelection
+        .sink { [weak self] enabled, closeOnPinchOut, tapAction in
             self?.updateGestureMonitor(
                 enabled: enabled,
                 closeOnPinchOut: closeOnPinchOut,
-                tapAction: tapAction,
-                fingerCount: fingerCount,
-                deviceSelectionMode: deviceSelectionMode,
-                selectedDeviceIDs: selectedDeviceIDs
+                tapAction: tapAction
             )
         }
         .store(in: &cancellables)
-    }
-
-    // Rebuilds the experimental gesture listener after sleep/wake.
-    // The low-level multitouch listener can become stale after wake even when
-    // its local "isListening" flag still looks healthy. If gesture support is
-    // removed later, delete this binder together with schedule/cancel helpers.
-    private func bindGestureWakeRecovery() {
-        let center = NSWorkspace.shared.notificationCenter
-
-        center.publisher(for: NSWorkspace.willSleepNotification)
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                self?.cancelGestureWakeRecovery()
-            }
-            .store(in: &cancellables)
-
-        center.publisher(for: NSWorkspace.didWakeNotification)
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                self?.scheduleGestureWakeRecovery()
-            }
-            .store(in: &cancellables)
-    }
-
-    private func scheduleGestureWakeRecovery() {
-        guard appStore.gestureEnabled || appStore.gestureTapAction != .off else { return }
-        guard !isTerminating else { return }
-
-        cancelGestureWakeRecovery()
-
-        // Rebuild twice: once after the initial wake settles, then again as a
-        // fallback for longer sleep/wake paths where the trackpad comes back
-        // later than NSWorkspaceDidWakeNotification.
-        for delay in [0.8, 2.0] {
-            let workItem = DispatchWorkItem { [weak self] in
-                guard let self else { return }
-                guard !self.isTerminating else { return }
-                guard self.appStore.gestureEnabled || self.appStore.gestureTapAction != .off else { return }
-                self.appStore.refreshGestureDeviceInventory()
-                self.gestureMonitor?.restart()
-            }
-            gestureWakeRecoveryWorkItems.append(workItem)
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
-        }
-    }
-
-    private func cancelGestureWakeRecovery() {
-        gestureWakeRecoveryWorkItems.forEach { $0.cancel() }
-        gestureWakeRecoveryWorkItems.removeAll()
     }
 
     private func updateHotCornerMonitor(enabled: Bool,
@@ -458,25 +401,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         showWindow()
     }
 
-    // Bridges Settings state into the experimental gesture monitor.
-    // If gesture support needs to be removed later, this is one of the main seams:
-    // delete LaunchNext/Gesture/, remove the Gesture settings/AppStore fields,
-    // then remove this method together with bindGesturePreference().
+    // Bridges Settings state into the gesture monitor.
     private func updateGestureMonitor(enabled: Bool,
                                       closeOnPinchOut: Bool,
-                                      tapAction: AppStore.GestureTapAction,
-                                      fingerCount: AppStore.GestureFingerCount,
-                                      deviceSelectionMode: GestureDeviceSelectionMode,
-                                      selectedDeviceIDs: [String]) {
+                                      tapAction: AppStore.GestureTapAction) {
         let configuration = GestureMonitor.Configuration(
             isEnabled: enabled || tapAction != .off,
             closeOnPinchOutEnabled: closeOnPinchOut,
             tapEnabled: tapAction != .off,
-            tapTogglesWindow: tapAction == .toggle,
-            deviceSelectionMode: deviceSelectionMode,
-            selectedDeviceIDs: selectedDeviceIDs,
-            requiredFingerCount: fingerCount.rawValue,
-            minimumOpenParticipatingFingerCount: fingerCount.minimumOpenParticipatingFingerCount
+            tapTogglesWindow: tapAction == .toggle
         )
 
         if gestureMonitor == nil {
@@ -1330,11 +1263,63 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     // }
 
     private func cleanUpHotKeyEventHandlerIfNeeded() {
-        // if hotKeyRef == nil && aiHotKeyRef == nil, let handler = hotKeyEventHandler {
-        if hotKeyRef == nil, let handler = hotKeyEventHandler {
+        // if hotKeyRef == nil && aiHotKeyRef == nil && f4HotKeyRef == nil, let handler = hotKeyEventHandler {
+        if hotKeyRef == nil && f4HotKeyRef == nil, let handler = hotKeyEventHandler {
             RemoveEventHandler(handler)
             hotKeyEventHandler = nil
         }
+    }
+
+    // MARK: - F4 / Launchpad Key Interception
+
+    /// Finds the system Launchpad symbolic hot key (typically F4) using HIServices.
+    private func findLaunchpadSymbolicHotKey() -> (keyCode: UInt32, modifiers: UInt32)? {
+        var hotKeys: Unmanaged<CFArray>?
+        let status = CopySymbolicHotKeys(&hotKeys)
+        guard status == noErr, let cfArray = hotKeys?.takeRetainedValue() else { return nil }
+        let array = cfArray as NSArray
+        for i in 0..<array.count {
+            guard let dict = array[i] as? [String: Any] else { continue }
+            guard dict[kHISymbolicHotKeyEnabled as String] as? Bool == true else { continue }
+            guard let code = dict[kHISymbolicHotKeyCode as String] as? Int,
+                  let mods = dict[kHISymbolicHotKeyModifiers as String] as? Int else { continue }
+            // F4 key code is 118 on ANSI keyboards — the standard Launchpad key
+            if code == 118 && mods == 0 {
+                return (UInt32(code), UInt32(mods))
+            }
+        }
+        return nil
+    }
+
+    private func registerF4HotKey() {
+        ensureHotKeyEventHandler()
+        guard let f4Info = findLaunchpadSymbolicHotKey() else {
+            NSLog("LaunchNext: F4/Launchpad symbolic hot key not found")
+            return
+        }
+        let hotKeyID = EventHotKeyID(signature: f4HotKeySignature, id: 1)
+        var ref: EventHotKeyRef?
+        let status = RegisterEventHotKey(
+            f4Info.keyCode,
+            f4Info.modifiers,
+            hotKeyID,
+            GetEventDispatcherTarget(),
+            0,
+            &ref
+        )
+        if status != noErr {
+            NSLog("LaunchNext: Failed to register F4 hotkey (status %d)", status)
+        } else {
+            f4HotKeyRef = ref
+        }
+    }
+
+    private func unregisterF4HotKey() {
+        if let ref = f4HotKeyRef {
+            UnregisterEventHotKey(ref)
+            f4HotKeyRef = nil
+        }
+        cleanUpHotKeyEventHandlerIfNeeded()
     }
 
     private func ensureHotKeyEventHandler() {
@@ -1351,6 +1336,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
             guard let self else { return }
             switch (signature, id) {
             case (self.launchpadHotKeySignature, 1):
+                self.toggleWindow()
+            case (self.f4HotKeySignature, 1):
                 self.toggleWindow()
             // case (self.aiOverlayHotKeySignature, 1):
             //     self.appStore.toggleAIOverlayPreview()
@@ -1388,12 +1375,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         window?.contentView?.alphaValue = 0
         windowIsVisible = false
 
-        // 初始化完成后执行首个淡入
+        // Execute first fade-in after initialization
         if showImmediately {
             showWindow()
         }
 
-        // 背景点击关闭逻辑改为 SwiftUI 内部实现，避免与输入控件冲突
+        // Background click-to-close logic changed to SwiftUI internal implementation, avoiding conflicts with input controls
     }
 
     private func bindAppearancePreference() {
@@ -1441,43 +1428,111 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     }
 
     private func bindSystemUIVisibility() {
-        Publishers.CombineLatest3(
-            appStore.$hideDock.removeDuplicates(),
-            appStore.$hideMenuBar.removeDuplicates(),
-            appStore.$isFullscreenMode.removeDuplicates()
-        )
+        appStore.$hideDock
+            .removeDuplicates()
             .receive(on: RunLoop.main)
-            .sink { [weak self] _, _, _ in
+            .sink { [weak self] _ in
                 self?.updateSystemUIVisibility()
+            }
+            .store(in: &cancellables)
+        appStore.$hideMenuBar
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updateSystemUIVisibility()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func bindMenuBarVisibility() {
+        appStore.$showInMenuBar
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updateMenuBarItemVisibility()
             }
             .store(in: &cancellables)
     }
 
     func updateSystemUIVisibility() {
         let shouldHideDock = appStore.hideDock && windowIsVisible
-        let shouldHideMenuBar = appStore.hideMenuBar && appStore.isFullscreenMode && windowIsVisible
+        let shouldHideMenuBar = appStore.hideMenuBar && windowIsVisible
         var options: NSApplication.PresentationOptions = []
-        if shouldHideMenuBar {
-            options.insert(.hideDock)
-            options.insert(.hideMenuBar)
-        } else if shouldHideDock {
-            options.insert(.autoHideDock)
-        }
+        if shouldHideDock { options.insert(.autoHideDock) }
+        if shouldHideMenuBar { options.insert(.autoHideMenuBar) }
         if options != NSApp.presentationOptions {
             NSApp.presentationOptions = options
         }
-        updateWindowLevelForSystemUI()
     }
 
-    private func updateWindowLevelForSystemUI() {
-        guard let window else { return }
-        let shouldCoverMenuBar = appStore.hideMenuBar && appStore.isFullscreenMode && windowIsVisible
-        let targetLevel: NSWindow.Level = shouldCoverMenuBar
-            ? NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 1)
-            : .floating
-        if window.level != targetLevel {
-            window.level = targetLevel
+    // MARK: - Menu Bar Status Item
+
+    func setupMenuBarItem() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+
+        if let button = statusItem?.button {
+            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+            if let img = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: "LaunchNext") {
+                button.image = img.withSymbolConfiguration(config)
+            }
+            button.action = #selector(menuBarClicked(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            button.target = self
         }
+
+        // Build the menu but do NOT attach it — attaching overrides left click
+        let menu = NSMenu()
+        menu.addItem(NSMenuItem(
+            title: "Show LaunchNext",
+            action: #selector(menuBarShowClicked),
+            keyEquivalent: ""
+        ))
+        menu.addItem(NSMenuItem(
+            title: "Settings\u{2026}",
+            action: #selector(menuBarSettingsClicked),
+            keyEquivalent: ","
+        ))
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(
+            title: "Quit LaunchNext",
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        ))
+        statusMenu = menu
+
+        updateMenuBarItemVisibility()
+    }
+
+    func updateMenuBarItemVisibility() {
+        statusItem?.isVisible = appStore.showInMenuBar
+    }
+
+    @objc func menuBarClicked(_ sender: Any) {
+        guard let event = NSApp.currentEvent else { return }
+        switch event.type {
+        case .leftMouseUp:
+            if windowIsVisible {
+                hideWindow()
+            } else {
+                showWindow()
+            }
+        case .rightMouseUp:
+            // Temporarily attach menu, trigger display, then detach
+            statusItem?.menu = statusMenu
+            statusItem?.button?.performClick(nil)
+            statusItem?.menu = nil
+        default:
+            break
+        }
+    }
+
+    @objc func menuBarShowClicked() {
+        showWindow()
+    }
+
+    @objc func menuBarSettingsClicked() {
+        appStore.isSetting = true
+        if !windowIsVisible { showWindow() }
     }
 
     private func wasLaunchedAsLoginItem() -> Bool {
@@ -1657,9 +1712,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
 
         let shouldPlaySound = windowIsVisible && !isTerminating
 
+        // Release system UI immediately so menu bar/dock come back without waiting for animation
+        if windowIsVisible {
+            windowIsVisible = false
+            updateSystemUIVisibility()
+        }
+
         let finalize: () -> Void = {
-            self.windowIsVisible = false
-            self.updateSystemUIVisibility()
             window.orderOut(nil)
             window.alphaValue = 1
             window.contentView?.alphaValue = 1
@@ -1671,7 +1730,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
             }
             self.appStore.searchText = ""
             self.appStore.openFolder = nil
-            self.appStore.saveAllOrder()
+            self.appStore.persistence.saveAllOrder()
             NotificationCenter.default.post(name: .launchpadWindowHidden, object: nil)
         }
 
@@ -1751,6 +1810,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
 
     func applicationWillTerminate(_ notification: Notification) {
         stopCLIEndpointMonitor()
+        unregisterF4HotKey()
         ControllerInputManager.shared.stop()
     }
     

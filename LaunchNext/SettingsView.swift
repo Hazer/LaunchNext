@@ -1,3 +1,7 @@
+import LaunchNextCLI
+import LaunchNextStrategies
+import LaunchNextUtilities
+import LaunchNextCore
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
@@ -39,7 +43,6 @@ struct SettingsView: View {
         }
     }
     @State private var showResetConfirm = false
-    @State private var showResetAppearanceConfirm = false
     @State private var selectedSection: SettingsSection = .general
     @State private var titleSearch: String = ""
     @State private var hasHiddenAppEntries: Bool = false
@@ -80,7 +83,6 @@ struct SettingsView: View {
     @State private var showCLIInfoPopover = false
     @State private var showCLIRemoveInfoPopover = false
     @State private var showCLIFullPathCommand = false
-    @State private var showHideMenuBarInfoPopover = false
     @State private var copiedCLICommand: String? = nil
     @State private var cliCommandActionMessage: String? = nil
     @State private var layoutModePreviewScope: LayoutModePreviewScope = .fullscreen
@@ -458,30 +460,6 @@ private var gestureTapActionBinding: Binding<AppStore.GestureTapAction> {
             guard appStore.gestureTapAction != newValue else { return }
             DispatchQueue.main.async {
                 appStore.gestureTapAction = newValue
-            }
-        }
-    )
-}
-
-private var gestureFingerCountBinding: Binding<AppStore.GestureFingerCount> {
-    Binding(
-        get: { appStore.gestureFingerCount },
-        set: { newValue in
-            guard appStore.gestureFingerCount != newValue else { return }
-            DispatchQueue.main.async {
-                appStore.gestureFingerCount = newValue
-            }
-        }
-    )
-}
-
-private var gestureDeviceSelectionModeBinding: Binding<GestureDeviceSelectionMode> {
-    Binding(
-        get: { appStore.gestureDeviceSelectionMode },
-        set: { newValue in
-            guard appStore.gestureDeviceSelectionMode != newValue else { return }
-            DispatchQueue.main.async {
-                appStore.gestureDeviceSelectionMode = newValue
             }
         }
     )
@@ -2275,7 +2253,6 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color.secondary.opacity(0.08))
@@ -2806,6 +2783,18 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             loginLayoutCard
                 .padding(.top, -10)
 
+            searchStrategyCard
+                .padding(.top, -10)
+
+            layoutModeCard
+                .padding(.top, -10)
+
+            showInDockCard
+                .padding(.top, -10)
+
+            showInMenuBarCard
+                .padding(.top, -10)
+
             Text(appStore.localized(.lockLayoutDescription))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -2827,33 +2816,17 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     Label(appStore.localized(.refresh), systemImage: "arrow.clockwise")
                 }
                 Spacer()
-                Menu {
-                    Button(role: .destructive) {
-                        showResetConfirm = true
-                    } label: {
-                        Label(appStore.localized(.resetLayout), systemImage: "square.grid.3x3")
-                    }
-                    Button(role: .destructive) {
-                        showResetAppearanceConfirm = true
-                    } label: {
-                        Label(appStore.localized(.resetAppearanceSettings), systemImage: "paintbrush")
-                    }
+                Button {
+                    showResetConfirm = true
                 } label: {
-                    Label(appStore.localized(.resetConfirm), systemImage: "arrow.counterclockwise")
+                    Label(appStore.localized(.resetLayout), systemImage: "arrow.counterclockwise")
                         .foregroundStyle(Color.red)
                 }
-                .menuStyle(.borderlessButton)
                 .alert(appStore.localized(.resetAlertTitle), isPresented: $showResetConfirm) {
                     Button(appStore.localized(.resetConfirm), role: .destructive) { appStore.resetLayout() }
                     Button(appStore.localized(.cancel), role: .cancel) {}
                 } message: {
                     Text(appStore.localized(.resetAlertMessage))
-                }
-                .alert(appStore.localized(.resetAppearanceAlertTitle), isPresented: $showResetAppearanceConfirm) {
-                    Button(appStore.localized(.resetConfirm), role: .destructive) { appStore.resetAppearanceSettings() }
-                    Button(appStore.localized(.cancel), role: .cancel) {}
-                } message: {
-                    Text(appStore.localized(.resetAppearanceAlertMessage))
                 }
                 Button {
                     AppDelegate.shared?.quitWithFade()
@@ -2862,6 +2835,113 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         .foregroundStyle(Color.red)
                 }
             }
+        }
+    }
+
+    private var searchStrategyCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(appStore.localized(.searchStrategyTitle))
+                .font(.subheadline.weight(.semibold))
+
+            Picker("", selection: $appStore.searchStrategyType) {
+                ForEach(SearchStrategyType.allCases) { type in
+                    Text(type.displayName).tag(type)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+
+            if appStore.searchStrategyType == .debounce {
+                HStack {
+                    Text(appStore.localized(.searchDebounceMsLabel))
+                        .font(.subheadline)
+                    Spacer()
+                    Text("\(appStore.searchDebounceMs)ms")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 50, alignment: .trailing)
+                }
+                Slider(
+                    value: Binding(
+                        get: { Double(appStore.searchDebounceMs) },
+                        set: { appStore.searchDebounceMs = Int($0) }
+                    ),
+                    in: Double(AppStore.searchDebounceMsRange.lowerBound)...Double(AppStore.searchDebounceMsRange.upperBound)
+                )
+            } else if appStore.searchStrategyType == .throttle {
+                HStack {
+                    Text(appStore.localized(.searchThrottleMsLabel))
+                        .font(.subheadline)
+                    Spacer()
+                    Text("\(appStore.searchThrottleMs)ms")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 50, alignment: .trailing)
+                }
+                Slider(
+                    value: Binding(
+                        get: { Double(appStore.searchThrottleMs) },
+                        set: { appStore.searchThrottleMs = Int($0) }
+                    ),
+                    in: Double(AppStore.searchThrottleMsRange.lowerBound)...Double(AppStore.searchThrottleMsRange.upperBound)
+                )
+
+                HStack {
+                    Text(appStore.localized(.searchThrottleLatestTitle))
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Toggle("", isOn: $appStore.searchThrottleLatest)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+            }
+        }
+    }
+
+    private var layoutModeCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(appStore.localized(.layoutModeTitle))
+                .font(.subheadline.weight(.semibold))
+
+            Picker("", selection: $appStore.layoutMode) {
+                ForEach(LayoutMode.allCases) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+        }
+    }
+
+    private var showInDockCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(appStore.localized(.showInDockTitle))
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Toggle("", isOn: $appStore.showInDock)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+            Text(appStore.localized(.showInDockDescription))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var showInMenuBarCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(appStore.localized(.showInMenuBarTitle))
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Toggle("", isOn: $appStore.showInMenuBar)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+            Text(appStore.localized(.showInMenuBarDescription))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -3251,7 +3331,6 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 12) {
                 Text(appStore.localized(.scanSourcesDefaultListTitle))
@@ -3260,9 +3339,6 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     appSourceRow(icon: "internaldrive", path: path, isAvailable: true, accessory: { EmptyView() })
                 }
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .liquidGlass(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
@@ -3299,6 +3375,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                                         Button {
                                             toggleExpandedSource(path)
                                         } label: {
+                                            // Image(systemName: expandedSource == standardizePath(path) ? "chevron.down.circle" : "chevron.right.circle")
+                                            //     .foregroundStyle(.secondary)
                                             Image(systemName: "ellipsis.circle")
                                                 .foregroundStyle(.secondary)
                                         }
@@ -3334,18 +3412,18 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                                                             .antialiased(true)
                                                             .frame(width: 24, height: 24)
                                                             .cornerRadius(5)
-                                                        VStack(alignment: .leading, spacing: 2) {
-                                                            Text(app.name)
-                                                                .font(.callout)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(app.name)
+                                        .font(.callout)
                                                                 .lineLimit(1)
                                                             Text(app.path)
                                                                 .font(.caption2)
                                                                 .foregroundStyle(.secondary)
                                                                 .lineLimit(1)
                                                         }
-                                                        Spacer()
-                                                        Button(role: .destructive) {
-                                                            removeAppFromLayout(app.path)
+                                Spacer()
+                                Button(role: .destructive) {
+                                    removeAppFromLayout(app.path)
                                                         } label: {
                                                             Image(systemName: "trash")
                                                                 .foregroundStyle(Color.red)
@@ -3371,75 +3449,6 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     }
                 }
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .liquidGlass(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .center, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "text.magnifyingglass")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(Color.accentColor)
-                            Text(appStore.localized(.scanSourcesFuzzySearchTitle))
-                                .font(.subheadline.weight(.semibold))
-                        }
-                        Text(appStore.localized(.scanSourcesFuzzySearchDescription))
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer(minLength: 20)
-
-                    Toggle("", isOn: $appStore.fuzzySearchEnabled)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-                .padding(.horizontal, 18)
-                .padding(.top, 16)
-                .padding(.bottom, 14)
-
-                Divider()
-                    .padding(.horizontal, 18)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(appStore.localized(.scanSourcesSearchDelayTitle))
-                                .font(.subheadline.weight(.semibold))
-                            Text(appStore.localized(.scanSourcesSearchDelayDescription))
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer(minLength: 12)
-
-                        Text("\(Int(appStore.searchDebounceMilliseconds.rounded())) ms")
-                            .font(.footnote.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Slider(
-                        value: $appStore.searchDebounceMilliseconds,
-                        in: AppStore.searchDebounceMillisecondsRange,
-                        step: 50
-                    )
-
-                    HStack {
-                        Text("\(Int(AppStore.searchDebounceMillisecondsRange.lowerBound)) ms")
-                        Spacer()
-                        Text("\(Int(AppStore.searchDebounceMillisecondsRange.upperBound)) ms")
-                    }
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 18)
-                .padding(.top, 14)
-                .padding(.bottom, 16)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .liquidGlass(in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .confirmationDialog(appStore.localized(.scanSourcesResetButton), isPresented: $showAppSourcesResetDialog, titleVisibility: .visible) {
             Button(appStore.localized(.scanSourcesResetButton), role: .destructive) {
@@ -3750,11 +3759,9 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
         appStore.compactItemsWithinPages()
         appStore.removeEmptyPages()
-        DispatchQueue.main.async {
-            appStore.folderUpdateTrigger = UUID()
-            appStore.gridRefreshTrigger = UUID()
-        }
-        appStore.saveAllOrder()
+        appStore.folderUpdateTrigger = UUID()
+        appStore.gridRefreshTrigger = UUID()
+        appStore.persistence.saveAllOrder()
     }
 
     private var shortcutsSection: some View {
@@ -4060,60 +4067,6 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text(appStore.localized(.gestureFingerCountTitle))
-                        Spacer()
-                        Text(appStore.localized(appStore.gestureFingerCount.localizationKey))
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    HStack(spacing: 8) {
-                        ForEach(AppStore.GestureFingerCount.allCases) { count in
-                            gestureFingerCountButton(for: count)
-                        }
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(appStore.localized(.gestureInputDeviceTitle))
-                        .font(.headline)
-
-                    HStack(spacing: 10) {
-                        gestureDeviceModeButton(for: .automatic)
-                        gestureDeviceModeButton(for: .selected)
-                    }
-
-                    if appStore.gestureDeviceSelectionMode == .selected {
-                        VStack(alignment: .leading, spacing: 8) {
-                            let showUnavailableMessage = appStore.availableGestureDevices.isEmpty || appStore.gestureUnavailableSelectionCount > 0
-
-                            if appStore.availableGestureDevices.isEmpty {
-                                Text(appStore.localized(.gestureInputDeviceUnavailableDescription))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            } else {
-                                ForEach(appStore.availableGestureDevices) { device in
-                                    gestureDeviceRow(for: device)
-                                }
-                            }
-
-                            if appStore.gestureSelectedDeviceIDs.isEmpty {
-                                Text(appStore.localized(.gestureInputDeviceManualEmpty))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            } else if showUnavailableMessage && !appStore.availableGestureDevices.isEmpty {
-                                Text(appStore.localized(.gestureInputDeviceUnavailableDescription))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                    }
-                }
-
                 VStack(alignment: .leading, spacing: 8) {
                     Text(appStore.localized(.gestureSystemHintTitle))
                         .font(.footnote.weight(.semibold))
@@ -4129,9 +4082,6 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .liquidGlass(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .onAppear {
-                appStore.refreshGestureDeviceInventory()
-            }
         }
     }
 
@@ -4263,143 +4213,6 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 11)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isSelected ? Color.accentColor.opacity(colorScheme == .dark ? 0.18 : 0.12)
-                                     : Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.25 : 0.75))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(isSelected ? Color.accentColor.opacity(0.65) : Color.primary.opacity(0.08), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func gestureFingerCountButton(for count: AppStore.GestureFingerCount) -> some View {
-        let isSelected = appStore.gestureFingerCount == count
-
-        return Button {
-            gestureFingerCountBinding.wrappedValue = count
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: count == .four ? "hand.raised" : "hand.raised.fill")
-                    .font(.caption.weight(.semibold))
-                Text(appStore.localized(count.localizationKey))
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 11)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isSelected ? Color.accentColor.opacity(colorScheme == .dark ? 0.18 : 0.12)
-                                     : Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.25 : 0.75))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(isSelected ? Color.accentColor.opacity(0.65) : Color.primary.opacity(0.08), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func gestureDeviceModeButton(for mode: GestureDeviceSelectionMode) -> some View {
-        let isSelected = appStore.gestureDeviceSelectionMode == mode
-        let symbolName = mode == .automatic ? "sparkles" : "list.bullet.circle"
-        let title = appStore.localized(mode == .automatic ? .gestureInputDeviceModeAuto : .gestureInputDeviceModeSelected)
-        let subtitle = mode == .automatic ? appStore.localized(.gestureInputDeviceAutoDescription) : gestureSelectedDeviceSummary
-
-        return Button {
-            gestureDeviceSelectionModeBinding.wrappedValue = mode
-        } label: {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: symbolName)
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-                    .frame(width: 20, height: 20)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 11)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(isSelected ? Color.accentColor.opacity(colorScheme == .dark ? 0.18 : 0.12)
-                                     : Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.25 : 0.75))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(isSelected ? Color.accentColor.opacity(0.65) : Color.primary.opacity(0.08), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var gestureSelectedDeviceSummary: String {
-        if appStore.gestureSelectedDeviceIDs.isEmpty {
-            return appStore.localized(.gestureInputDeviceManualEmpty)
-        }
-
-        let selectedNames = appStore.availableGestureDevices
-            .filter { appStore.gestureSelectedDeviceIDs.contains($0.id) }
-            .map(\.name)
-
-        if selectedNames.isEmpty {
-            return appStore.localized(.gestureInputDeviceUnavailableDescription)
-        }
-
-        return selectedNames.prefix(2).joined(separator: ", ")
-    }
-
-    private func gestureDeviceRow(for device: GestureInputDevice) -> some View {
-        let isSelected = appStore.gestureSelectedDeviceIDs.contains(device.id)
-
-        return Button {
-            let updatedSelection: [String]
-            if isSelected {
-                updatedSelection = appStore.gestureSelectedDeviceIDs.filter { $0 != device.id }
-            } else {
-                updatedSelection = Array(Set(appStore.gestureSelectedDeviceIDs + [device.id])).sorted()
-            }
-            DispatchQueue.main.async {
-                appStore.gestureSelectedDeviceIDs = updatedSelection
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.headline)
-                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(device.name)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-
-                    Text(appStore.localized(device.isBuiltIn ? .gestureInputDeviceBuiltInBadge : .gestureInputDeviceExternalBadge))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(isSelected ? Color.accentColor.opacity(colorScheme == .dark ? 0.18 : 0.12)
@@ -4681,29 +4494,11 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
             HStack {
                 Text(appStore.localized(.hideMenuBarOption))
-                Button {
-                    showHideMenuBarInfoPopover.toggle()
-                } label: {
-                    Image(systemName: "info.circle")
-                        .font(.caption.weight(.regular))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .popover(isPresented: $showHideMenuBarInfoPopover, arrowEdge: .top) {
-                    Text(appStore.localized(.hideMenuBarInfoBody))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(12)
-                        .frame(width: 280, alignment: .leading)
-                }
                 Spacer()
                 Toggle("", isOn: $appStore.hideMenuBar)
                     .labelsHidden()
                     .toggleStyle(.switch)
             }
-            .disabled(!appStore.isFullscreenMode)
-            .opacity(appStore.isFullscreenMode ? 1 : 0.45)
 
             HStack {
                 Text(appStore.localized(.rememberPageTitle))
@@ -4765,82 +4560,18 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                 }
             }
 
-            backgroundStyleCard
-        }
-    }
-
-    private var backgroundStyleCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.accentColor.opacity(0.14))
-                    Image(systemName: "paintpalette")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(appStore.localized(.backgroundStyleTitle))
+                    .font(.headline)
+                Picker("", selection: $appStore.launchpadBackgroundStyle) {
+                    ForEach(AppStore.BackgroundStyle.allCases) { style in
+                        Text(appStore.localized(style.localizationKey)).tag(style)
+                    }
                 }
-                .frame(width: 32, height: 32)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(appStore.localized(.backgroundStyleTitle))
-                        .font(.headline)
-                    Text(appStore.localized(appStore.launchpadBackgroundStyle.localizationKey))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-            }
-
-            HStack(spacing: 10) {
-                backgroundStyleOption(.blur, systemImage: "drop")
-                backgroundStyleOption(.glass, systemImage: "sparkles")
+                .pickerStyle(.segmented)
+                .labelsHidden()
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(nsColor: .quaternarySystemFill))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.28), lineWidth: 0.7)
-        )
-    }
-
-    private func backgroundStyleOption(_ style: AppStore.BackgroundStyle, systemImage: String) -> some View {
-        let selected = appStore.launchpadBackgroundStyle == style
-
-        return Button {
-            appStore.launchpadBackgroundStyle = style
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 13, weight: .semibold))
-                Text(appStore.localized(style.localizationKey))
-                    .font(.callout.weight(.semibold))
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                if selected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                }
-            }
-            .foregroundStyle(selected ? Color.accentColor : Color.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(selected ? Color.accentColor.opacity(0.16) : Color(nsColor: .controlBackgroundColor).opacity(0.72))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .strokeBorder(selected ? Color.accentColor.opacity(0.42) : Color(nsColor: .separatorColor).opacity(0.22), lineWidth: 0.8)
-            )
-        }
-        .buttonStyle(.plain)
     }
 
     private var appearanceSecondarySection: some View {
@@ -4948,83 +4679,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-
-            folderLayoutModeCard
         }
-    }
-
-    private var folderLayoutModeCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.accentColor.opacity(0.14))
-                    Image(systemName: "rectangle.grid.2x2")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
-                }
-                .frame(width: 32, height: 32)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(appStore.localized(.folderLayoutTitle))
-                        .font(.headline)
-                    Text(appStore.localized(.folderLayoutDescription))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-            }
-
-            HStack(spacing: 10) {
-                folderLayoutModeOption(.paged, systemImage: "rectangle.grid.2x2")
-                folderLayoutModeOption(.vertical, systemImage: "arrow.up.and.down")
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(nsColor: .quaternarySystemFill))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.28), lineWidth: 0.7)
-        )
-    }
-
-    private func folderLayoutModeOption(_ mode: AppStore.FolderLayoutMode, systemImage: String) -> some View {
-        let selected = appStore.folderLayoutMode == mode
-
-        return Button {
-            appStore.folderLayoutMode = mode
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 13, weight: .semibold))
-                Text(appStore.localized(mode.localizationKey))
-                    .font(.callout.weight(.semibold))
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                if selected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                }
-            }
-            .foregroundStyle(selected ? Color.accentColor : Color.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(selected ? Color.accentColor.opacity(0.16) : Color(nsColor: .controlBackgroundColor).opacity(0.72))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .strokeBorder(selected ? Color.accentColor.opacity(0.42) : Color(nsColor: .separatorColor).opacity(0.22), lineWidth: 0.8)
-            )
-        }
-        .buttonStyle(.plain)
     }
 
     private var appearanceTertiarySection: some View {
@@ -5450,9 +5105,6 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     keys.insert(AppStore.gestureEnabledKey)
                     keys.insert(AppStore.gestureCloseOnPinchOutKey)
                     keys.insert(AppStore.gestureTapActionKey)
-                    keys.insert(AppStore.gestureFingerCountKey)
-                    keys.insert(AppStore.gestureDeviceSelectionModeKey)
-                    keys.insert(AppStore.gestureSelectedDeviceIDsKey)
                 }
                 if appearanceCheckbox.state == .on {
                     keys.insert(AppStore.sidebarIconPresetKey)
@@ -5464,7 +5116,6 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     keys.insert("isFullscreenMode")
                     keys.insert("showLabels")
                     keys.insert("hideDock")
-                    keys.insert(AppStore.hideMenuBarKey)
                     keys.insert("enableAnimations")
                     keys.insert(AppStore.windowOpenAnimationKey)
                     keys.insert("useLocalizedThirdPartyTitles")
@@ -5481,7 +5132,6 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     keys.insert("gridRowSpacing")
                     keys.insert("folderDropZoneScale")
                     keys.insert(AppStore.folderPreviewHighResKey)
-                    keys.insert(AppStore.folderLayoutModeKey)
                     keys.insert("pageIndicatorOffset")
                     keys.insert(AppStore.pageIndicatorTopPaddingKey)
                     keys.insert(AppStore.pageIndicatorPerDisplayEnabledKey)
@@ -5853,7 +5503,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     private var updatesStatusCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            let availableRelease: AppStore.UpdateRelease? = {
+            let availableRelease: UpdateRelease? = {
                 if case .updateAvailable(let release) = appStore.updateState { return release }
                 return nil
             }()
@@ -5996,7 +5646,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         }
     }
 
-    private var currentAvailableRelease: AppStore.UpdateRelease? {
+    private var currentAvailableRelease: UpdateRelease? {
         if case .updateAvailable(let release) = appStore.updateState {
             return release
         }
