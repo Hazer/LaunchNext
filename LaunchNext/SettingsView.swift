@@ -91,21 +91,21 @@ struct SettingsView: View {
 
     // Sidebar sizing presets
     private var sidebarIconFrame: CGFloat {
-        switch appStore.sidebarIconPreset {
+        switch appStore.settingsStore.sidebarIconPreset {
         case .large: return 26
         case .medium: return 24
         }
     }
 
     private var sidebarIconFontSize: CGFloat {
-        switch appStore.sidebarIconPreset {
+        switch appStore.settingsStore.sidebarIconPreset {
         case .large: return 13
         case .medium: return 12
         }
     }
 
     private var sidebarRowVerticalPadding: CGFloat {
-        switch appStore.sidebarIconPreset {
+        switch appStore.settingsStore.sidebarIconPreset {
         case .large: return 2
         case .medium: return 1
         }
@@ -116,7 +116,7 @@ struct SettingsView: View {
     }
 
     private var sidebarHeaderCornerRadius: CGFloat {
-        switch appStore.sidebarIconPreset {
+        switch appStore.settingsStore.sidebarIconPreset {
         case .large: return 3
         case .medium: return 3
         }
@@ -235,7 +235,7 @@ struct SettingsView: View {
         .onDisappear {
             stopShortcutCapture(cancel: false)
         }
-        .onChange(of: appStore.isFullscreenMode) { _, _ in
+        .onChange(of: appStore.settingsStore.isFullscreenMode) { _, _ in
             guard selectedSection == .appearance else { return }
             syncLayoutModePreviewScopeToRuntime()
         }
@@ -299,7 +299,7 @@ private var selectedScopePerDisplayEnabled: Bool {
 }
 
 private func syncLayoutModePreviewScopeToRuntime() {
-    let target: LayoutModePreviewScope = appStore.isFullscreenMode ? .fullscreen : .compact
+    let target: LayoutModePreviewScope = appStore.settingsStore.isFullscreenMode ? .fullscreen : .compact
     guard layoutModePreviewScope != target else { return }
     layoutModePreviewScope = target
 }
@@ -348,11 +348,11 @@ private func scopedPerDisplayIndicatorBinding() -> Binding<Bool> {
 
 private var dockDragSideBinding: Binding<AppStore.DockDragSide> {
     Binding(
-        get: { appStore.dockDragSide },
+        get: { appStore.settingsStore.dockDragSide },
         set: { newValue in
-            guard appStore.dockDragSide != newValue else { return }
+            guard appStore.settingsStore.dockDragSide != newValue else { return }
             DispatchQueue.main.async {
-                appStore.dockDragSide = newValue
+                appStore.settingsStore.dockDragSide = newValue
             }
         }
     )
@@ -360,13 +360,13 @@ private var dockDragSideBinding: Binding<AppStore.DockDragSide> {
 
 private var dockDragTriggerDistanceBinding: Binding<Double> {
     Binding(
-        get: { appStore.dockDragTriggerDistance },
+        get: { appStore.settingsStore.dockDragTriggerDistance },
         set: { newValue in
             let clamped = min(max(newValue, AppStore.dockDragTriggerDistanceRange.lowerBound),
                               AppStore.dockDragTriggerDistanceRange.upperBound)
-            guard appStore.dockDragTriggerDistance != clamped else { return }
+            guard appStore.settingsStore.dockDragTriggerDistance != clamped else { return }
             DispatchQueue.main.async {
-                appStore.dockDragTriggerDistance = clamped
+                appStore.settingsStore.dockDragTriggerDistance = clamped
             }
         }
     )
@@ -374,11 +374,11 @@ private var dockDragTriggerDistanceBinding: Binding<Double> {
 
 private var hotCornerPositionBinding: Binding<AppStore.HotCornerPosition> {
     Binding(
-        get: { appStore.hotCornerPosition },
+        get: { appStore.settingsStore.hotCornerPosition },
         set: { newValue in
-            guard appStore.hotCornerPosition != newValue else { return }
+            guard appStore.settingsStore.hotCornerPosition != newValue else { return }
             DispatchQueue.main.async {
-                appStore.hotCornerPosition = newValue
+                appStore.settingsStore.hotCornerPosition = newValue
             }
         }
     )
@@ -386,13 +386,13 @@ private var hotCornerPositionBinding: Binding<AppStore.HotCornerPosition> {
 
 private var hotCornerTriggerDelayBinding: Binding<Double> {
     Binding(
-        get: { appStore.hotCornerTriggerDelay },
+        get: { appStore.settingsStore.hotCornerTriggerDelay },
         set: { newValue in
             let clamped = min(max(newValue, AppStore.hotCornerTriggerDelayRange.lowerBound),
                               AppStore.hotCornerTriggerDelayRange.upperBound)
-            guard appStore.hotCornerTriggerDelay != clamped else { return }
+            guard appStore.settingsStore.hotCornerTriggerDelay != clamped else { return }
             DispatchQueue.main.async {
-                appStore.hotCornerTriggerDelay = clamped
+                appStore.settingsStore.hotCornerTriggerDelay = clamped
             }
         }
     )
@@ -400,13 +400,13 @@ private var hotCornerTriggerDelayBinding: Binding<Double> {
 
 private var hotCornerHitboxSizeBinding: Binding<Double> {
     Binding(
-        get: { appStore.hotCornerHitboxSize },
+        get: { appStore.settingsStore.hotCornerHitboxSize },
         set: { newValue in
             let clamped = min(max(newValue, AppStore.hotCornerHitboxSizeRange.lowerBound),
                               AppStore.hotCornerHitboxSizeRange.upperBound)
-            guard appStore.hotCornerHitboxSize != clamped else { return }
+            guard appStore.settingsStore.hotCornerHitboxSize != clamped else { return }
             DispatchQueue.main.async {
-                appStore.hotCornerHitboxSize = clamped
+                appStore.settingsStore.hotCornerHitboxSize = clamped
             }
         }
     )
@@ -414,11 +414,11 @@ private var hotCornerHitboxSizeBinding: Binding<Double> {
 
 private var hotCornerToggleWhenOpenBinding: Binding<Bool> {
     Binding(
-        get: { appStore.hotCornerToggleWhenOpen },
+        get: { appStore.settingsStore.hotCornerToggleWhenOpen },
         set: { newValue in
-            guard appStore.hotCornerToggleWhenOpen != newValue else { return }
+            guard appStore.settingsStore.hotCornerToggleWhenOpen != newValue else { return }
             DispatchQueue.main.async {
-                appStore.hotCornerToggleWhenOpen = newValue
+                appStore.settingsStore.hotCornerToggleWhenOpen = newValue
             }
         }
     )
@@ -431,11 +431,11 @@ private var hotCornerToggleWhenOpenBinding: Binding<Bool> {
 // and LaunchNext/Gesture/.
 private var gestureEnabledBinding: Binding<Bool> {
     Binding(
-        get: { appStore.gestureEnabled },
+        get: { appStore.settingsStore.gestureEnabled },
         set: { newValue in
-            guard appStore.gestureEnabled != newValue else { return }
+            guard appStore.settingsStore.gestureEnabled != newValue else { return }
             DispatchQueue.main.async {
-                appStore.gestureEnabled = newValue
+                appStore.settingsStore.gestureEnabled = newValue
             }
         }
     )
@@ -443,11 +443,11 @@ private var gestureEnabledBinding: Binding<Bool> {
 
 private var gestureCloseOnPinchOutBinding: Binding<Bool> {
     Binding(
-        get: { appStore.gestureCloseOnPinchOut },
+        get: { appStore.settingsStore.gestureCloseOnPinchOut },
         set: { newValue in
-            guard appStore.gestureCloseOnPinchOut != newValue else { return }
+            guard appStore.settingsStore.gestureCloseOnPinchOut != newValue else { return }
             DispatchQueue.main.async {
-                appStore.gestureCloseOnPinchOut = newValue
+                appStore.settingsStore.gestureCloseOnPinchOut = newValue
             }
         }
     )
@@ -455,11 +455,11 @@ private var gestureCloseOnPinchOutBinding: Binding<Bool> {
 
 private var gestureTapActionBinding: Binding<AppStore.GestureTapAction> {
     Binding(
-        get: { appStore.gestureTapAction },
+        get: { appStore.settingsStore.gestureTapAction },
         set: { newValue in
-            guard appStore.gestureTapAction != newValue else { return }
+            guard appStore.settingsStore.gestureTapAction != newValue else { return }
             DispatchQueue.main.async {
-                appStore.gestureTapAction = newValue
+                appStore.settingsStore.gestureTapAction = newValue
             }
         }
     )
@@ -718,24 +718,24 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                 Text(appStore.localized(.gameControllerPlaceholderTitle))
                     .font(.headline.weight(.semibold))
 
-                Toggle(isOn: $appStore.gameControllerEnabled) {
+                Toggle(isOn: $appStore.settingsStore.gameControllerEnabled) {
                     Text(appStore.localized(.gameControllerToggleTitle))
                         .font(.subheadline.weight(.semibold))
                 }
                 .toggleStyle(.switch)
 
-                Toggle(isOn: $appStore.gameControllerMenuTogglesLaunchpad) {
+                Toggle(isOn: $appStore.settingsStore.gameControllerMenuTogglesLaunchpad) {
                     Text(appStore.localized(.gameControllerMenuToggleTitle))
                         .font(.subheadline.weight(.semibold))
                 }
                 .toggleStyle(.switch)
-                .disabled(!appStore.gameControllerEnabled)
-                .opacity(appStore.gameControllerEnabled ? 1 : 0.5)
+                .disabled(!appStore.settingsStore.gameControllerEnabled)
+                .opacity(appStore.settingsStore.gameControllerEnabled ? 1 : 0.5)
 
                 Text(appStore.localized(.gameControllerMenuToggleSubtitle))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                    .opacity(appStore.gameControllerEnabled ? 1 : 0.6)
+                    .opacity(appStore.settingsStore.gameControllerEnabled ? 1 : 0.6)
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(gameControllerStatusText)
@@ -762,7 +762,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     guideRow(icon: "dpad", text: appStore.localized(.gameControllerQuickGuideDirection))
                     guideRow(icon: "a.circle.fill", text: appStore.localized(.gameControllerQuickGuideSelect))
                     guideRow(icon: "b.circle.fill", text: appStore.localized(.gameControllerQuickGuideCancel))
-                    if appStore.gameControllerMenuTogglesLaunchpad {
+                    if appStore.settingsStore.gameControllerMenuTogglesLaunchpad {
                         guideRow(icon: "line.3.horizontal", text: appStore.localized(.gameControllerQuickGuideMenuToggle))
                     }
                 }
@@ -785,7 +785,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     }
 
     private var gameControllerStatusText: String {
-        if !appStore.gameControllerEnabled {
+        if !appStore.settingsStore.gameControllerEnabled {
             return appStore.localized(.gameControllerStatusDisabled)
         }
 
@@ -800,7 +800,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     private var soundSection: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Toggle(isOn: $appStore.soundEffectsEnabled) {
+            Toggle(isOn: $appStore.settingsStore.soundEffectsEnabled) {
                 Text(appStore.localized(.soundToggleTitle))
                     .font(.subheadline.weight(.semibold))
             }
@@ -811,14 +811,14 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                 .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 12) {
-                soundPickerRow(title: .soundEventLaunchpadOpen, binding: $appStore.soundLaunchpadOpenSound)
-                soundPickerRow(title: .soundEventLaunchpadClose, binding: $appStore.soundLaunchpadCloseSound)
-                soundPickerRow(title: .soundEventNavigation, binding: $appStore.soundNavigationSound)
+                soundPickerRow(title: .soundEventLaunchpadOpen, binding: $appStore.settingsStore.soundLaunchpadOpenSound)
+                soundPickerRow(title: .soundEventLaunchpadClose, binding: $appStore.settingsStore.soundLaunchpadCloseSound)
+                soundPickerRow(title: .soundEventNavigation, binding: $appStore.settingsStore.soundNavigationSound)
             }
 
             Divider()
 
-            Toggle(isOn: $appStore.voiceFeedbackEnabled) {
+            Toggle(isOn: $appStore.settingsStore.voiceFeedbackEnabled) {
                 Text(appStore.localized(.voiceToggleTitle))
                     .font(.subheadline.weight(.semibold))
             }
@@ -1218,8 +1218,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             ) {
                 appStore.forceShowOnboarding()
             }
-            .disabled(!appStore.isFullscreenMode)
-            .opacity(appStore.isFullscreenMode ? 1 : 0.45)
+            .disabled(!appStore.settingsStore.isFullscreenMode)
+            .opacity(appStore.settingsStore.isFullscreenMode ? 1 : 0.45)
             Text(appStore.localized(.developmentForceOnboardingHint))
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -1239,21 +1239,21 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     title: "Pure White",
                     systemImage: "sun.max.fill"
                 ) {
-                    appStore.developmentBackgroundOverride = .solidWhite
+                    appStore.settingsStore.developmentBackgroundOverride = .solidWhite
                 }
 
                 updateControlButton(
                     title: "Pure Black",
                     systemImage: "moon.fill"
                 ) {
-                    appStore.developmentBackgroundOverride = .solidBlack
+                    appStore.settingsStore.developmentBackgroundOverride = .solidBlack
                 }
 
                 updateControlButton(
                     title: "Clear",
                     systemImage: "arrow.counterclockwise"
                 ) {
-                    appStore.developmentBackgroundOverride = .none
+                    appStore.settingsStore.developmentBackgroundOverride = .none
                 }
 
                 Text("Development-only preview override, not persisted.")
@@ -1268,7 +1268,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             .font(.caption.monospacedDigit())
             .foregroundStyle(.secondary)
 
-            Toggle(appStore.localized(.showFPSOverlay), isOn: $appStore.showFPSOverlay)
+            Toggle(appStore.localized(.showFPSOverlay), isOn: $appStore.settingsStore.showFPSOverlay)
                 .toggleStyle(.switch)
             Text(appStore.localized(.showFPSOverlayDisclaimer))
                 .font(.caption)
@@ -1331,8 +1331,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     private var performanceSection: some View {
         let stats = appStore.cacheStatistics
-        let isLeanMode = appStore.performanceMode == .lean
-        let canUseCAGrid = appStore.performanceMode == .lean
+        let isLeanMode = appStore.settingsStore.performanceMode == .lean
+        let canUseCAGrid = appStore.settingsStore.performanceMode == .lean
 
         return VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 8) {
@@ -1362,7 +1362,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                             .font(.headline)
                     }
                     Spacer()
-                    Toggle("", isOn: $appStore.useCAGridRenderer)
+                    Toggle("", isOn: $appStore.settingsStore.useCAGridRenderer)
                         .labelsHidden()
                         .toggleStyle(.switch)
                         .disabled(!canUseCAGrid)
@@ -1375,13 +1375,13 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         .foregroundStyle(.secondary)
                 }
 
-                if appStore.useCAGridRenderer {
+                if appStore.settingsStore.useCAGridRenderer {
                     Text(appStore.localized(.performanceRendererWarning))
                         .font(.footnote)
                         .foregroundStyle(Color.accentColor)
                 }
 
-                if !appStore.useCAGridRenderer {
+                if !appStore.settingsStore.useCAGridRenderer {
                     Text(appStore.localized(.performanceRendererRecommendation))
                         .font(.caption)
                         .foregroundStyle(Color.accentColor)
@@ -1439,7 +1439,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             .frame(maxWidth: .infinity, alignment: .leading)
             .liquidGlass(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
-        .onChange(of: appStore.performanceMode) { _, _ in
+        .onChange(of: appStore.settingsStore.performanceMode) { _, _ in
             showPerformanceRestartPrompt = true
         }
         .alert(appStore.localized(.performanceModeRestartTitle), isPresented: $showPerformanceRestartPrompt) {
@@ -1753,7 +1753,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     }
 
     private var uninstallSection: some View {
-        let rawPath = appStore.uninstallToolAppPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawPath = appStore.settingsStore.uninstallToolAppPath.trimmingCharacters(in: .whitespacesAndNewlines)
         let toolURL = appStore.uninstallToolAppURL
         let hasSelection = !rawPath.isEmpty
         let isMissing = appStore.uninstallToolConfiguredButMissing
@@ -2706,10 +2706,10 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     }
 
     private func performanceModeButton(mode: PerformanceMode, title: String) -> some View {
-        let isSelected = appStore.performanceMode == mode
+        let isSelected = appStore.settingsStore.performanceMode == mode
         return Button {
             withAnimation(.easeInOut(duration: 0.15)) {
-                appStore.performanceMode = mode
+                appStore.settingsStore.performanceMode = mode
             }
         } label: {
             Text(title)
@@ -2952,7 +2952,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     Text(appStore.localized(.launchAtLoginTitle))
                         .font(.subheadline.weight(.semibold))
                     Spacer()
-                    Toggle("", isOn: $appStore.isStartOnLogin)
+                    Toggle("", isOn: $appStore.settingsStore.isStartOnLogin)
                         .labelsHidden()
                         .toggleStyle(.switch)
                         .disabled(!appStore.canConfigureStartOnLogin)
@@ -2963,7 +2963,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     Text(appStore.localized(.showQuickRefreshButton))
                         .font(.subheadline.weight(.semibold))
                     Spacer()
-                    Toggle("", isOn: $appStore.showQuickRefreshButton)
+                    Toggle("", isOn: $appStore.settingsStore.showQuickRefreshButton)
                         .labelsHidden()
                         .toggleStyle(.switch)
                 }
@@ -2977,7 +2977,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     Text(appStore.localized(.lockLayoutTitle))
                         .font(.subheadline.weight(.semibold))
                     Spacer()
-                    Toggle("", isOn: $appStore.isLayoutLocked)
+                    Toggle("", isOn: $appStore.settingsStore.isLayoutLocked)
                         .labelsHidden()
                         .toggleStyle(.switch)
                 }
@@ -3030,8 +3030,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                             Divider()
                             HStack(spacing: 8) {
                                 Button(role: .destructive) {
-                                    if appStore.developmentEnableCLICode {
-                                        appStore.developmentEnableCLICode = false
+                                    if appStore.settingsStore.developmentEnableCLICode {
+                                        appStore.settingsStore.developmentEnableCLICode = false
                                         cliCommandActionMessage = appStore.localized(.commandLineInterfaceRemoveCommandDone)
                                     } else {
                                         let removed = appStore.removeInstalledCLICommand()
@@ -3075,7 +3075,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         .frame(width: 360, alignment: .leading)
                     }
                     Spacer()
-                    Toggle("", isOn: $appStore.developmentEnableCLICode)
+                    Toggle("", isOn: $appStore.settingsStore.developmentEnableCLICode)
                         .labelsHidden()
                         .toggleStyle(.switch)
                 }
@@ -3280,9 +3280,9 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     }
 
     private func appearanceOptionCard(title: String, imageName: String, mode: AppearancePreference) -> some View {
-        let isSelected = appStore.appearancePreference == mode
+        let isSelected = appStore.settingsStore.appearancePreference == mode
         return Button {
-            appStore.appearancePreference = mode
+            appStore.settingsStore.appearancePreference = mode
         } label: {
             VStack(spacing: 2) {
                 Image(imageName)
@@ -3310,7 +3310,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                 .font(.headline)
                 .frame(minWidth: 90, alignment: .leading)
             Spacer()
-            Picker("", selection: $appStore.preferredLanguage) {
+            Picker("", selection: $appStore.settingsStore.preferredLanguage) {
                 ForEach(AppLanguage.allCases) { language in
                     Text(appStore.localizedLanguageName(for: language)).tag(language)
                 }
@@ -3358,16 +3358,16 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         Label(appStore.localized(.scanSourcesResetButton), systemImage: "arrow.counterclockwise")
                     }
                     .buttonStyle(.borderless)
-                    .disabled(appStore.customAppSourcePaths.isEmpty)
+                    .disabled(appStore.settingsStore.customAppSourcePaths.isEmpty)
                 }
 
-                if appStore.customAppSourcePaths.isEmpty {
+                if appStore.settingsStore.customAppSourcePaths.isEmpty {
                     Text(appStore.localized(.scanSourcesEmptyHint))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 4)
                 } else {
-                    ForEach(appStore.customAppSourcePaths, id: \.self) { path in
+                    ForEach(appStore.settingsStore.customAppSourcePaths, id: \.self) { path in
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
                                 appSourceRow(icon: "folder", path: path, isAvailable: pathExists(path)) {
@@ -3609,17 +3609,17 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     private func backgroundMaskColorBinding(isDark: Bool) -> Binding<Color> {
         Binding(
             get: {
-                let rgba = isDark ? appStore.backgroundMaskDarkColor : appStore.backgroundMaskLightColor
+                let rgba = isDark ? appStore.settingsStore.backgroundMaskDarkColor : appStore.settingsStore.backgroundMaskLightColor
                 return rgba.color
             },
             set: { newValue in
                 let updated = AppStore.RGBAColor(newValue)
-                let current = isDark ? appStore.backgroundMaskDarkColor : appStore.backgroundMaskLightColor
+                let current = isDark ? appStore.settingsStore.backgroundMaskDarkColor : appStore.settingsStore.backgroundMaskLightColor
                 guard current != updated else { return }
                 if isDark {
-                    appStore.backgroundMaskDarkColor = updated
+                    appStore.settingsStore.backgroundMaskDarkColor = updated
                 } else {
-                    appStore.backgroundMaskLightColor = updated
+                    appStore.settingsStore.backgroundMaskLightColor = updated
                 }
             }
         )
@@ -3767,7 +3767,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     private var shortcutsSection: some View {
         let isCapturing = isCapturingShortcut(.launchpad)
         let canSave = isCapturing && pendingShortcut != nil
-        let canClear = isCapturing || appStore.globalHotKey != nil
+        let canClear = isCapturing || appStore.settingsStore.globalHotKey != nil
 
         return VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 12) {
@@ -3867,7 +3867,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         Text(appStore.localized(.dockDragSideTitle))
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text(appStore.localized(appStore.dockDragSide.localizationKey))
+                        Text(appStore.localized(appStore.settingsStore.dockDragSide.localizationKey))
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 9)
@@ -3880,15 +3880,15 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                             dockDragSideButton(for: side)
                         }
                     }
-                    .disabled(!appStore.dockDragEnabled)
-                    .opacity(appStore.dockDragEnabled ? 1 : 0.45)
+                    .disabled(!appStore.settingsStore.dockDragEnabled)
+                    .opacity(appStore.settingsStore.dockDragEnabled ? 1 : 0.45)
 
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             Text(appStore.localized(.dockDragTriggerDistanceTitle))
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            Text("\(Int(appStore.dockDragTriggerDistance)) px")
+                            Text("\(Int(appStore.settingsStore.dockDragTriggerDistance)) px")
                                 .font(.footnote.monospacedDigit())
                                 .foregroundStyle(.secondary)
                         }
@@ -3896,8 +3896,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         Slider(value: dockDragTriggerDistanceBinding,
                                in: AppStore.dockDragTriggerDistanceRange,
                                step: 1)
-                        .disabled(!appStore.dockDragEnabled)
-                        .opacity(appStore.dockDragEnabled ? 1 : 0.45)
+                        .disabled(!appStore.settingsStore.dockDragEnabled)
+                        .opacity(appStore.settingsStore.dockDragEnabled ? 1 : 0.45)
 
                         HStack {
                             Text("\(Int(AppStore.dockDragTriggerDistanceRange.lowerBound))")
@@ -3906,7 +3906,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         }
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.tertiary)
-                        .opacity(appStore.dockDragEnabled ? 1 : 0.45)
+                        .opacity(appStore.settingsStore.dockDragEnabled ? 1 : 0.45)
                     }
                 }
             }
@@ -3942,15 +3942,15 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         .labelsHidden()
                         .toggleStyle(.switch)
                 }
-                .disabled(!appStore.hotCornerEnabled)
-                .opacity(appStore.hotCornerEnabled ? 1 : 0.45)
+                .disabled(!appStore.settingsStore.hotCornerEnabled)
+                .opacity(appStore.settingsStore.hotCornerEnabled ? 1 : 0.45)
 
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Text(appStore.localized(.hotCornerPositionTitle))
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text(appStore.localized(appStore.hotCornerPosition.localizationKey))
+                        Text(appStore.localized(appStore.settingsStore.hotCornerPosition.localizationKey))
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 9)
@@ -3968,15 +3968,15 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                             hotCornerPositionButton(for: .bottomRight)
                         }
                     }
-                    .disabled(!appStore.hotCornerEnabled)
-                    .opacity(appStore.hotCornerEnabled ? 1 : 0.45)
+                    .disabled(!appStore.settingsStore.hotCornerEnabled)
+                    .opacity(appStore.settingsStore.hotCornerEnabled ? 1 : 0.45)
 
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             Text(appStore.localized(.hotCornerTriggerDelayTitle))
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            Text("\(Int((appStore.hotCornerTriggerDelay * 1000).rounded())) ms")
+                            Text("\(Int((appStore.settingsStore.hotCornerTriggerDelay * 1000).rounded())) ms")
                                 .font(.footnote.monospacedDigit())
                                 .foregroundStyle(.secondary)
                         }
@@ -3984,8 +3984,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         Slider(value: hotCornerTriggerDelayBinding,
                                in: AppStore.hotCornerTriggerDelayRange,
                                step: 0.05)
-                        .disabled(!appStore.hotCornerEnabled)
-                        .opacity(appStore.hotCornerEnabled ? 1 : 0.45)
+                        .disabled(!appStore.settingsStore.hotCornerEnabled)
+                        .opacity(appStore.settingsStore.hotCornerEnabled ? 1 : 0.45)
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
@@ -3993,7 +3993,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                             Text(appStore.localized(.hotCornerHitboxSizeTitle))
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            Text("\(Int(appStore.hotCornerHitboxSize.rounded())) px")
+                            Text("\(Int(appStore.settingsStore.hotCornerHitboxSize.rounded())) px")
                                 .font(.footnote.monospacedDigit())
                                 .foregroundStyle(.secondary)
                         }
@@ -4001,8 +4001,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         Slider(value: hotCornerHitboxSizeBinding,
                                in: AppStore.hotCornerHitboxSizeRange,
                                step: 1)
-                        .disabled(!appStore.hotCornerEnabled)
-                        .opacity(appStore.hotCornerEnabled ? 1 : 0.45)
+                        .disabled(!appStore.settingsStore.hotCornerEnabled)
+                        .opacity(appStore.settingsStore.hotCornerEnabled ? 1 : 0.45)
 
                         HStack {
                             Text("\(Int(AppStore.hotCornerHitboxSizeRange.lowerBound))")
@@ -4011,7 +4011,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         }
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.tertiary)
-                        .opacity(appStore.hotCornerEnabled ? 1 : 0.45)
+                        .opacity(appStore.settingsStore.hotCornerEnabled ? 1 : 0.45)
                     }
                 }
             }
@@ -4048,14 +4048,14 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         .labelsHidden()
                         .toggleStyle(.switch)
                 }
-                .disabled(!appStore.gestureEnabled)
-                .opacity(appStore.gestureEnabled ? 1 : 0.45)
+                .disabled(!appStore.settingsStore.gestureEnabled)
+                .opacity(appStore.settingsStore.gestureEnabled ? 1 : 0.45)
 
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
                         Text(appStore.localized(.gestureTapActionTitle))
                         Spacer()
-                        Text(appStore.localized(appStore.gestureTapAction.localizationKey))
+                        Text(appStore.localized(appStore.settingsStore.gestureTapAction.localizationKey))
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(.secondary)
                     }
@@ -4108,12 +4108,12 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     @ViewBuilder
     private var dockDragPreviewHighlight: some View {
-        if !appStore.dockDragEnabled {
+        if !appStore.settingsStore.dockDragEnabled {
             Image(systemName: "slash.circle")
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundStyle(.secondary)
         } else {
-            switch appStore.dockDragSide {
+            switch appStore.settingsStore.dockDragSide {
             case .disabled:
                 EmptyView()
             case .bottom:
@@ -4146,11 +4146,11 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     private var dockDragEnabledBinding: Binding<Bool> {
         Binding(
-            get: { appStore.dockDragEnabled },
+            get: { appStore.settingsStore.dockDragEnabled },
             set: { newValue in
-                guard appStore.dockDragEnabled != newValue else { return }
+                guard appStore.settingsStore.dockDragEnabled != newValue else { return }
                 DispatchQueue.main.async {
-                    appStore.dockDragEnabled = newValue
+                    appStore.settingsStore.dockDragEnabled = newValue
                 }
             }
         )
@@ -4158,18 +4158,18 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     private var hotCornerEnabledBinding: Binding<Bool> {
         Binding(
-            get: { appStore.hotCornerEnabled },
+            get: { appStore.settingsStore.hotCornerEnabled },
             set: { newValue in
-                guard appStore.hotCornerEnabled != newValue else { return }
+                guard appStore.settingsStore.hotCornerEnabled != newValue else { return }
                 DispatchQueue.main.async {
-                    appStore.hotCornerEnabled = newValue
+                    appStore.settingsStore.hotCornerEnabled = newValue
                 }
             }
         )
     }
 
     private func dockDragSideButton(for side: AppStore.DockDragSide) -> some View {
-        let isSelected = appStore.dockDragSide == side
+        let isSelected = appStore.settingsStore.dockDragSide == side
 
         return Button {
             dockDragSideBinding.wrappedValue = side
@@ -4198,7 +4198,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     }
 
     private func gestureTapActionButton(for action: AppStore.GestureTapAction) -> some View {
-        let isSelected = appStore.gestureTapAction == action
+        let isSelected = appStore.settingsStore.gestureTapAction == action
 
         return Button {
             gestureTapActionBinding.wrappedValue = action
@@ -4287,7 +4287,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     @ViewBuilder
     private var gesturePreviewHighlight: some View {
-        if !appStore.gestureEnabled && appStore.gestureTapAction == .off {
+        if !appStore.settingsStore.gestureEnabled && appStore.settingsStore.gestureTapAction == .off {
             Image(systemName: "slash.circle")
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundStyle(.secondary)
@@ -4308,7 +4308,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         .position(point)
                 }
 
-                if appStore.gestureEnabled {
+                if appStore.settingsStore.gestureEnabled {
                     ForEach(Array(points.enumerated()), id: \.offset) { _, point in
                         Path { path in
                             path.move(to: point)
@@ -4322,11 +4322,11 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                 }
 
                 Circle()
-                    .fill(Color.accentColor.opacity(appStore.gestureTapAction != .off ? 0.22 : 0.16))
-                    .frame(width: appStore.gestureTapAction != .off ? 26 : 18, height: appStore.gestureTapAction != .off ? 26 : 18)
+                    .fill(Color.accentColor.opacity(appStore.settingsStore.gestureTapAction != .off ? 0.22 : 0.16))
+                    .frame(width: appStore.settingsStore.gestureTapAction != .off ? 26 : 18, height: appStore.settingsStore.gestureTapAction != .off ? 26 : 18)
                     .position(center)
 
-                if appStore.gestureTapAction != .off {
+                if appStore.settingsStore.gestureTapAction != .off {
                     Circle()
                         .stroke(Color.accentColor.opacity(0.55), lineWidth: 2)
                         .frame(width: 34, height: 34)
@@ -4338,7 +4338,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
     @ViewBuilder
     private var hotCornerPreviewHighlight: some View {
-        if !appStore.hotCornerEnabled {
+        if !appStore.settingsStore.hotCornerEnabled {
             Image(systemName: "slash.circle")
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundStyle(.secondary)
@@ -4356,7 +4356,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     }
 
     private func hotCornerPreviewPoint(in size: CGSize, inset: CGFloat) -> CGPoint {
-        switch appStore.hotCornerPosition {
+        switch appStore.settingsStore.hotCornerPosition {
         case .topLeft:
             return CGPoint(x: inset + 6, y: inset + 6)
         case .topRight:
@@ -4369,7 +4369,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     }
 
     private func hotCornerPositionButton(for position: AppStore.HotCornerPosition) -> some View {
-        let isSelected = appStore.hotCornerPosition == position
+        let isSelected = appStore.settingsStore.hotCornerPosition == position
 
         return Button {
             hotCornerPositionBinding.wrappedValue = position
@@ -4427,7 +4427,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             HStack {
                 Text(appStore.localized(.classicMode))
                 Spacer()
-                Toggle("", isOn: $appStore.isFullscreenMode)
+                Toggle("", isOn: $appStore.settingsStore.isFullscreenMode)
                     .labelsHidden()
                     .toggleStyle(.switch)
             }
@@ -4435,7 +4435,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             HStack {
                 Text(appStore.localized(.showLabels))
                 Spacer()
-                Toggle("", isOn: $appStore.showLabels)
+                Toggle("", isOn: $appStore.settingsStore.showLabels)
                     .labelsHidden()
                     .toggleStyle(.switch)
             }
@@ -4443,7 +4443,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             HStack {
                 Text(appStore.localized(.useLocalizedThirdPartyTitles))
                 Spacer()
-                Toggle("", isOn: $appStore.useLocalizedThirdPartyTitles)
+                Toggle("", isOn: $appStore.settingsStore.useLocalizedThirdPartyTitles)
                     .labelsHidden()
                     .toggleStyle(.switch)
             }
@@ -4451,17 +4451,17 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             HStack {
                 Text(appStore.localized(.predictDrop))
                 Spacer()
-                Toggle("", isOn: $appStore.enableDropPrediction)
+                Toggle("", isOn: $appStore.settingsStore.enableDropPrediction)
                     .labelsHidden()
                     .toggleStyle(.switch)
             }
-            .disabled(appStore.useCAGridRenderer)
-            .opacity(appStore.useCAGridRenderer ? 0.5 : 1)
+            .disabled(appStore.settingsStore.useCAGridRenderer)
+            .opacity(appStore.settingsStore.useCAGridRenderer ? 0.5 : 1)
 
             HStack {
                 Text(appStore.localized(.enableAnimations))
                 Spacer()
-                Toggle("", isOn: $appStore.enableAnimations)
+                Toggle("", isOn: $appStore.settingsStore.enableAnimations)
                     .labelsHidden()
                     .toggleStyle(.switch)
             }
@@ -4469,17 +4469,17 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             HStack {
                 Text(appStore.localized(.followScrollPagingTitle))
                 Spacer()
-                Toggle("", isOn: $appStore.followScrollPagingEnabled)
+                Toggle("", isOn: $appStore.settingsStore.followScrollPagingEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
             }
-            .disabled(appStore.useCAGridRenderer)
-            .opacity(appStore.useCAGridRenderer ? 0.5 : 1)
+            .disabled(appStore.settingsStore.useCAGridRenderer)
+            .opacity(appStore.settingsStore.useCAGridRenderer ? 0.5 : 1)
 
             HStack {
                 Text(appStore.localized(.reverseWheelPagingTitle))
                 Spacer()
-                Toggle("", isOn: $appStore.reverseWheelPagingDirection)
+                Toggle("", isOn: $appStore.settingsStore.reverseWheelPagingDirection)
                     .labelsHidden()
                     .toggleStyle(.switch)
             }
@@ -4487,7 +4487,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             HStack {
                 Text(appStore.localized(.hideDockOption))
                 Spacer()
-                Toggle("", isOn: $appStore.hideDock)
+                Toggle("", isOn: $appStore.settingsStore.hideDock)
                     .labelsHidden()
                     .toggleStyle(.switch)
             }
@@ -4495,15 +4495,17 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             HStack {
                 Text(appStore.localized(.hideMenuBarOption))
                 Spacer()
-                Toggle("", isOn: $appStore.hideMenuBar)
+                Toggle("", isOn: $appStore.settingsStore.hideMenuBar)
                     .labelsHidden()
                     .toggleStyle(.switch)
             }
+            .disabled(!appStore.settingsStore.isFullscreenMode)
+            .opacity(appStore.settingsStore.isFullscreenMode ? 1 : 0.45)
 
             HStack {
                 Text(appStore.localized(.rememberPageTitle))
                 Spacer()
-                Toggle("", isOn: $appStore.rememberLastPage)
+                Toggle("", isOn: $appStore.settingsStore.rememberLastPage)
                     .labelsHidden()
                     .toggleStyle(.switch)
             }
@@ -4511,7 +4513,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             HStack {
                 Text(appStore.localized(.hoverMagnification))
                 Spacer()
-                Toggle("", isOn: $appStore.enableHoverMagnification)
+                Toggle("", isOn: $appStore.settingsStore.enableHoverMagnification)
                     .labelsHidden()
                     .toggleStyle(.switch)
             }
@@ -4519,7 +4521,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             HStack {
                 Text(appStore.localized(.activePressEffect))
                 Spacer()
-                Toggle("", isOn: $appStore.enableActivePressEffect)
+                Toggle("", isOn: $appStore.settingsStore.enableActivePressEffect)
                     .labelsHidden()
                     .toggleStyle(.switch)
             }
@@ -4528,7 +4530,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                 HStack {
                     Text(appStore.localized(.folderPreviewHighResTitle))
                     Spacer()
-                    Toggle("", isOn: $appStore.enableHighResFolderPreviews)
+                    Toggle("", isOn: $appStore.settingsStore.enableHighResFolderPreviews)
                         .labelsHidden()
                         .toggleStyle(.switch)
                 }
@@ -4540,7 +4542,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             HStack {
                 Text(appStore.localized(.windowOpenAnimationTitle))
                 Spacer()
-                Toggle("", isOn: $appStore.enableWindowOpenAnimation)
+                Toggle("", isOn: $appStore.settingsStore.enableWindowOpenAnimation)
                     .labelsHidden()
                     .toggleStyle(.switch)
             }
@@ -4548,12 +4550,12 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             HStack {
                 Text(appStore.localized(.backgroundMaskTitle))
                 Spacer()
-                Toggle("", isOn: $appStore.backgroundMaskEnabled)
+                Toggle("", isOn: $appStore.settingsStore.backgroundMaskEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
             }
 
-            if appStore.backgroundMaskEnabled {
+            if appStore.settingsStore.backgroundMaskEnabled {
                 VStack(alignment: .leading, spacing: 8) {
                     ColorPicker(appStore.localized(.backgroundMaskLightLabel), selection: backgroundMaskColorBinding(isDark: false), supportsOpacity: true)
                     ColorPicker(appStore.localized(.backgroundMaskDarkLabel), selection: backgroundMaskColorBinding(isDark: true), supportsOpacity: true)
@@ -4568,25 +4570,83 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         Text(appStore.localized(style.localizationKey)).tag(style)
                     }
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+                .frame(width: 32, height: 32)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(appStore.localized(.backgroundStyleTitle))
+                        .font(.headline)
+                    Text(appStore.localized(appStore.settingsStore.launchpadBackgroundStyle.localizationKey))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+
+            HStack(spacing: 10) {
+                backgroundStyleOption(.blur, systemImage: "drop")
+                backgroundStyleOption(.glass, systemImage: "sparkles")
             }
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(nsColor: .quaternarySystemFill))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.28), lineWidth: 0.7)
+        )
+    }
+
+    private func backgroundStyleOption(_ style: AppStore.BackgroundStyle, systemImage: String) -> some View {
+        let selected = appStore.settingsStore.launchpadBackgroundStyle == style
+
+        return Button {
+            appStore.settingsStore.launchpadBackgroundStyle = style
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(appStore.localized(style.localizationKey))
+                    .font(.callout.weight(.semibold))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                if selected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+            }
+            .foregroundStyle(selected ? Color.accentColor : Color.primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(selected ? Color.accentColor.opacity(0.16) : Color(nsColor: .controlBackgroundColor).opacity(0.72))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .strokeBorder(selected ? Color.accentColor.opacity(0.42) : Color(nsColor: .separatorColor).opacity(0.22), lineWidth: 0.8)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private var appearanceSecondarySection: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
-                let durationEnabled = appStore.enableAnimations && !appStore.useCAGridRenderer
+                let durationEnabled = appStore.settingsStore.enableAnimations && !appStore.settingsStore.useCAGridRenderer
                 Text(appStore.localized(.animationDurationLabel))
                     .font(.headline)
-                Slider(value: $appStore.animationDuration, in: 0.1...1.0, step: 0.05)
+                Slider(value: $appStore.settingsStore.animationDuration, in: 0.1...1.0, step: 0.05)
                     .disabled(!durationEnabled)
                     .opacity(durationEnabled ? 1 : 0.5)
                 HStack {
                     Text("0.1s").font(.footnote)
                     Spacer()
-                    Text(String(format: "%.2fs", appStore.animationDuration))
+                    Text(String(format: "%.2fs", appStore.settingsStore.animationDuration))
                         .font(.footnote)
                     Spacer()
                     Text("1.0s").font(.footnote)
@@ -4598,7 +4658,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             VStack(alignment: .leading, spacing: 8) {
                 Text(appStore.localized(.iconLabelFontWeight))
                     .font(.headline)
-                Picker("", selection: $appStore.iconLabelFontWeight) {
+                Picker("", selection: $appStore.settingsStore.iconLabelFontWeight) {
                     ForEach(AppStore.IconLabelFontWeightOption.allCases) { option in
                         Text(option.displayName).tag(option)
                     }
@@ -4610,7 +4670,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             VStack(alignment: .leading, spacing: 8) {
                 Text(appStore.localized(.sidebarIconSizeTitle))
                     .font(.headline)
-                Picker("", selection: $appStore.sidebarIconPreset) {
+                Picker("", selection: $appStore.settingsStore.sidebarIconPreset) {
                     Text(appStore.localized(.sidebarIconSizeLarge)).tag(AppStore.SidebarIconPreset.large)
                     Text(appStore.localized(.sidebarIconSizeMedium)).tag(AppStore.SidebarIconPreset.medium)
                 }
@@ -4638,13 +4698,13 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     Text(appStore.localized(.folderWindowWidth))
                         .font(.headline)
                     Spacer()
-                    Text(String(format: "%.0f%%", appStore.folderPopoverWidthFactor * 100))
+                    Text(String(format: "%.0f%%", appStore.settingsStore.folderPopoverWidthFactor * 100))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                Slider(value: $appStore.folderPopoverWidthFactor,
+                Slider(value: $appStore.settingsStore.folderPopoverWidthFactor,
                        in: AppStore.folderPopoverWidthRange)
-                    .disabled(appStore.isFullscreenMode)
+                    .disabled(appStore.settingsStore.isFullscreenMode)
                 HStack {
                     Text(String(format: "%.0f%%", AppStore.folderPopoverWidthRange.lowerBound * 100))
                         .font(.footnote)
@@ -4659,13 +4719,13 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     Text(appStore.localized(.folderWindowHeight))
                         .font(.headline)
                     Spacer()
-                    Text(String(format: "%.0f%%", appStore.folderPopoverHeightFactor * 100))
+                    Text(String(format: "%.0f%%", appStore.settingsStore.folderPopoverHeightFactor * 100))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                Slider(value: $appStore.folderPopoverHeightFactor,
+                Slider(value: $appStore.settingsStore.folderPopoverHeightFactor,
                        in: AppStore.folderPopoverHeightRange)
-                    .disabled(appStore.isFullscreenMode)
+                    .disabled(appStore.settingsStore.isFullscreenMode)
                 HStack {
                     Text(String(format: "%.0f%%", AppStore.folderPopoverHeightRange.lowerBound * 100))
                         .font(.footnote)
@@ -4687,14 +4747,14 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             VStack(alignment: .leading, spacing: 8) {
                 Text(appStore.localized(.hoverMagnificationScale))
                     .font(.headline)
-                Slider(value: $appStore.hoverMagnificationScale,
+                Slider(value: $appStore.settingsStore.hoverMagnificationScale,
                        in: AppStore.hoverMagnificationRange)
-                    .disabled(!appStore.enableHoverMagnification)
+                    .disabled(!appStore.settingsStore.enableHoverMagnification)
                 HStack {
                     Text(String(format: "%.2fx", AppStore.hoverMagnificationRange.lowerBound))
                         .font(.footnote)
                     Spacer()
-                    Text(String(format: "%.2fx", appStore.hoverMagnificationScale))
+                    Text(String(format: "%.2fx", appStore.settingsStore.hoverMagnificationScale))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -4706,14 +4766,14 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             VStack(alignment: .leading, spacing: 8) {
                 Text(appStore.localized(.activePressScale))
                     .font(.headline)
-                Slider(value: $appStore.activePressScale,
+                Slider(value: $appStore.settingsStore.activePressScale,
                        in: AppStore.activePressScaleRange)
-                    .disabled(!appStore.enableActivePressEffect)
+                    .disabled(!appStore.settingsStore.enableActivePressEffect)
                 HStack {
                     Text(String(format: "%.2fx", AppStore.activePressScaleRange.lowerBound))
                         .font(.footnote)
                     Spacer()
-                    Text(String(format: "%.2fx", appStore.activePressScale))
+                    Text(String(format: "%.2fx", appStore.settingsStore.activePressScale))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -4727,8 +4787,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     Text(appStore.localized(.iconsPerRow))
                         .font(.headline)
                     Spacer()
-                    Stepper(value: $appStore.gridColumnsPerPage, in: AppStore.gridColumnRange) {
-                        Text("\(appStore.gridColumnsPerPage)")
+                    Stepper(value: $appStore.settingsStore.gridColumnsPerPage, in: AppStore.gridColumnRange) {
+                        Text("\(appStore.settingsStore.gridColumnsPerPage)")
                             .font(.callout.monospacedDigit())
                     }
                     .controlSize(.small)
@@ -4740,8 +4800,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     Text(appStore.localized(.rowsPerPage))
                         .font(.headline)
                     Spacer()
-                    Stepper(value: $appStore.gridRowsPerPage, in: AppStore.gridRowRange) {
-                        Text("\(appStore.gridRowsPerPage)")
+                    Stepper(value: $appStore.settingsStore.gridRowsPerPage, in: AppStore.gridRowRange) {
+                        Text("\(appStore.settingsStore.gridRowsPerPage)")
                             .font(.callout.monospacedDigit())
                     }
                     .controlSize(.small)
@@ -4753,11 +4813,11 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     Text(appStore.localized(.iconHorizontalSpacing))
                         .font(.headline)
                     Spacer()
-                    Text("\(Int(appStore.iconColumnSpacing)) pt")
+                    Text("\(Int(appStore.settingsStore.iconColumnSpacing)) pt")
                         .font(.callout.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
-                Slider(value: $appStore.iconColumnSpacing,
+                Slider(value: $appStore.settingsStore.iconColumnSpacing,
                        in: AppStore.columnSpacingRange,
                        step: 1)
             }
@@ -4767,11 +4827,11 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                     Text(appStore.localized(.iconVerticalSpacing))
                         .font(.headline)
                     Spacer()
-                    Text("\(Int(appStore.iconRowSpacing)) pt")
+                    Text("\(Int(appStore.settingsStore.iconRowSpacing)) pt")
                         .font(.callout.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
-                Slider(value: $appStore.iconRowSpacing,
+                Slider(value: $appStore.settingsStore.iconRowSpacing,
                        in: AppStore.rowSpacingRange,
                        step: 1)
             }
@@ -4807,7 +4867,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             VStack(alignment: .leading, spacing: 8) {
                 Text(appStore.localized(.scrollSensitivity))
                     .font(.headline)
-                Slider(value: $appStore.scrollSensitivity, in: 0.01...0.99)
+                Slider(value: $appStore.settingsStore.scrollSensitivity, in: 0.01...0.99)
                 HStack {
                     Text(appStore.localized(.low)).font(.footnote)
                     Spacer()
@@ -5659,7 +5719,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                 Text(appStore.localized(.autoCheckForUpdates))
                     .font(.subheadline)
                 Spacer()
-                Toggle("", isOn: $appStore.autoCheckForUpdates)
+                Toggle("", isOn: $appStore.settingsStore.autoCheckForUpdates)
                     .labelsHidden()
                     .toggleStyle(.switch)
             }
