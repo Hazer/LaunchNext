@@ -566,6 +566,7 @@ private struct DefaultsCache {
             126: "↑"
         ]
     }
+    let settingsStore = SettingsStore()
     @Published var apps: [AppInfo] = []
     @Published var folders: [FolderInfo] = []
     @Published var items: [LaunchpadItem] = []
@@ -596,15 +597,14 @@ private struct DefaultsCache {
     // Development-only override to capture flat screenshots quickly.
     @Published var developmentBackgroundOverride: DevelopmentBackgroundOverride = .none
 
-    @Published var developmentEnableCLICode: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.developmentEnableCLICodeKey) == nil { return false }
-        return UserDefaults.standard.bool(forKey: AppStore.developmentEnableCLICodeKey)
-    }() {
-        didSet {
-            UserDefaults.standard.set(developmentEnableCLICode, forKey: Self.developmentEnableCLICodeKey)
-            if developmentEnableCLICode && !oldValue {
+    var developmentEnableCLICode: Bool {
+        get { settingsStore.developmentEnableCLICode }
+        set {
+            let oldValue = settingsStore.developmentEnableCLICode
+            settingsStore.developmentEnableCLICode = newValue
+            if newValue && !oldValue {
                 installCLICommandIfNeeded()
-            } else if !developmentEnableCLICode && oldValue {
+            } else if !newValue && oldValue {
                 uninstallCLICommandIfNeeded()
             }
         }
@@ -906,44 +906,19 @@ private struct DefaultsCache {
             }
     }
 
-    @Published var isStartOnLogin: Bool = {
-        if #available(macOS 13.0, *) {
-            return SMAppService.mainApp.status == .enabled
-        }
-        return false
-    }() {
-        didSet {
-            guard !loginItemUpdateInProgress else { return }
-            guard isStartOnLogin != oldValue else { return }
-            guard #available(macOS 13.0, *) else {
-                loginItemUpdateInProgress = true
-                isStartOnLogin = false
-                loginItemUpdateInProgress = false
-                return
-            }
-
-            loginItemUpdateInProgress = true
-            defer { loginItemUpdateInProgress = false }
-
-            do {
-                if isStartOnLogin {
-                    try SMAppService.mainApp.register()
-                } else {
-                    try SMAppService.mainApp.unregister()
-                }
-            } catch {
-                NSLog("LaunchNext: Failed to update login item setting - %@", error.localizedDescription)
-                isStartOnLogin = oldValue
-            }
-        }
+    var isStartOnLogin: Bool {
+        get { settingsStore.isStartOnLogin }
+        set { settingsStore.isStartOnLogin = newValue }
     }
     var canConfigureStartOnLogin: Bool {
-        if #available(macOS 13.0, *) { return true }
-        return false
+        settingsStore.canConfigureStartOnLogin
     }
-    @Published var isFullscreenMode: Bool = false {
-        didSet {
-            UserDefaults.standard.set(isFullscreenMode, forKey: "isFullscreenMode")
+    var isFullscreenMode: Bool {
+        get { settingsStore.isFullscreenMode }
+        set {
+            let oldValue = settingsStore.isFullscreenMode
+            settingsStore.isFullscreenMode = newValue
+            guard newValue != oldValue else { return }
             syncActiveAppearanceProxies(from: currentAppearanceLayoutMode)
             persistLegacyAppearanceProxyValues()
             DispatchQueue.main.async { [weak self] in
@@ -951,7 +926,7 @@ private struct DefaultsCache {
                     appDelegate.updateWindowMode(isFullscreen: self?.isFullscreenMode ?? false)
                 }
             }
-            
+
             DispatchQueue.main.async { [weak self] in
                 self?.clearIconCachesForLayoutChange()
                 self?.triggerGridRefresh()
@@ -1267,24 +1242,14 @@ private struct DefaultsCache {
         }
     }
 
-    @Published var hideDock: Bool = {
-        if UserDefaults.standard.object(forKey: "hideDock") == nil { return false }
-        return UserDefaults.standard.bool(forKey: "hideDock")
-    }() {
-        didSet {
-            guard hideDock != oldValue else { return }
-            UserDefaults.standard.set(hideDock, forKey: "hideDock")
-        }
+    var hideDock: Bool {
+        get { settingsStore.hideDock }
+        set { settingsStore.hideDock = newValue }
     }
 
-    @Published var hideMenuBar: Bool = {
-        if UserDefaults.standard.object(forKey: hideMenuBarKey) == nil { return true }
-        return UserDefaults.standard.bool(forKey: hideMenuBarKey)
-    }() {
-        didSet {
-            guard hideMenuBar != oldValue else { return }
-            UserDefaults.standard.set(hideMenuBar, forKey: Self.hideMenuBarKey)
-        }
+    var hideMenuBar: Bool {
+        get { settingsStore.hideMenuBar }
+        set { settingsStore.hideMenuBar = newValue }
     }
     
     @Published var scrollSensitivity: Double {
@@ -1293,28 +1258,22 @@ private struct DefaultsCache {
         }
     }
 
-    @Published var gridColumnsPerPage: Int {
-        didSet {
-            let clamped = Self.clampColumns(gridColumnsPerPage)
-            if gridColumnsPerPage != clamped {
-                gridColumnsPerPage = clamped
-                return
-            }
-            guard gridColumnsPerPage != oldValue else { return }
-            UserDefaults.standard.set(gridColumnsPerPage, forKey: Self.gridColumnsKey)
+    var gridColumnsPerPage: Int {
+        get { settingsStore.gridColumnsPerPage }
+        set {
+            let oldValue = settingsStore.gridColumnsPerPage
+            settingsStore.gridColumnsPerPage = newValue
+            guard settingsStore.gridColumnsPerPage != oldValue else { return }
             handleGridConfigurationChange()
         }
     }
 
-    @Published var gridRowsPerPage: Int {
-        didSet {
-            let clamped = Self.clampRows(gridRowsPerPage)
-            if gridRowsPerPage != clamped {
-                gridRowsPerPage = clamped
-                return
-            }
-            guard gridRowsPerPage != oldValue else { return }
-            UserDefaults.standard.set(gridRowsPerPage, forKey: Self.gridRowsKey)
+    var gridRowsPerPage: Int {
+        get { settingsStore.gridRowsPerPage }
+        set {
+            let oldValue = settingsStore.gridRowsPerPage
+            settingsStore.gridRowsPerPage = newValue
+            guard settingsStore.gridRowsPerPage != oldValue else { return }
             handleGridConfigurationChange()
         }
     }
@@ -1489,13 +1448,9 @@ private struct DefaultsCache {
         }
     }
 
-    @Published var showInMenuBar: Bool = {
-        UserDefaults.standard.bool(forKey: showInMenuBarKey)
-    }() {
-        didSet {
-            guard showInMenuBar != oldValue else { return }
-            UserDefaults.standard.set(showInMenuBar, forKey: Self.showInMenuBarKey)
-        }
+    var showInMenuBar: Bool {
+        get { settingsStore.showInMenuBar }
+        set { settingsStore.showInMenuBar = newValue }
     }
 
     @Published var activePressScale: Double = {
@@ -1573,13 +1528,12 @@ private struct DefaultsCache {
         }
     }
 
-    @Published var isLayoutLocked: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.lockLayoutKey) == nil { return false }
-        return UserDefaults.standard.bool(forKey: AppStore.lockLayoutKey)
-    }() {
-        didSet {
-            guard isLayoutLocked != oldValue else { return }
-            UserDefaults.standard.set(isLayoutLocked, forKey: AppStore.lockLayoutKey)
+    var isLayoutLocked: Bool {
+        get { settingsStore.isLayoutLocked }
+        set {
+            let oldValue = settingsStore.isLayoutLocked
+            settingsStore.isLayoutLocked = newValue
+            guard newValue != oldValue else { return }
             triggerGridRefresh()
         }
     }
@@ -1613,11 +1567,9 @@ private struct DefaultsCache {
         didSet { UserDefaults.standard.set(animationDuration, forKey: "animationDuration") }
     }
 
-    @Published var enableWindowOpenAnimation: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.windowOpenAnimationKey) == nil { return true }
-        return UserDefaults.standard.bool(forKey: AppStore.windowOpenAnimationKey)
-    }() {
-        didSet { UserDefaults.standard.set(enableWindowOpenAnimation, forKey: Self.windowOpenAnimationKey) }
+    var enableWindowOpenAnimation: Bool {
+        get { settingsStore.enableWindowOpenAnimation }
+        set { settingsStore.enableWindowOpenAnimation = newValue }
     }
 
     @Published var useLocalizedThirdPartyTitles: Bool = {
@@ -1650,24 +1602,14 @@ private struct DefaultsCache {
         }
     }
 
-    @Published var gameControllerEnabled: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.gameControllerEnabledKey) == nil { return false }
-        return UserDefaults.standard.bool(forKey: AppStore.gameControllerEnabledKey)
-    }() {
-        didSet {
-            guard oldValue != gameControllerEnabled else { return }
-            UserDefaults.standard.set(gameControllerEnabled, forKey: AppStore.gameControllerEnabledKey)
-        }
+    var gameControllerEnabled: Bool {
+        get { settingsStore.gameControllerEnabled }
+        set { settingsStore.gameControllerEnabled = newValue }
     }
 
-    @Published var gameControllerMenuTogglesLaunchpad: Bool = {
-        if UserDefaults.standard.object(forKey: AppStore.gameControllerMenuToggleKey) == nil { return true }
-        return UserDefaults.standard.bool(forKey: AppStore.gameControllerMenuToggleKey)
-    }() {
-        didSet {
-            guard oldValue != gameControllerMenuTogglesLaunchpad else { return }
-            UserDefaults.standard.set(gameControllerMenuTogglesLaunchpad, forKey: AppStore.gameControllerMenuToggleKey)
-        }
+    var gameControllerMenuTogglesLaunchpad: Bool {
+        get { settingsStore.gameControllerMenuTogglesLaunchpad }
+        set { settingsStore.gameControllerMenuTogglesLaunchpad = newValue }
     }
 
     @Published var soundEffectsEnabled: Bool = {
@@ -1750,13 +1692,14 @@ private struct DefaultsCache {
         }
     }
 
-    @Published var rememberLastPage: Bool = AppStore.defaultRememberSetting() {
-        didSet {
-            UserDefaults.standard.set(rememberLastPage, forKey: Self.rememberPageKey)
-            if rememberLastPage {
-                UserDefaults.standard.set(currentPage, forKey: Self.rememberedPageIndexKey)
+    var rememberLastPage: Bool {
+        get { settingsStore.rememberLastPage }
+        set {
+            settingsStore.rememberLastPage = newValue
+            if newValue {
+                UserDefaults.standard.set(currentPage, forKey: AppStore.rememberedPageIndexKey)
             } else {
-                UserDefaults.standard.removeObject(forKey: Self.rememberedPageIndexKey)
+                UserDefaults.standard.removeObject(forKey: AppStore.rememberedPageIndexKey)
             }
         }
     }
@@ -1791,22 +1734,9 @@ private struct DefaultsCache {
         }
     }
 
-    @Published var appearancePreference: AppearancePreference = {
-        if let raw = UserDefaults.standard.string(forKey: "appearancePreference"),
-           let pref = AppearancePreference(rawValue: raw) {
-            return pref
-        }
-        return .system
-    }() {
-        didSet {
-            guard oldValue != appearancePreference else { return }
-            UserDefaults.standard.set(appearancePreference.rawValue, forKey: "appearancePreference")
-        }
-    }
-
-    private static func defaultRememberSetting() -> Bool {
-        if UserDefaults.standard.object(forKey: rememberPageKey) == nil { return true }
-        return UserDefaults.standard.bool(forKey: rememberPageKey)
+    var appearancePreference: AppearancePreference {
+        get { settingsStore.appearancePreference }
+        set { settingsStore.appearancePreference = newValue }
     }
 
     @Published var globalHotKey: HotKeyConfiguration? = AppStore.loadHotKeyConfiguration() {
@@ -1867,180 +1797,62 @@ private struct DefaultsCache {
         }
     }
 
-    @Published var hotCornerEnabled: Bool = {
-        let defaults = UserDefaults.standard
-        if defaults.object(forKey: AppStore.hotCornerEnabledKey) == nil {
-            defaults.set(false, forKey: AppStore.hotCornerEnabledKey)
-        }
-        return defaults.bool(forKey: AppStore.hotCornerEnabledKey)
-    }() {
-        didSet {
-            guard hotCornerEnabled != oldValue else { return }
-            UserDefaults.standard.set(hotCornerEnabled, forKey: Self.hotCornerEnabledKey)
-        }
+    var hotCornerEnabled: Bool {
+        get { settingsStore.hotCornerEnabled }
+        set { settingsStore.hotCornerEnabled = newValue }
     }
 
-    @Published var hotCornerPosition: HotCornerPosition = {
-        let defaults = UserDefaults.standard
-        if let raw = defaults.string(forKey: AppStore.hotCornerPositionKey),
-           let position = HotCornerPosition(rawValue: raw) {
-            return position
-        }
-        return .topLeft
-    }() {
-        didSet {
-            guard hotCornerPosition != oldValue else { return }
-            UserDefaults.standard.set(hotCornerPosition.rawValue, forKey: Self.hotCornerPositionKey)
-        }
+    var hotCornerPosition: HotCornerPosition {
+        get { settingsStore.hotCornerPosition }
+        set { settingsStore.hotCornerPosition = newValue }
     }
 
-    @Published var hotCornerTriggerDelay: Double = {
-        let defaults = UserDefaults.standard
-        let stored = defaults.object(forKey: AppStore.hotCornerTriggerDelayKey) as? Double
-        let initial = stored ?? AppStore.defaultHotCornerTriggerDelay
-        let clamped = AppStore.clampHotCornerTriggerDelay(initial)
-        if stored == nil || stored != clamped {
-            defaults.set(clamped, forKey: AppStore.hotCornerTriggerDelayKey)
-        }
-        return clamped
-    }() {
-        didSet {
-            let clamped = Self.clampHotCornerTriggerDelay(hotCornerTriggerDelay)
-            if hotCornerTriggerDelay != clamped {
-                hotCornerTriggerDelay = clamped
-                return
-            }
-            UserDefaults.standard.set(hotCornerTriggerDelay, forKey: Self.hotCornerTriggerDelayKey)
-        }
+    var hotCornerTriggerDelay: Double {
+        get { settingsStore.hotCornerTriggerDelay }
+        set { settingsStore.hotCornerTriggerDelay = newValue }
     }
 
-    @Published var hotCornerHitboxSize: Double = {
-        let defaults = UserDefaults.standard
-        let stored = defaults.object(forKey: AppStore.hotCornerHitboxSizeKey) as? Double
-        let initial = stored ?? AppStore.defaultHotCornerHitboxSize
-        let clamped = AppStore.clampHotCornerHitboxSize(initial)
-        if stored == nil || stored != clamped {
-            defaults.set(clamped, forKey: AppStore.hotCornerHitboxSizeKey)
-        }
-        return clamped
-    }() {
-        didSet {
-            let clamped = Self.clampHotCornerHitboxSize(hotCornerHitboxSize)
-            if hotCornerHitboxSize != clamped {
-                hotCornerHitboxSize = clamped
-                return
-            }
-            UserDefaults.standard.set(hotCornerHitboxSize, forKey: Self.hotCornerHitboxSizeKey)
-        }
+    var hotCornerHitboxSize: Double {
+        get { settingsStore.hotCornerHitboxSize }
+        set { settingsStore.hotCornerHitboxSize = newValue }
     }
 
-    @Published var hotCornerToggleWhenOpen: Bool = {
-        let defaults = UserDefaults.standard
-        if defaults.object(forKey: AppStore.hotCornerToggleWhenOpenKey) == nil {
-            defaults.set(false, forKey: AppStore.hotCornerToggleWhenOpenKey)
-        }
-        return defaults.bool(forKey: AppStore.hotCornerToggleWhenOpenKey)
-    }() {
-        didSet {
-            guard hotCornerToggleWhenOpen != oldValue else { return }
-            UserDefaults.standard.set(hotCornerToggleWhenOpen, forKey: Self.hotCornerToggleWhenOpenKey)
-        }
+    var hotCornerToggleWhenOpen: Bool {
+        get { settingsStore.hotCornerToggleWhenOpen }
+        set { settingsStore.hotCornerToggleWhenOpen = newValue }
     }
 
     // Experimental gesture settings consumed by LaunchpadApp gesture wiring.
     // Remove these fields together with the gesture monitor/configuration flow
     // if low-level multitouch support is no longer needed.
-    @Published var gestureEnabled: Bool = {
-        let defaults = UserDefaults.standard
-        if defaults.object(forKey: AppStore.gestureEnabledKey) == nil {
-            defaults.set(false, forKey: AppStore.gestureEnabledKey)
-        }
-        return defaults.bool(forKey: AppStore.gestureEnabledKey)
-    }() {
-        didSet {
-            guard gestureEnabled != oldValue else { return }
-            UserDefaults.standard.set(gestureEnabled, forKey: Self.gestureEnabledKey)
-        }
+    var gestureEnabled: Bool {
+        get { settingsStore.gestureEnabled }
+        set { settingsStore.gestureEnabled = newValue }
     }
 
-    @Published var gestureCloseOnPinchOut: Bool = {
-        let defaults = UserDefaults.standard
-        if defaults.object(forKey: AppStore.gestureCloseOnPinchOutKey) == nil {
-            defaults.set(false, forKey: AppStore.gestureCloseOnPinchOutKey)
-        }
-        return defaults.bool(forKey: AppStore.gestureCloseOnPinchOutKey)
-    }() {
-        didSet {
-            guard gestureCloseOnPinchOut != oldValue else { return }
-            UserDefaults.standard.set(gestureCloseOnPinchOut, forKey: Self.gestureCloseOnPinchOutKey)
-        }
+    var gestureCloseOnPinchOut: Bool {
+        get { settingsStore.gestureCloseOnPinchOut }
+        set { settingsStore.gestureCloseOnPinchOut = newValue }
     }
 
-    @Published var gestureTapAction: GestureTapAction = {
-        let defaults = UserDefaults.standard
-        if let rawValue = defaults.string(forKey: AppStore.gestureTapActionKey),
-           let action = GestureTapAction(rawValue: rawValue) {
-            return action
-        }
-        let legacyEnabled = defaults.object(forKey: "gestureTapEnabled") as? Bool ?? false
-        let legacyToggle = defaults.object(forKey: "gestureTapToggleWhenOpen") as? Bool ?? false
-        let migratedAction: GestureTapAction = legacyEnabled ? (legacyToggle ? .toggle : .open) : .off
-        defaults.set(migratedAction.rawValue, forKey: AppStore.gestureTapActionKey)
-        return migratedAction
-    }() {
-        didSet {
-            guard gestureTapAction != oldValue else { return }
-            UserDefaults.standard.set(gestureTapAction.rawValue, forKey: Self.gestureTapActionKey)
-        }
+    var gestureTapAction: GestureTapAction {
+        get { settingsStore.gestureTapAction }
+        set { settingsStore.gestureTapAction = newValue }
     }
 
-    @Published var gestureFingerCount: GestureFingerCount = {
-        let defaults = UserDefaults.standard
-        guard let rawValue = defaults.object(forKey: AppStore.gestureFingerCountKey) as? Int,
-              let count = GestureFingerCount(rawValue: rawValue) else {
-            defaults.set(GestureFingerCount.four.rawValue, forKey: AppStore.gestureFingerCountKey)
-            return .four
-        }
-        return count
-    }() {
-        didSet {
-            guard gestureFingerCount != oldValue else { return }
-            UserDefaults.standard.set(gestureFingerCount.rawValue, forKey: Self.gestureFingerCountKey)
-        }
+    var gestureFingerCount: GestureFingerCount {
+        get { settingsStore.gestureFingerCount }
+        set { settingsStore.gestureFingerCount = newValue }
     }
 
-    @Published var gestureDeviceSelectionMode: GestureDeviceSelectionMode = {
-        let defaults = UserDefaults.standard
-        guard let rawValue = defaults.string(forKey: AppStore.gestureDeviceSelectionModeKey),
-              let mode = GestureDeviceSelectionMode(rawValue: rawValue) else {
-            defaults.set(GestureDeviceSelectionMode.automatic.rawValue, forKey: AppStore.gestureDeviceSelectionModeKey)
-            return .automatic
-        }
-        return mode
-    }() {
-        didSet {
-            guard gestureDeviceSelectionMode != oldValue else { return }
-            UserDefaults.standard.set(gestureDeviceSelectionMode.rawValue, forKey: Self.gestureDeviceSelectionModeKey)
-        }
+    var gestureDeviceSelectionMode: GestureDeviceSelectionMode {
+        get { settingsStore.gestureDeviceSelectionMode }
+        set { settingsStore.gestureDeviceSelectionMode = newValue }
     }
 
-    @Published var gestureSelectedDeviceIDs: [String] = {
-        let defaults = UserDefaults.standard
-        let rawIDs = defaults.stringArray(forKey: AppStore.gestureSelectedDeviceIDsKey) ?? []
-        let normalized = Array(Set(rawIDs)).sorted()
-        if rawIDs != normalized {
-            defaults.set(normalized, forKey: AppStore.gestureSelectedDeviceIDsKey)
-        }
-        return normalized
-    }() {
-        didSet {
-            let normalized = Array(Set(gestureSelectedDeviceIDs)).sorted()
-            if gestureSelectedDeviceIDs != normalized {
-                gestureSelectedDeviceIDs = normalized
-                return
-            }
-            UserDefaults.standard.set(normalized, forKey: Self.gestureSelectedDeviceIDsKey)
-        }
+    var gestureSelectedDeviceIDs: [String] {
+        get { settingsStore.gestureSelectedDeviceIDs }
+        set { settingsStore.gestureSelectedDeviceIDs = newValue }
     }
 
     @Published private(set) var availableGestureDevices: [GestureInputDevice] = []
@@ -2129,7 +1941,7 @@ private struct DefaultsCache {
     private let fsEventsQueue = DispatchQueue(label: "app.store.fsevents")
     private let customIconFileURL: URL
     private let defaultAppIcon: NSImage
-    private var loginItemUpdateInProgress = false
+
     private var volumeObservers: [NSObjectProtocol] = []
     
     // Computed properties
@@ -2503,6 +2315,13 @@ private struct DefaultsCache {
     }
 
     init() {
+        // Forward settingsStore change notifications so views observing
+        // `appStore.{setting}` (computed forwarding wrappers) receive updates.
+        settingsStore.objectWillChange
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
         let cache = DefaultsCache()
 
         if !cache.containsKey("isFullscreenMode") {
@@ -2749,10 +2568,7 @@ private struct DefaultsCache {
     }
 
     func syncLoginItemStatusFromSystem() {
-        guard #available(macOS 13.0, *) else { return }
-        loginItemUpdateInProgress = true
-        isStartOnLogin = SMAppService.mainApp.status == .enabled
-        loginItemUpdateInProgress = false
+        settingsStore.syncFromSystem()
     }
 
     private func installCLICommandIfNeeded() {

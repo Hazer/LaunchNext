@@ -80,7 +80,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         VoiceManager.shared.bind(appStore: appStore)
 
         let launchedAtLogin = wasLaunchedAsLoginItem()
-        let shouldSilentlyLaunch = launchedAtLogin && appStore.isStartOnLogin
+        let shouldSilentlyLaunch = launchedAtLogin && appStore.settingsStore.isStartOnLogin
 
         setupWindow(showImmediately: !shouldSilentlyLaunch)
         appStore.performInitialScanIfNeeded()
@@ -99,11 +99,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         bindGesturePreference()
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.applyAppearancePreference(self.appStore.appearancePreference)
+            self.applyAppearancePreference(self.appStore.settingsStore.appearancePreference)
             self.updateSystemUIVisibility()
         }
 
-        if appStore.isFullscreenMode { updateWindowMode(isFullscreen: true) }
+        if appStore.settingsStore.isFullscreenMode { updateWindowMode(isFullscreen: true) }
     }
 
     private func runHeadlessModeIfRequested() -> Bool {
@@ -111,7 +111,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         guard parsed.mode != .gui else { return false }
 
         let needsEndpoint = requiresCLIEndpoint(parsed)
-        if needsEndpoint && !appStore.developmentEnableCLICode {
+        if needsEndpoint && !appStore.settingsStore.developmentEnableCLICode {
             fputs("Command line interface is disabled.\n", stderr)
             fputs("Make sure \"Command line interface\" is ON in General settings.\n", stderr)
             isTerminating = true
@@ -215,8 +215,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     }
 
     private func buildCLISnapshotJSON() -> String? {
-        let columns = max(appStore.gridColumnsPerPage, 1)
-        let rows = max(appStore.gridRowsPerPage, 1)
+        let columns = max(appStore.settingsStore.gridColumnsPerPage, 1)
+        let rows = max(appStore.settingsStore.gridRowsPerPage, 1)
         let itemsPerPage = max(columns * rows, 1)
         let totalItems = appStore.items.count
         let totalPages = max(1, (totalItems + itemsPerPage - 1) / itemsPerPage)
@@ -272,7 +272,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
                 "currentPage": appStore.currentPage,
                 "totalItems": totalItems,
                 "totalPages": totalPages,
-                "fullscreenMode": appStore.isFullscreenMode
+                "fullscreenMode": appStore.settingsStore.isFullscreenMode
             ],
             "hiddenAppPaths": appStore.hiddenAppPaths.sorted(),
             "items": itemEntries
@@ -315,7 +315,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     }
 
     private func bindCLICodePreference() {
-        appStore.$developmentEnableCLICode
+        appStore.settingsStore.$developmentEnableCLICode
             .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] enabled in
@@ -326,10 +326,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
 
     private func bindHotCornerPreference() {
         Publishers.CombineLatest4(
-            appStore.$hotCornerEnabled.removeDuplicates(),
-            appStore.$hotCornerPosition.removeDuplicates(),
-            appStore.$hotCornerTriggerDelay.removeDuplicates(),
-            appStore.$hotCornerHitboxSize.removeDuplicates()
+            appStore.settingsStore.$hotCornerEnabled.removeDuplicates(),
+            appStore.settingsStore.$hotCornerPosition.removeDuplicates(),
+            appStore.settingsStore.$hotCornerTriggerDelay.removeDuplicates(),
+            appStore.settingsStore.$hotCornerHitboxSize.removeDuplicates()
         )
         .receive(on: RunLoop.main)
         .sink { [weak self] enabled, position, delay, hitboxSize in
@@ -350,14 +350,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         // updateGestureMonitor()/handleGestureTrigger() and the Gesture folder.
         Publishers.CombineLatest(
             Publishers.CombineLatest4(
-                appStore.$gestureEnabled.removeDuplicates(),
-                appStore.$gestureCloseOnPinchOut.removeDuplicates(),
-                appStore.$gestureTapAction.removeDuplicates(),
-                appStore.$gestureFingerCount.removeDuplicates()
+                appStore.settingsStore.$gestureEnabled.removeDuplicates(),
+                appStore.settingsStore.$gestureCloseOnPinchOut.removeDuplicates(),
+                appStore.settingsStore.$gestureTapAction.removeDuplicates(),
+                appStore.settingsStore.$gestureFingerCount.removeDuplicates()
             ),
             Publishers.CombineLatest(
-                appStore.$gestureDeviceSelectionMode.removeDuplicates(),
-                appStore.$gestureSelectedDeviceIDs.removeDuplicates()
+                appStore.settingsStore.$gestureDeviceSelectionMode.removeDuplicates(),
+                appStore.settingsStore.$gestureSelectedDeviceIDs.removeDuplicates()
             )
         )
         .receive(on: RunLoop.main)
@@ -405,7 +405,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         guard !isAnimatingWindow else { return }
 
         if windowIsVisible {
-            guard appStore.hotCornerToggleWhenOpen else { return }
+            guard appStore.settingsStore.hotCornerToggleWhenOpen else { return }
             hideWindow()
             return
         }
@@ -642,7 +642,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     }
 
     private func handleCLICreateFolder(_ arguments: [String: String]) -> LaunchNextCLICommandResult {
-        if appStore.isLayoutLocked {
+        if appStore.settingsStore.isLayoutLocked {
             return .failure("Layout is locked. Disable layout lock before using create-folder.")
         }
 
@@ -746,7 +746,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     }
 
     private func handleCLIMove(_ arguments: [String: String]) -> LaunchNextCLICommandResult {
-        if appStore.isLayoutLocked {
+        if appStore.settingsStore.isLayoutLocked {
             return .failure("Layout is locked. Disable layout lock before using move.")
         }
 
@@ -1403,7 +1403,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     }
 
     private func bindAppearancePreference() {
-        appStore.$appearancePreference
+        appStore.settingsStore.$appearancePreference
             .receive(on: RunLoop.main)
             .sink { [weak self] preference in
                 DispatchQueue.main.async {
@@ -1416,7 +1416,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     
 
     private func bindControllerPreference() {
-        appStore.$gameControllerEnabled
+        appStore.settingsStore.$gameControllerEnabled
             .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { enabled in
@@ -1435,9 +1435,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
             .sink { [weak self] command in
                 guard let self else { return }
                 guard case .menu = command else { return }
-                guard self.appStore.gameControllerEnabled else { return }
+                guard self.appStore.settingsStore.gameControllerEnabled else { return }
 
-                if self.appStore.gameControllerMenuTogglesLaunchpad {
+                if self.appStore.settingsStore.gameControllerMenuTogglesLaunchpad {
                     self.toggleWindow()
                 } else if self.windowIsVisible {
                     self.hideWindow()
@@ -1448,16 +1448,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
 
     private func bindSystemUIVisibility() {
         Publishers.CombineLatest3(
-            appStore.$hideDock.removeDuplicates(),
-            appStore.$hideMenuBar.removeDuplicates(),
-            appStore.$isFullscreenMode.removeDuplicates()
+            appStore.settingsStore.$hideDock.removeDuplicates(),
+            appStore.settingsStore.$hideMenuBar.removeDuplicates(),
+            appStore.settingsStore.$isFullscreenMode.removeDuplicates()
         )
             .receive(on: RunLoop.main)
             .sink { [weak self] _, _, _ in
                 self?.updateSystemUIVisibility()
             }
             .store(in: &cancellables)
-        appStore.$hideMenuBar
+        appStore.settingsStore.$hideMenuBar
             .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
@@ -1467,7 +1467,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     }
 
     private func bindMenuBarVisibility() {
-        appStore.$showInMenuBar
+        appStore.settingsStore.$showInMenuBar
             .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
@@ -1477,8 +1477,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     }
 
     func updateSystemUIVisibility() {
-        let shouldHideDock = appStore.hideDock && windowIsVisible
-        let shouldHideMenuBar = appStore.hideMenuBar && windowIsVisible
+        let shouldHideDock = appStore.settingsStore.hideDock && windowIsVisible
+        let shouldHideMenuBar = appStore.settingsStore.hideMenuBar && windowIsVisible
         var options: NSApplication.PresentationOptions = []
         if shouldHideDock { options.insert(.autoHideDock) }
         if shouldHideMenuBar { options.insert(.autoHideMenuBar) }
@@ -1490,7 +1490,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
 
     private func updateWindowLevelForSystemUI() {
         guard let window else { return }
-        let shouldCoverMenuBar = appStore.hideMenuBar && appStore.isFullscreenMode && windowIsVisible
+        let shouldCoverMenuBar = appStore.settingsStore.hideMenuBar && appStore.settingsStore.isFullscreenMode && windowIsVisible
         let targetLevel: NSWindow.Level = shouldCoverMenuBar
             ? NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 1)
             : .floating
@@ -1538,7 +1538,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     }
 
     func updateMenuBarItemVisibility() {
-        statusItem?.isVisible = appStore.showInMenuBar
+        statusItem?.isVisible = appStore.settingsStore.showInMenuBar
     }
 
     @objc func menuBarClicked(_ sender: Any) {
@@ -1659,7 +1659,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     private func applyCornerRadius() {
         guard let contentView = window?.contentView else { return }
         contentView.wantsLayer = true
-        contentView.layer?.cornerRadius = appStore.isFullscreenMode ? 0 : 30
+        contentView.layer?.cornerRadius = appStore.settingsStore.isFullscreenMode ? 0 : 30
         contentView.layer?.masksToBounds = true
     }
     
@@ -1695,7 +1695,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
         }
 
         let screen = getCurrentActiveScreen() ?? NSScreen.main!
-        let rect = appStore.isFullscreenMode ? screen.frame : calculateContentRect(for: screen)
+        let rect = appStore.settingsStore.isFullscreenMode ? screen.frame : calculateContentRect(for: screen)
         window.setFrame(rect, display: true)
         applyCornerRadius()
 
@@ -1729,7 +1729,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
             }
         }
 
-        if appStore.enableWindowOpenAnimation {
+        if appStore.settingsStore.enableWindowOpenAnimation {
             animateWindow(to: 1) {
                 finalizeShow()
             }
@@ -1757,7 +1757,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
             window.alphaValue = 1
             window.contentView?.alphaValue = 1
             self.appStore.isSetting = false
-            if self.appStore.rememberLastPage {
+            if self.appStore.settingsStore.rememberLastPage {
                 self.appStore.persistCurrentPageIfNeeded()
             } else {
                 self.appStore.currentPage = 0
@@ -1780,7 +1780,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
             SoundManager.shared.play(.launchpadClose)
         }
 
-        if appStore.enableWindowOpenAnimation {
+        if appStore.settingsStore.enableWindowOpenAnimation {
             animateWindow(to: 0) {
                 finalize()
             }
