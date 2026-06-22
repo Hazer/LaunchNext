@@ -17,23 +17,37 @@ Proposals C (CAFolderGridView) and E (GestureInputDevice) were initially deferre
 
 Both deferred assets were written **before** these refactors and reference types/properties that no longer exist (or have moved).
 
-## Proposal C — CAFolderGridView integration (PORTED to develop on 2026-06-21)
+## Proposal C — CAFolderGridView (DRAFT — inspiration for rework, not production target)
 
-### Status: PORTED (component) — LaunchpadView wiring still pending
+### Status: DRAFT, NOT a production target
 
-**Landed on develop** (commit not yet created at time of writing this section update, but the files are in place and build clean):
+**CAFolderGridView was drafted before the decision to do a deeper LaunchpadView
+rework.** It exists on `develop` (compiles clean) but must be treated as
+**inspiration and intent reference, not code to wire or finalize**. The new
+render architecture that comes out of the LaunchpadView rework (see
+`docs/launchpad-rework-plan.md`, to be written) **must be better than this
+draft** — not necessarily a descendant of it.
+
+Concretely: do not assume the rework will wire `CAFolderGridViewRepresentable`
+into `LaunchpadView`. The rework may produce a different rendering abstraction
+(unified layout manager, declarative renderer, etc.) that makes this draft
+obsolete. Use this code as a reference for *what features the folder renderer
+needs* (paged + vertical layouts, hover magnification, drag reorder, page-flip
+edge detection, context menu integration), not as *the renderer to ship*.
+
+### What landed on `develop` (commit `f92125a`)
 - `LaunchNext/CAFolderGridView.swift` (1,345 lines)
 - `LaunchNext/CAFolderGridViewRepresentable.swift` (133 lines)
 - `AppStore.FolderLayoutMode` enum + `SettingsStore.folderLayoutMode` property
 - `AppStore.copyAppPath(_:)`, `showAppInFinder(_:)`, `reorderAppInFolder(folderID:from:to:)` methods
 - `FolderManager.reorderAppInFolder(folderID:from:to:)` (proper delegate-based persistence)
 
-**Still pending** (small follow-up, see §"Integration plan" step 5 below):
-- Add `useCAGridFolderRenderer: Bool` toggle to SettingsStore (mirror existing `useCAGridRenderer`).
-- In `LaunchpadView` at line 673, switch between SwiftUI `FolderView` and `CAFolderGridViewRepresentable` based on the toggle.
-- The Representable needs page-state bindings (`currentPage`, `pageCount`, `verticalScrollOffset`) — add `@State` for these on `LaunchpadView` (or compute them in a small `FolderGridState` holder).
+The new methods/enum/property on `AppStore`/`SettingsStore`/`FolderManager` are
+**independently useful** — they should survive the rework regardless of whether
+CAFolderGridView itself does. They give the new renderer the same hooks it'll
+need.
 
-### Source files (in worktrees, byte-identical between the two)
+### Source files (originals, in worktrees)
 - `LaunchNext/CAFolderGridView.swift` (1,345 lines) — Core Animation NSView for folder content grid
 - `LaunchNext/CAFolderGridViewRepresentable.swift` (133 lines) — NSViewRepresentable bridge to SwiftUI
 

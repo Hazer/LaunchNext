@@ -140,12 +140,7 @@ struct LaunchpadView: View {
     private static var geometryCache: [String: CGPoint] = [:]
     private static var lastGeometryUpdate: Date = Date.distantPast
     private let geometryCacheTimeout: TimeInterval = 0.1 // 100ms cache timeout
-
-    // Ranked fuzzy search (acronym / subsequence / token-prefix scoring).
-    // Used by `filteredItems`; falls back to plain substring when
-    // `appStore.settingsStore.fuzzySearchEnabled` is false.
-    private let searchEngine = LaunchpadSearchEngine()
-
+    
     // Performance monitoring
     @State private var performanceMetrics: [String: TimeInterval] = [:]
     private let enablePerformanceMonitoring = false // Set to true to enable performance monitoring
@@ -203,11 +198,50 @@ struct LaunchpadView: View {
     }
 
     var filteredItems: [LaunchpadItem] {
-        searchEngine.filter(
-            items: appStore.items,
-            query: appStore.searchQuery,
-            fuzzyEnabled: appStore.settingsStore.fuzzySearchEnabled
-        )
+        let query = appStore.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return appStore.items }
+
+        var result: [LaunchpadItem] = []
+        var searchedApps = Set<String>() // Used for deduplication, avoid showing the same app twice
+        
+        // First search items on the main screen
+        for item in appStore.items {
+            switch item {
+            case .app(let app):
+                if app.name.localizedCaseInsensitiveContains(query) {
+                    result.append(.app(app))
+                    searchedApps.insert(app.url.path)
+                }
+            case .missingApp(let placeholder):
+                if placeholder.displayName.localizedCaseInsensitiveContains(query) {
+                    if !searchedApps.contains(placeholder.bundlePath) {
+                        result.append(.missingApp(placeholder))
+                        searchedApps.insert(placeholder.bundlePath)
+                    }
+                }
+            case .folder(let folder):
+                // Check folder name
+                if folder.name.localizedCaseInsensitiveContains(query) {
+                    result.append(.folder(folder))
+                }
+                
+                // Check apps inside the folder, extract and display directly if matched
+                let matchingApps = folder.apps.filter { app in
+                    app.name.localizedCaseInsensitiveContains(query)
+                }
+                for app in matchingApps {
+                    if !searchedApps.contains(app.url.path) {
+                        result.append(.app(app))
+                        searchedApps.insert(app.url.path)
+                    }
+                }
+                
+            case .empty:
+                break
+            }
+        }
+        
+        return result
     }
     
     var pages: [[LaunchpadItem]] {
@@ -277,7 +311,7 @@ struct LaunchpadView: View {
     private var launchpadEventBoundView: some View {
         launchpadBaseView
         .sheet(isPresented: $appStore.isSetting) {
-            SettingsView(appStore: appStore, settingsStore: appStore.settingsStore)
+            SettingsView(appStore: appStore)
         }
         .onChange(of: appStore.settingsStore.followScrollPagingEnabled) { _ in
             if scrollState.followOffset != 0 || scrollState.accumulatedX != 0 || scrollState.isUserSwiping {
@@ -528,7 +562,7 @@ struct LaunchpadView: View {
             .padding(.horizontal)
             .contentShape(Rectangle())
             .onTapGesture {
-                if appStore.openFolder == nil && !appStore.isFolderNameEditing && !appStore.isSetting {
+                if appStore.openFolder == nil && !appStore.isFolderNameEditing {
                     AppDelegate.shared?.hideWindow()
                 }
             }
@@ -632,8 +666,8 @@ struct LaunchpadView: View {
 
             if let openFolder = appStore.openFolder {
                 GeometryReader { proxy in
-                    let widthFactor: CGFloat = appStore.settingsStore.isFullscreenMode ? 0.7 : CGFloat(appStore.settingsStore.folderPopoverWidthFactor)
-                    let heightFactor: CGFloat = appStore.settingsStore.isFullscreenMode ? 0.7 : CGFloat(appStore.settingsStore.folderPopoverHeightFactor)
+                    let widthFactor: CGFloat = appStore.settingsStore.isFullscreenMode ? 0.7 : CGFloat(appStore.folderPopoverWidthFactor)
+                    let heightFactor: CGFloat = appStore.settingsStore.isFullscreenMode ? 0.7 : CGFloat(appStore.folderPopoverHeightFactor)
                     let minWidth: CGFloat = appStore.settingsStore.isFullscreenMode ? 520 : 560
                     let minHeight: CGFloat = 420
                     let rawHorizontalMargin: CGFloat = appStore.settingsStore.isFullscreenMode ? max(proxy.size.width * 0.15, 120) : 32
@@ -719,7 +753,7 @@ struct LaunchpadView: View {
                         .frame(height: topPaddingHeight)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if appStore.openFolder == nil && !appStore.isFolderNameEditing && !appStore.isSetting {
+                            if appStore.openFolder == nil && !appStore.isFolderNameEditing {
                                 AppDelegate.shared?.hideWindow()
                             }
                         }
@@ -735,7 +769,7 @@ struct LaunchpadView: View {
                         .frame(height: bottomPad)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if appStore.openFolder == nil && !appStore.isFolderNameEditing && !appStore.isSetting {
+                            if appStore.openFolder == nil && !appStore.isFolderNameEditing {
                                 AppDelegate.shared?.hideWindow()
                             }
                         }
@@ -748,7 +782,7 @@ struct LaunchpadView: View {
                         .frame(width: sidePad)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if appStore.openFolder == nil && !appStore.isFolderNameEditing && !appStore.isSetting {
+                            if appStore.openFolder == nil && !appStore.isFolderNameEditing {
                                 AppDelegate.shared?.hideWindow()
                             }
                         }
@@ -757,7 +791,7 @@ struct LaunchpadView: View {
                         .frame(width: sidePad)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if appStore.openFolder == nil && !appStore.isFolderNameEditing && !appStore.isSetting {
+                            if appStore.openFolder == nil && !appStore.isFolderNameEditing {
                                 AppDelegate.shared?.hideWindow()
                             }
                         }
@@ -2107,10 +2141,6 @@ extension LaunchpadView {
         if code == 36 { // return
             if isSearchFieldFocused, isIMEComposing() { return event }
 
-            // If the user hit Return with an active search query, treat it as
-            // "open the first (or currently-selected) match". This mirrors
-            // standard launcher UX (Alfred, Raycast, Spotlight) where Return
-            // on search results activates the top hit.
             let trimmedQuery = appStore.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmedQuery.isEmpty {
                 if selectedIndex == nil || !(selectedIndex.map { filteredItems.indices.contains($0) } ?? false) {
@@ -2645,7 +2675,7 @@ extension LaunchpadView {
         if scrollState.wheelLastDirection != direction { scrollState.wheelAccumulated = 0 }
         scrollState.wheelLastDirection = direction
         scrollState.wheelAccumulated += abs(primaryDelta)
-        let baselineSensitivity = max(SettingsStore.defaultScrollSensitivity, 0.0001)
+        let baselineSensitivity = max(AppStore.defaultScrollSensitivity, 0.0001)
         let relativeSensitivity = max(appStore.settingsStore.scrollSensitivity, 0.0001) / baselineSensitivity
         // Scale wheel threshold by sensitivity.
         let threshold: CGFloat = 2.0 / CGFloat(relativeSensitivity)
@@ -2660,7 +2690,7 @@ extension LaunchpadView {
     }
 
     private func flipThreshold(_ pageWidth: CGFloat) -> CGFloat {
-        let baseline = max(SettingsStore.defaultScrollSensitivity, 0.001)
+        let baseline = max(AppStore.defaultScrollSensitivity, 0.001)
         return pageWidth * ((baseline * baseline) / max(appStore.settingsStore.scrollSensitivity, 0.001))
     }
 
