@@ -428,8 +428,13 @@ extension CAGridView {
                 longPressTimer = timer
             }
         } else {
-            // Click empty area - start page drag mode (only in paged mode)
-            if !isVerticalMode {
+            // Click empty area
+            if isVerticalMode {
+                // In vertical scroll mode there are no pages to drag; treat an
+                // empty-area click as a "click outside content" so the host
+                // (e.g. dismiss-on-empty-click) can react.
+                onEmptyAreaClicked?()
+            } else {
                 isPageDragging = true
                 pageDragStartX = location.x
                 pageDragStartOffset = scrollOffset

@@ -18,6 +18,45 @@ extension Notification.Name {
 class BorderlessWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    /// Dismiss the panel when the user clicks outside any interactive view.
+    /// Mirrors the SwiftUI `onTapGesture { hideWindow() }` blocks in
+    /// `LaunchpadView` but catches clicks that escape SwiftUI hit-testing
+    /// (e.g. on Core Animation sublayers like `CAGridView`).
+    override func sendEvent(_ event: NSEvent) {
+        guard event.type == .leftMouseDown || event.type == .rightMouseDown else {
+            super.sendEvent(event)
+            return
+        }
+
+        let appDelegate = AppDelegate.shared
+        guard let appStore = appDelegate?.appStore,
+              appStore.openFolder == nil,
+              !appStore.isFolderNameEditing,
+              !appStore.isSetting
+        else {
+            super.sendEvent(event)
+            return
+        }
+
+        let point = contentView?.convert(event.locationInWindow, from: nil) ?? event.locationInWindow
+        if let hit = contentView?.hitTest(point), isInteractiveView(hit) {
+            super.sendEvent(event)
+        } else {
+            appDelegate?.hideWindow()
+        }
+    }
+
+    private func isInteractiveView(_ view: NSView?) -> Bool {
+        var v = view
+        while let cur = v {
+            if cur is NSControl || cur is NSTextView || cur is NSScrollView || cur is NSVisualEffectView || cur is CAGridView {
+                return true
+            }
+            v = cur.superview
+        }
+        return false
+    }
 }
 
 @main
@@ -1827,14 +1866,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSGestureR
     private func isInteractiveView(_ view: NSView?) -> Bool {
         var v = view
         while let cur = v {
-            if cur is NSControl || cur is NSTextView || cur is NSScrollView || cur is NSVisualEffectView { return true }
+            if cur is NSControl || cur is NSTextView || cur is NSScrollView || cur is NSVisualEffectView || cur is CAGridView { return true }
             v = cur.superview
         }
         return false
     }
 
     @objc private func handleBackgroundClick(_ sender: NSClickGestureRecognizer) {
-        guard appStore.openFolder == nil && !appStore.isFolderNameEditing else { return }
+        guard appStore.openFolder == nil && !appStore.isFolderNameEditing && !appStore.isSetting else { return }
         guard let view = sender.view else { return }
         let p = sender.location(in: view)
         if let hit = view.hitTest(p), isInteractiveView(hit) { return }

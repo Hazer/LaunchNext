@@ -528,7 +528,7 @@ struct LaunchpadView: View {
             .padding(.horizontal)
             .contentShape(Rectangle())
             .onTapGesture {
-                if appStore.openFolder == nil && !appStore.isFolderNameEditing {
+                if appStore.openFolder == nil && !appStore.isFolderNameEditing && !appStore.isSetting {
                     AppDelegate.shared?.hideWindow()
                 }
             }
@@ -719,7 +719,7 @@ struct LaunchpadView: View {
                         .frame(height: topPaddingHeight)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if appStore.openFolder == nil && !appStore.isFolderNameEditing {
+                            if appStore.openFolder == nil && !appStore.isFolderNameEditing && !appStore.isSetting {
                                 AppDelegate.shared?.hideWindow()
                             }
                         }
@@ -735,7 +735,7 @@ struct LaunchpadView: View {
                         .frame(height: bottomPad)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if appStore.openFolder == nil && !appStore.isFolderNameEditing {
+                            if appStore.openFolder == nil && !appStore.isFolderNameEditing && !appStore.isSetting {
                                 AppDelegate.shared?.hideWindow()
                             }
                         }
@@ -748,7 +748,7 @@ struct LaunchpadView: View {
                         .frame(width: sidePad)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if appStore.openFolder == nil && !appStore.isFolderNameEditing {
+                            if appStore.openFolder == nil && !appStore.isFolderNameEditing && !appStore.isSetting {
                                 AppDelegate.shared?.hideWindow()
                             }
                         }
@@ -757,7 +757,7 @@ struct LaunchpadView: View {
                         .frame(width: sidePad)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if appStore.openFolder == nil && !appStore.isFolderNameEditing {
+                            if appStore.openFolder == nil && !appStore.isFolderNameEditing && !appStore.isSetting {
                                 AppDelegate.shared?.hideWindow()
                             }
                         }
