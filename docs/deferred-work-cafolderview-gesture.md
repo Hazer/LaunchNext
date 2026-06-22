@@ -1,19 +1,37 @@
 # Deferred work — CAFolderGridView + GestureInputDevice integration
 
 **Created:** 2026-06-21 (during consolidation Phase E)
-**Status:** Deferred from consolidation pass. Tracked here for a future session.
-**Build state at deferral:** develop branch builds clean (BUILD SUCCEEDED) without these.
+**Updated:** 2026-06-21 (later in same session — see Status)
+**Status:**
+- **Proposal C (CAFolderGridView): PORTED to develop on 2026-06-21.** The NSView + Representable now compile and build clean against current architecture. Only the LaunchpadView wiring (toggle between SwiftUI FolderView and CAGridView) remains.
+- **Proposal E (GestureInputDevice): DROPPED on 2026-06-21.** Architecturally inapplicable post-OMS-removal (HIDGestureMonitor uses a system-wide CGEventTap; no per-device filtering possible). See §"Decision (2026-06-21): DROP" below.
 
-## Why deferred
+**Build state:** develop branch builds clean (BUILD SUCCEEDED) with CAFolderGridView ported.
 
-Proposals C (CAFolderGridView) and E (GestureInputDevice) were deferred during the 2026-06-21 consolidation because the salvaged files target an **older architecture** that current `main`/`develop` has moved past. Two specific refactor epochs intervened:
+## Why initially deferred
+
+Proposals C (CAFolderGridView) and E (GestureInputDevice) were initially deferred during the 2026-06-21 consolidation because the salvaged files target an **older architecture** that current `main`/`develop` has moved past. Two specific refactor epochs intervened:
 
 1. **SettingsStore extraction** (commit `5b14d92`, Phase 2 manager-extraction work, 2026-05-03) — moved ~76 `@Published` settings properties off `AppStore` into a new `SettingsStore` class.
 2. **OMS removal** (commit `9fe9d34`, IMPROVEMENT_PLAN Priority 1) — removed `ThirdParty/OpenMultitouchSupportXCF/` entirely and replaced it with `LaunchNextInput/HIDGestureMonitor` (CGEventTap-based).
 
 Both deferred assets were written **before** these refactors and reference types/properties that no longer exist (or have moved).
 
-## Proposal C — CAFolderGridView integration
+## Proposal C — CAFolderGridView integration (PORTED to develop on 2026-06-21)
+
+### Status: PORTED (component) — LaunchpadView wiring still pending
+
+**Landed on develop** (commit not yet created at time of writing this section update, but the files are in place and build clean):
+- `LaunchNext/CAFolderGridView.swift` (1,345 lines)
+- `LaunchNext/CAFolderGridViewRepresentable.swift` (133 lines)
+- `AppStore.FolderLayoutMode` enum + `SettingsStore.folderLayoutMode` property
+- `AppStore.copyAppPath(_:)`, `showAppInFinder(_:)`, `reorderAppInFolder(folderID:from:to:)` methods
+- `FolderManager.reorderAppInFolder(folderID:from:to:)` (proper delegate-based persistence)
+
+**Still pending** (small follow-up, see §"Integration plan" step 5 below):
+- Add `useCAGridFolderRenderer: Bool` toggle to SettingsStore (mirror existing `useCAGridRenderer`).
+- In `LaunchpadView` at line 673, switch between SwiftUI `FolderView` and `CAFolderGridViewRepresentable` based on the toggle.
+- The Representable needs page-state bindings (`currentPage`, `pageCount`, `verticalScrollOffset`) — add `@State` for these on `LaunchpadView` (or compute them in a small `FolderGridState` holder).
 
 ### Source files (in worktrees, byte-identical between the two)
 - `LaunchNext/CAFolderGridView.swift` (1,345 lines) — Core Animation NSView for folder content grid
@@ -79,7 +97,15 @@ Defines `GestureDeviceSelectionMode` enum (`automatic` / `selected`) and `Gestur
 
 The file extends `OMSDeviceInfo`, which was part of `ThirdParty/OpenMultitouchSupportXCF/` — **removed from main** by commit `9fe9d34` (OMS → HIDGestureMonitor migration). Extending a type that doesn't exist = compile error.
 
-### Integration plan
+### Decision (2026-06-21): DROP — not architecturally applicable
+
+Investigation during the C+E port confirmed `HIDGestureMonitor` uses `CGEvent.tapCreate(tap: Self.hidEventTap, ...)` — a **single system-wide `kCGHIDEventTap`** (`LaunchNextInput/Gesture/HIDGestureMonitor.swift:80`, `:155-170`). It observes all gesture events globally; there is **no per-device filtering** capability in the new architecture.
+
+`GestureDeviceSelectionMode` and `GestureInputDevice` were abstractions over OMS's per-device enumeration API. Without OMS, they have no consumer and no equivalent capability to bind to. Adding them to develop would be dead types.
+
+**Action:** not porting. The worktree's `LaunchNext/Gesture/GestureInputDevice.swift` is preserved in `worktree-agent-af967f48` (and would be recoverable from the `archive/af967f48-unique-assets` tag if/when worktrees are dropped) for archaeological reference. If multi-device gesture filtering ever becomes a requirement again, the design would need to use `IOHIDManager` (not CGEventTap) — the OMS-era abstraction wouldn't help.
+
+### Integration plan (historical — decision above supersedes)
 
 1. **Decide if this abstraction is still needed.** Main replaced OMS with `HIDGestureMonitor` (CGEventTap). The concept of "select which input device feeds gestures" may or may not translate cleanly to the new architecture. Check `HIDGestureMonitor.swift` for whether device selection is even possible there (CGEventTap is system-wide; OMS was per-device).
 
