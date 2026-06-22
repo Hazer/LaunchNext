@@ -184,6 +184,38 @@ final class FolderManager {
         delegate.persistenceSaveAllOrder()
     }
 
+    /// Reorder an app within a folder. Persists via the same delegate pattern
+    /// used by addAppToFolder / removeAppFromFolder.
+    @discardableResult
+    func reorderAppInFolder(folderID: String, from sourceIndex: Int, to destinationIndex: Int) -> Bool {
+        guard let delegate else { return false }
+        var currentFolders = delegate.currentFolders
+        guard let folderIndex = currentFolders.firstIndex(where: { $0.id == folderID }) else { return false }
+
+        var updatedFolder = currentFolders[folderIndex]
+        guard updatedFolder.apps.indices.contains(sourceIndex) else { return false }
+
+        let movingApp = updatedFolder.apps.remove(at: sourceIndex)
+        let clampedDestination = min(max(0, destinationIndex), updatedFolder.apps.count)
+        updatedFolder.apps.insert(movingApp, at: clampedDestination)
+        currentFolders[folderIndex] = updatedFolder
+
+        // Sync the folder reference in the items list
+        var items = delegate.currentItems
+        for idx in items.indices {
+            if case .folder(let f) = items[idx], f.id == folderID {
+                items[idx] = .folder(updatedFolder)
+            }
+        }
+
+        delegate.applyFolderChanges(currentFolders, items: items)
+        delegate.triggerFolderUpdate()
+        delegate.triggerGridRefresh()
+        delegate.refreshCacheAfterFolderOperation()
+        delegate.persistenceSaveAllOrder()
+        return true
+    }
+
     func renameFolder(_ folder: FolderInfo, newName: String) {
         guard let delegate else { return }
         var currentFolders = delegate.currentFolders

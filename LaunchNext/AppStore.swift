@@ -249,6 +249,23 @@ enum AppearancePreference: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Layout mode for folder content grids (CAFolderGridView). Mirrors the
+    /// main-grid `LayoutMode` (in LaunchNextStrategies) but lives here because
+    /// folder grids are app-target views, not a framework abstraction.
+    enum FolderLayoutMode: String, CaseIterable, Identifiable {
+        case paged
+        case vertical
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .paged: return "Paged"
+            case .vertical: return "Vertical Scroll"
+            }
+        }
+    }
+
     static let customTitlesKey = "customAppTitles"
     static let hiddenAppsKey = "hiddenAppBundlePaths"
     static let rememberedPageIndexKey = "rememberedPageIndex"
@@ -1835,6 +1852,34 @@ enum AppearancePreference: String, CaseIterable, Identifiable {
     
     func removeAppFromFolder(_ app: AppInfo, folder: FolderInfo) {
         folderManager.removeAppFromFolder(app, folder: folder)
+    }
+
+    /// Copy an app's path to the system pasteboard.
+    @discardableResult
+    func copyAppPath(_ app: AppInfo) -> Bool {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        return pasteboard.setString(app.url.path, forType: .string)
+    }
+
+    /// Reveal an app in Finder (activates a file viewer selecting the app's URL).
+    @discardableResult
+    func showAppInFinder(_ app: AppInfo) -> Bool {
+        guard FileManager.default.fileExists(atPath: app.url.path) else { return false }
+        NSWorkspace.shared.activateFileViewerSelecting([app.url])
+        return true
+    }
+
+    /// Reorder an app within a folder. Used by CAFolderGridView's drag-reorder.
+    @discardableResult
+    func reorderAppInFolder(folderID: String, from sourceIndex: Int, to destinationIndex: Int) -> Bool {
+        let result = folderManager.reorderAppInFolder(folderID: folderID, from: sourceIndex, to: destinationIndex)
+        if result, openFolder?.id == folderID {
+            // FolderManager persists the new order to currentFolders; reflect it
+            // in the @Published openFolder binding so SwiftUI/CAGridView re-render.
+            openFolder = currentFolders.first(where: { $0.id == folderID }) ?? openFolder
+        }
+        return result
     }
 
     

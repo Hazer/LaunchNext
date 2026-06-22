@@ -111,6 +111,7 @@ final class SettingsStore: ObservableObject {
     static let searchThrottleLatestKey = "searchThrottleLatest"
     static let fuzzySearchEnabledKey = "fuzzySearchEnabled"
     static let layoutModeKey = "layoutMode"
+    static let folderLayoutModeKey = "folderLayoutMode"
     static let showInDockKey = "showInDock"
     static let showInMenuBarKey = "showInMenuBar"
     static let hideMenuBarKey = "hideMenuBar"
@@ -547,6 +548,22 @@ final class SettingsStore: ObservableObject {
         didSet {
             guard layoutMode != oldValue else { return }
             UserDefaults.standard.set(layoutMode.rawValue, forKey: Self.layoutModeKey)
+        }
+    }
+
+    /// Layout mode for folder content grids (consumed by CAFolderGridView).
+    /// Distinct from the main-grid `layoutMode` so users can e.g. keep the main
+    /// grid paged while allowing folders to scroll vertically.
+    @Published var folderLayoutMode: AppStore.FolderLayoutMode = {
+        if let raw = UserDefaults.standard.string(forKey: folderLayoutModeKey),
+           let mode = AppStore.FolderLayoutMode(rawValue: raw) {
+            return mode
+        }
+        return .paged
+    }() {
+        didSet {
+            guard folderLayoutMode != oldValue else { return }
+            UserDefaults.standard.set(folderLayoutMode.rawValue, forKey: Self.folderLayoutModeKey)
         }
     }
 
