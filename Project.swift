@@ -152,7 +152,10 @@ let project = Project(
             name: "LaunchNextInput",
             bundleId: "io.roversx.launchnext.input",
             sources: ["LaunchNextInput/**/*.swift"],
-            dependencies: [.target(name: "LaunchNextCore")]
+            dependencies: [
+                .target(name: "LaunchNextCore"),
+                .sdk(name: "IOKit", type: .framework, status: .required)
+            ]
         ),
 
         // MARK: - Strategies Framework
