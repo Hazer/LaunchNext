@@ -3,7 +3,7 @@
 **Created:** 2026-06-22
 **Status:** Draft for user review. NOT for execution until approved.
 **Author:** ZCode agent session 2026-06-22, based on user direction + research in `docs/rework-research.md`
-**Scope:** Classic/Modern/Hybrid mode split + unified data flow + settings per-mode, with renderer abstraction as a middle-priority workstream. The rework targets **high value, high cost**, with sprinkles of mid.
+**Scope:** Classic/Compact/Hybrid mode split + unified data flow + settings per-mode, with renderer abstraction as a middle-priority workstream. The rework targets **high value, high cost**, with sprinkles of mid.
 
 > This document is the **single source of truth** for the rework. A clean-context agent (likely Claude Code) picking this up should read this end-to-end, plus `docs/rework-research.md` for the evidence base, plus `docs/consolidation-handoff.md` for the current state of the codebase.
 
@@ -73,7 +73,7 @@ After this, all 37 commits on local `main` (plus 14 on `develop` from this sessi
 
 The wall is structural, not feature-driven. You can keep adding features, but each addition fights the architecture:
 
-1. **Mode concepts are scattered** — Classic/Modern binary exists (`AppearanceLayoutMode`) but isn't rigorous. Vertical mode works only through CAGridView's special-case code. Settings aren't gated by mode in the UI.
+1. **Mode concepts are scattered** — Classic/Compact binary exists (`AppearanceLayoutMode`) but isn't rigorous. Vertical mode works only through CAGridView's special-case code. Settings aren't gated by mode in the UI.
 2. **Two renderer paths** — SwiftUI (paged assumption) and CAGridView (flat items + internal paging/vertical). Adding a feature requires touching both, or accepting that one path is the poor cousin.
 3. **Settings bloat** — SettingsView is 5,797 lines. SettingsStore has ~80 properties. As modes multiply, this becomes unmanageable.
 4. **Gesture regression** — the system that was supposed to be the *primary* way users invoke LaunchNext (4-finger pinch) is now flaky and feature-poor.
@@ -90,7 +90,7 @@ Four enums encoding related concepts with no unification:
 |---|---|---|---|
 | `LayoutMode` | `LaunchNextStrategies/LayoutStrategy.swift` | `.paged`, `.vertical` | Main-grid scroll strategy |
 | `FolderLayoutMode` | `LaunchNext/AppStore.swift` (added this session) | `.paged`, `.vertical` | Folder content grid (used only by draft CAGridView) |
-| `AppearanceLayoutMode` | `LaunchNext/AppStore.swift` | `.fullscreen`, `.compact` | **The Classic/Modern split** |
+| `AppearanceLayoutMode` | `LaunchNext/AppStore.swift` | `.fullscreen`, `.compact` | **The Classic/Compact split** (colloquially "Classic/Modern"; Compact is the modern-feeling windowed mode) |
 | `LayoutModePreviewScope` | `LaunchNext/SettingsView.swift` (private) | mirrors `AppearanceLayoutMode` | UI helper |
 
 **Why this is bad**: "is the main grid paged or vertical?" and "is the app in fullscreen or windowed mode?" are different questions, but they're entangled in code. A new developer (or agent) can't tell from the type system whether changing `LayoutMode.vertical` affects fullscreen only, windowed only, or both. The Hybrid mode you want doesn't have a home — it would need to be a fifth enum or a hack.
@@ -163,27 +163,35 @@ public enum InterfaceMode: String, CaseIterable, Codable, Identifiable {
     case classic    // Fullscreen, fixed horizontal grid, no vertical mode.
                     // This is the Launchpad-classic experience.
                     // ≈ AppearanceLayoutMode.fullscreen + LayoutMode.paged only.
+                    // Mostly the upstream LaunchNext experience, minus unrelated fixes.
     
-    case modern     // Windowed (compact), supports both paged and vertical.
+    case compact    // Windowed (Tahoe-like), supports both paged and vertical.
                     // ≈ AppearanceLayoutMode.compact + LayoutMode.{paged, vertical}.
+                    // The "modern" windowed UI. Compact name retained from
+                    // existing AppearanceLayoutMode.compact — less surprise
+                    // for users with existing preferences.
     
-    case hybrid     // Fullscreen, supports horizontal AND vertical AND future layouts.
-                    // The home for evolved classic-fullscreen work with modern features.
-                    // ≈ AppearanceLayoutMode.fullscreen + LayoutMode.{paged, vertical, ...future}.
+    case hybrid     // Fullscreen-first, customizable outer shell, supports
+                    // horizontal AND vertical AND future layouts. The home
+                    // for evolved classic work with modern features. Gets
+                    // the new rendering architecture. References previous
+                    // attempts (good and bad) for inspiration but doesn't
+                    // duplicate their mistakes. May eventually be more
+                    // "modern" than Compact in feel.
     
     var id: String { rawValue }
     
     var supportsVerticalScroll: Bool {
         switch self {
         case .classic: return false
-        case .modern, .hybrid: return true
+        case .compact, .hybrid: return true
         }
     }
     
-    var isFullscreen: Bool {
+    var defaultWindowGeometry: WindowGeometry {
         switch self {
-        case .classic, .hybrid: return true
-        case .modern: return false
+        case .classic, .hybrid: return .fullscreen  // Hybrid is fullscreen-first; customizable later
+        case .compact: return .compact
         }
     }
 }
@@ -191,12 +199,14 @@ public enum InterfaceMode: String, CaseIterable, Codable, Identifiable {
 
 **Key properties:**
 - `classic` is the regression-to-original-Launchpad mode. Horizontal-only. No vertical. Cleanest possible code path. (Per your direction: this is a separate, simpler renderer path, not a feature subset of the current code.)
-- `modern` is the current windowed UI. Supports vertical (it already did, per upstream's `168f857` commit).
-- `hybrid` is the home for your evolved fullscreen-vertical work. Gets the new rendering architecture. References your previous attempts (good and bad) for inspiration but doesn't duplicate their mistakes.
+- `compact` is the current windowed UI (was `.compact` in `AppearanceLayoutMode`, was called "modern" colloquially). Supports vertical (it already did, per upstream's `168f857` commit). Name retained from existing enum to minimize user-facing surprise.
+- `hybrid` is the home for your evolved fullscreen-vertical work. Gets the new rendering architecture. **Fullscreen-first** (defaults to `WindowGeometry.fullscreen`) but the outer shell is customizable via `LayoutDescriptor.windowGeometry` — can later support 90%-screen panels, floating windows, etc. without architectural change.
+
+**User-switchable at runtime** (per your direction). Switching modes recomputes `LayoutDescriptor` and triggers re-render. Per-mode `AppearanceStore` + `BehaviorStore` ensure each mode retains its own settings across switches.
 
 **Migration from `AppearanceLayoutMode`:**
 - `AppearanceLayoutMode.fullscreen` → ambiguous (was it being used with vertical or not?). Migration script can check `SettingsStore.layoutMode`: if `.vertical` and fullscreen → `.hybrid`; else `.classic`.
-- `AppearanceLayoutMode.compact` → `.modern`.
+- `AppearanceLayoutMode.compact` → `.compact` (drop the "modern" colloquialism in user-facing strings; the enum case stays `.compact`).
 
 ### 3.2 `LayoutDescriptor` — the data flow unifier
 
@@ -205,10 +215,11 @@ Replace the bifurcated data flow with a single computed descriptor:
 ```swift
 struct LayoutDescriptor {
     let mode: InterfaceMode
-    let scrollStyle: ScrollStyle  // .paged or .vertical (only valid options for the mode)
+    let scrollStyle: ScrollStyle         // .paged or .vertical (gated by mode.supportsVerticalScroll)
+    let windowGeometry: WindowGeometry   // fullscreen / compact / custom — see below
     let columns: Int
     let rows: Int
-    let itemsPerPage: Int  // For paged; for vertical, the column count
+    let itemsPerPage: Int                // For paged; for vertical, the column count
     let pageSpacing: CGFloat
     // ... appearance-driven fields
 }
@@ -217,9 +228,24 @@ enum ScrollStyle {
     case paged
     case vertical
 }
+
+/// How the LaunchNext window is positioned and sized on screen.
+/// Decoupled from InterfaceMode so that any mode can later support
+/// non-default geometries (e.g., a 90%-screen Hybrid panel) without
+/// architecture changes.
+enum WindowGeometry {
+    case fullscreen                      // Classic + Hybrid default: cover the whole screen
+    case compact                         // Compact default: Tahoe-like windowed
+    case custom(rect: CGRect, hasShadow: Bool, cornerRadius: CGFloat)  // Hybrid evolution: configurable outer shell
+}
 ```
 
-**LaunchpadView computes one `LayoutDescriptor` from `interfaceMode + settings`**. Every consumer (SwiftUI path, CAGridView, CAFolderGridView) reads from the same descriptor. No more bifurcation.
+**Why `WindowGeometry` is in the descriptor (per Q2 discussion):**
+- Hybrid is **fullscreen-first** but its outer shell is customizable. Default = `.fullscreen`. Later R-8b evolution may expose `.custom` — a 90%-screen panel, floating window, etc.
+- Putting geometry in the descriptor (not the mode) means Compact isn't architecturally trapped at "small windowed" either — same `.custom` path is available if Compact users ever want a larger variant.
+- This avoids re-introducing the "wall" you hit. Locking Hybrid to fullscreen-only would require another architecture change when the floating-panel idea surfaces.
+
+**LaunchpadView computes one `LayoutDescriptor` from `interfaceMode + settingsStore`**. Every consumer (SwiftUI path, CAGridView, CAFolderGridView, Classic renderer) reads from the same descriptor. No more bifurcation.
 
 - `makePages` becomes `func makePages(from: [LaunchpadItem], layout: LayoutDescriptor) -> [[LaunchpadItem]]` — for paged layouts, it chunks. For vertical layouts, it returns a single page (or the renderer ignores pages entirely and reads items directly).
 - `LayoutDescriptor` is also the input to the renderer abstraction (see 3.4).
@@ -241,7 +267,7 @@ Apply all three approaches (A+B+C) per your direction:
 - SettingsView filters its form by these tags.
 
 **UI split (option B):**
-- SettingsView's Appearance section becomes **three sub-sections** (Classic, Modern, Hybrid), showing only the tagged settings for each.
+- SettingsView's Appearance section becomes **three sub-sections** (Classic, Compact, Hybrid), showing only the tagged settings for each.
 - Master-detail UI: user picks the mode they're configuring; only relevant settings appear.
 
 ### 3.4 `GridRenderer` protocol — unify the CA renderers (medium priority)
@@ -301,8 +327,9 @@ Refactor `CAGridView` and `CAFolderGridView` to conform. New renderer additions 
 
 ### Phase R-5: Classic mode as a separate renderer path
 - Per your direction (Q1: "option b, separate simpler code path"): implement Classic mode as its own simpler renderer path. It doesn't need to support vertical, scroll-sensitive layouts, or the modern features. A separate `ClassicGridRenderer` (or just a stripped-down SwiftUI view) for Classic mode only.
-- Modern + Hybrid share the unified renderer.
-- **This is where the "wall" gets dismantled** — Classic becomes a clean, simple surface; Modern and Hybrid get the powerful unified path.
+- Compact + Hybrid share the unified renderer.
+- **Effort tradeoff per user direction**: "retaining some useful changes is good, but it depends on the effort. Some effort may be better spent on hybrid. But some are small enough to be ported and improve classic experience vastly, without changing its original intent." Concretely: port the small high-impact changes (e.g., search-on-Return, the input guards) to Classic since they're trivial and improve the experience. Skip the larger features (vertical, fade masks, etc.) — those would change Classic's intent. **This is a judgment call for the executing agent** — document each decision in the "Decisions made during execution" section.
+- **This is where the "wall" gets dismantled** — Classic becomes a clean, simple surface; Compact and Hybrid get the powerful unified path.
 
 ### Phase R-6 (deferred, medium priority): `GridRenderer` protocol
 - Refactor CAGridView + CAFolderGridView + ClassicGridRenderer to conform to a shared protocol
@@ -314,9 +341,20 @@ Refactor `CAGridView` and `CAFolderGridView` to conform. New renderer additions 
 - Implement `IOHIDTouchProvider`, wire `GestureStateMachine` into the active detection path
 - Independent of the LaunchpadView rework — can proceed in parallel
 
-### Phase R-8 (parallel): Hybrid mode feature work
-- Once R-5 lands, Hybrid mode has its home. New features (your evolved fullscreen-vertical additions, plus whatever else Hybrid distinguishes itself with) land here.
-- Reference material: `docs/worktree-sources/` (your previous attempts, treated as inspiration not specification)
+### Phase R-8a: Hybrid MvP — fullscreen + vertical + accumulated fixes
+- **Scope**: baseline Hybrid = fullscreen mode (default `WindowGeometry.fullscreen`) + vertical scroll support + any small fixes/improvements that didn't land in Classic or Compact during R-1 through R-5.
+- This is the minimum that makes Hybrid a real, usable mode — distinct from Classic (which is fullscreen + horizontal only) and Compact (which is windowed + horizontal/vertical).
+- **Target outcome**: Hybrid users get the evolved fullscreen-vertical experience you originally built (`0e53b58` and related), now on the new rendering architecture. They can switch to Classic or Compact at runtime and back; settings persist per mode.
+- Reference material for what "the evolved experience" means: your Phase A commits (`3856be2` through `5389a0b`), the worktree sources in `docs/worktree-sources/`, and the vertical-scroll implementation on `CAGridView`.
+
+### Phase R-8b (deferred indefinitely): Hybrid Evolution — new features
+- **Scope**: brainstorm and plan new features that distinguish Hybrid beyond the MvP baseline. This phase starts only after the rendering architecture (R-1 through R-5) is proven working and flexible.
+- **Examples of potential R-8b features** (for brainstorming, not commitment):
+  - Customizable outer shell (`WindowGeometry.custom`): 90%-screen panel, floating window, custom corner radius / shadow
+  - Free-form layout (not just paged or vertical — e.g., smart grouping, recents shelf, search-results overlay)
+  - Advanced gesture mappings (multi-action gestures, mode-specific gestures)
+  - Per-display configurations (different Hybrid layouts on different monitors)
+- **No urgency.** Hybrid MvP (R-8a) is the user-visible goal. R-8b is the long-term evolution with less pressure, brainstormed once the foundation is solid.
 
 ## Part 5 — Handoff prompt for the next agent
 
@@ -389,16 +427,13 @@ you'll need to make local decisions. Document those decisions in this file
 
 ## Open questions for the user (resolve before starting Phase R-1)
 
-1. Does the `InterfaceMode` enum's case naming (`classic`/`modern`/`hybrid`)
-   match what you want users to see in the UI? These become user-facing labels.
-2. For Classic mode's separate renderer path (Phase R-5): how minimal should
-   it be? Pure Launchpad-clone (no settings beyond grid size), or retain
-   useful settings (dock/menubar visibility, hot corner)?
-3. Should `InterfaceMode` be user-switchable at runtime, or set once at first
-   launch? (Affects how much state needs to migrate when switching.)
-4. The Hybrid mode's distinguishing features beyond "fullscreen + vertical" —
-   what are they? This affects R-8 scope. (If undecided, R-8 can be deferred
-   indefinitely; Hybrid initially = fullscreen + vertical + modern features.)
+**These have been answered during plan review (2026-06-22). Preserved as decisions.**
+
+1. **InterfaceMode case naming** — DECIDED: `.classic` / `.compact` / `.hybrid`. The `.compact` name is retained from the existing `AppearanceLayoutMode.compact` to minimize surprise for users with existing preferences. The colloquial "modern" label is dropped from code; user-facing strings can say whatever reads best.
+2. **Classic mode's separate renderer path scope** — DECIDED: port small high-impact changes that don't change Classic's intent (e.g., search-on-Return, input guards). Skip larger features. Executing agent uses judgment + documents decisions.
+3. **User-switchable at runtime** — DECIDED: yes. Switching modes recomputes `LayoutDescriptor` and triggers re-render. Per-mode settings persist across switches.
+4. **Hybrid fullscreen-only vs fullscreen-first customizable** — DECIDED: **fullscreen-first with customizable outer shell.** `LayoutDescriptor.windowGeometry` defaults to `.fullscreen` for Hybrid but supports `.custom(rect, hasShadow, cornerRadius)` for later evolution. Compact also benefits from the same path if it ever wants a larger variant. See Part 3.2 for the `WindowGeometry` enum.
+5. **Hybrid distinguishing features beyond fullscreen + vertical** — DECIDED: split into R-8a (MvP: fullscreen + vertical + accumulated fixes) and R-8b (Evolution: new features brainstormed after the architecture is proven). See Part 4 Phases R-8a/R-8b.
 
 ## Reference material
 
@@ -426,11 +461,11 @@ you'll need to make local decisions. Document those decisions in this file
 | Area | Current location | Post-rework location | Phase |
 |---|---|---|---|
 | `InterfaceMode` enum | (doesn't exist) | `LaunchNextCore/InterfaceMode.swift` | R-1 |
-| `LayoutDescriptor`, `ScrollStyle` | (doesn't exist) | `LaunchNextStrategies/LayoutDescriptor.swift` | R-2 |
+| `LayoutDescriptor`, `ScrollStyle`, `WindowGeometry` | (doesn't exist) | `LaunchNextStrategies/LayoutDescriptor.swift` | R-2 |
 | `AppearanceStore` per mode | (in `SettingsStore`, scattered) | `LaunchNext/Appearance/AppearanceStore.swift` | R-3 |
 | `BehaviorStore` per mode | (in `SettingsStore`, scattered) | `LaunchNext/Appearance/BehaviorStore.swift` | R-3 |
 | Classic renderer path | (doesn't exist; fork inside current LaunchpadView) | `LaunchNext/Renderers/ClassicGridRenderer.swift` | R-5 |
-| Modern/Hybrid renderer path | `LaunchNext/CAGridView.swift` + SwiftUI path | `LaunchNext/Renderers/UnifiedGridRenderer.swift` (shared) | R-4, R-5 |
+| Compact/Hybrid renderer path | `LaunchNext/CAGridView.swift` + SwiftUI path | `LaunchNext/Renderers/UnifiedGridRenderer.swift` (shared) | R-4, R-5 |
 | `GridRenderer` protocol | (doesn't exist) | `LaunchNextStrategies/GridRenderer.swift` | R-6 (deferred) |
 | Gesture state machine | `LaunchNextInput/Gesture/GestureStateMachine.swift` (scaffolded) | same location (production impl) | R-7 (parallel) |
 
