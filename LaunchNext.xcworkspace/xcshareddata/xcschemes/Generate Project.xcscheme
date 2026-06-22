@@ -19,13 +19,13 @@
       disablePerformanceAntipatternChecker = "YES"
       launchStyle = "0"
       useCustomWorkingDirectory = "YES"
-      customWorkingDirectory = "/Users/hazer/Projects/BrowserOSProjects/LaunchNext/.worktrees/phase2-manager-extraction"
+      customWorkingDirectory = "/Users/hazer/Projects/LaunchNext"
       ignoresPersistentStateOnLaunch = "NO"
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
       allowLocationSimulation = "YES">
       <PathRunnable
-         FilePath = "/Users/hazer/.local/share/mise/installs/tuist/4.191.5/tuist"
+         FilePath = "/Users/hazer/.local/share/mise/installs/tuist/latest/tuist"
          runnableDebuggingMode = "0">
       </PathRunnable>
       <CommandLineArguments>
