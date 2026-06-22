@@ -140,7 +140,12 @@ struct LaunchpadView: View {
     private static var geometryCache: [String: CGPoint] = [:]
     private static var lastGeometryUpdate: Date = Date.distantPast
     private let geometryCacheTimeout: TimeInterval = 0.1 // 100ms cache timeout
-    
+
+    // Ranked fuzzy search (acronym / subsequence / token-prefix scoring).
+    // Used by `filteredItems`; falls back to plain substring when
+    // `appStore.settingsStore.fuzzySearchEnabled` is false.
+    private let searchEngine = LaunchpadSearchEngine()
+
     // Performance monitoring
     @State private var performanceMetrics: [String: TimeInterval] = [:]
     private let enablePerformanceMonitoring = false // Set to true to enable performance monitoring
@@ -198,50 +203,11 @@ struct LaunchpadView: View {
     }
 
     var filteredItems: [LaunchpadItem] {
-        let query = appStore.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return appStore.items }
-
-        var result: [LaunchpadItem] = []
-        var searchedApps = Set<String>() // Used for deduplication, avoid showing the same app twice
-        
-        // First search items on the main screen
-        for item in appStore.items {
-            switch item {
-            case .app(let app):
-                if app.name.localizedCaseInsensitiveContains(query) {
-                    result.append(.app(app))
-                    searchedApps.insert(app.url.path)
-                }
-            case .missingApp(let placeholder):
-                if placeholder.displayName.localizedCaseInsensitiveContains(query) {
-                    if !searchedApps.contains(placeholder.bundlePath) {
-                        result.append(.missingApp(placeholder))
-                        searchedApps.insert(placeholder.bundlePath)
-                    }
-                }
-            case .folder(let folder):
-                // Check folder name
-                if folder.name.localizedCaseInsensitiveContains(query) {
-                    result.append(.folder(folder))
-                }
-                
-                // Check apps inside the folder, extract and display directly if matched
-                let matchingApps = folder.apps.filter { app in
-                    app.name.localizedCaseInsensitiveContains(query)
-                }
-                for app in matchingApps {
-                    if !searchedApps.contains(app.url.path) {
-                        result.append(.app(app))
-                        searchedApps.insert(app.url.path)
-                    }
-                }
-                
-            case .empty:
-                break
-            }
-        }
-        
-        return result
+        searchEngine.filter(
+            items: appStore.items,
+            query: appStore.searchQuery,
+            fuzzyEnabled: appStore.settingsStore.fuzzySearchEnabled
+        )
     }
     
     var pages: [[LaunchpadItem]] {

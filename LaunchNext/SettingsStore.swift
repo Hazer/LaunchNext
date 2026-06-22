@@ -109,6 +109,7 @@ final class SettingsStore: ObservableObject {
     static let searchDebounceMsKey = "searchDebounceMs"
     static let searchThrottleMsKey = "searchThrottleMs"
     static let searchThrottleLatestKey = "searchThrottleLatest"
+    static let fuzzySearchEnabledKey = "fuzzySearchEnabled"
     static let layoutModeKey = "layoutMode"
     static let showInDockKey = "showInDock"
     static let showInMenuBarKey = "showInMenuBar"
@@ -254,6 +255,19 @@ final class SettingsStore: ObservableObject {
             guard searchThrottleLatest != oldValue else { return }
             UserDefaults.standard.set(searchThrottleLatest, forKey: Self.searchThrottleLatestKey)
             if searchStrategyType == .throttle { sideEffects?.handleSetupSearchPipeline() }
+        }
+    }
+
+    /// Enables fuzzy matching (acronym / subsequence / token-prefix scoring) in
+    /// `LaunchpadSearchEngine`. When false, search falls back to plain
+    /// `localizedCaseInsensitiveContains` substring matching.
+    @Published var fuzzySearchEnabled: Bool = {
+        if UserDefaults.standard.object(forKey: fuzzySearchEnabledKey) == nil { return true }
+        return UserDefaults.standard.bool(forKey: fuzzySearchEnabledKey)
+    }() {
+        didSet {
+            guard fuzzySearchEnabled != oldValue else { return }
+            UserDefaults.standard.set(fuzzySearchEnabled, forKey: Self.fuzzySearchEnabledKey)
         }
     }
 
